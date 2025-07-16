@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "name": "county-transparency",
+  "version": "0.1.0",
+  "workspaces": ["packages/*"]
+} 

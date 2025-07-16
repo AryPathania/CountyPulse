@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "jsx": "react-jsx",
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@connectors/*": ["packages/connectors/*"],
+      "@pipeline/*": ["packages/pipeline/src/*"],
+      "@db/*": ["packages/db/migrations/*"],
+      "@functions/*": ["packages/functions/*"],
+      "@ui/*": ["packages/ui/src/*"]
+    }
+  }
+} 

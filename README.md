@@ -1,2 +1,7 @@
-# CountyPulse
-News agent for king county -- Seattle
+# County Transparency
+## Setup
+pnpm install
+## Development
+pnpm --filter @county-transparency/ui dev
+## Deploy
+supabase functions deploy

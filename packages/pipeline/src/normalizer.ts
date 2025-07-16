@@ -1,0 +1,1 @@
+// Pipeline normalizer module - placeholder 
