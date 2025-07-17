@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "county-transparency",
+  "name": "county-pulse",
   "version": "0.1.0",
   "workspaces": ["packages/*"]
 } 

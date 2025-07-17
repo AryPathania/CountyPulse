@@ -14,7 +14,6 @@ export const testConnection = async () => {
   try {
     const { data, error } = await supabase.from('sources').select('*').limit(1)
     if (error) throw error
-    console.log('Supabase connection successful')
     return data
   } catch (error) {
     console.error('Supabase connection failed:', error)

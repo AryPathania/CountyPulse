@@ -1,5 +1,5 @@
 {
-  "name": "@county-transparency/pipeline",
+  "name": "@county-pulse/pipeline",
   "version": "0.1.0",
   "main": "src/index.ts",
   "license": "MIT"
