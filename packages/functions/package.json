@@ -1,6 +1,0 @@
-{
-  "name": "@county-pulse/functions",
-  "version": "0.1.0",
-  "main": "src/index.ts",
-  "license": "MIT"
-} 

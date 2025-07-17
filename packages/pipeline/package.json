@@ -2,5 +2,9 @@
   "name": "@county-pulse/pipeline",
   "version": "0.1.0",
   "main": "src/index.ts",
-  "license": "MIT"
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@county-pulse/db": "workspace:*"
+  }
 } 

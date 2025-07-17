@@ -2,5 +2,13 @@
   "name": "@county-pulse/db",
   "version": "0.1.0",
   "main": "src/index.ts",
-  "license": "MIT"
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "~5.8.3"
+  }
 } 
