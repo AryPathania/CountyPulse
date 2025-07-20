@@ -1,3 +1,6 @@
+-- Enable vector extension for embeddings
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Table: normalized_items
 -- Parsed and enriched records with embeddings for semantic search.
 

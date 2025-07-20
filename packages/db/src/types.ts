@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -12,31 +11,6 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          operationName?: string
-          query?: string
-          variables?: Json
-          extensions?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
   }
   public: {
     Tables: {
@@ -362,6 +336,36 @@ export type Database = {
           },
         ]
       }
+      user_profiles: {
+        Row: {
+          created_at: string | null
+          display_name: string
+          id: string
+          profile_completed_at: string | null
+          profile_version: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_name: string
+          id?: string
+          profile_completed_at?: string | null
+          profile_version?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string
+          id?: string
+          profile_completed_at?: string | null
+          profile_version?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       watches: {
         Row: {
           category_id: number | null
@@ -619,10 +623,22 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
 } as const
+
+// Re-export common types for convenience
+export type User = {
+  id: string
+  email?: string
+  // Add other auth.users fields as needed
+}
+
+export type Session = {
+  user: User
+  // Add other session fields as needed
+}
+
+export type UserProfile = Database['public']['Tables']['user_profiles']['Row']
+

@@ -2,5 +2,14 @@
   "private": true,
   "name": "county-pulse",
   "version": "0.1.0",
-  "workspaces": ["packages/*"]
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "pnpm --filter @county-pulse/ui dev",
+    "build": "pnpm -r build",
+    "deploy": "supabase functions deploy",
+    "gen-types": "supabase gen types typescript --project-id cgpgnoixxghrwmfhmmqc > packages/db/src/types.ts",
+    "deploy-functions": "supabase functions deploy",
+    "migrate": "supabase db push",
+    "setup-resend": "supabase secrets set RESEND_API_KEY=$RESEND_API_KEY --project-ref cgpgnoixxghrwmfhmmqc"
+  }
 } 
