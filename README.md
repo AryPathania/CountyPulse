@@ -5,3 +5,5 @@ pnpm install
 pnpm --filter @county-pulse/ui dev
 ## Deploy
 supabase functions deploy
+
+Just adding this to trigger a deployment.
