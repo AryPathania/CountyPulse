@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../components/auth/AuthProvider'
-import { createUserProfile, updateUserProfile, markProfileComplete, getUserProfileWithCompletion } from '@county-pulse/db'
+import { createUserProfile, updateUserProfile, markProfileComplete, getUserProfile, type UserProfile } from '@county-pulse/db'
 
 export const CompleteProfile: React.FC = () => {
   const [displayName, setDisplayName] = useState('')
@@ -9,16 +9,30 @@ export const CompleteProfile: React.FC = () => {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUpdate, setIsUpdate] = useState(false)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const navigate = useNavigate()
-  const { user, userProfile, refreshProfile } = useAuth()
+  const { user } = useAuth()
 
   useEffect(() => {
-    // Pre-populate form if updating existing profile
-    if (userProfile) {
-      setDisplayName(userProfile.display_name || '')
-      setIsUpdate(true)
+    // Load user profile when component mounts
+    const loadProfile = async () => {
+      if (user?.id) {
+        try {
+          const profile = await getUserProfile(user.id)
+          setUserProfile(profile)
+          if (profile) {
+            setDisplayName(profile.display_name || '')
+            setIsUpdate(true)
+          }
+        } catch (error) {
+          console.error('Failed to load profile:', error)
+          // Profile doesn't exist yet, that's fine for new users
+        }
+      }
     }
-  }, [userProfile])
+    
+    loadProfile()
+  }, [user?.id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,9 +61,6 @@ export const CompleteProfile: React.FC = () => {
         })
       }
 
-      // Refresh the profile in the auth context
-      await refreshProfile()
-
       // Redirect to dashboard
       navigate('/')
     } catch (err) {
@@ -61,13 +72,15 @@ export const CompleteProfile: React.FC = () => {
     }
   }
 
+  if (!user) {
+    return <div>Please log in to complete your profile.</div>
+  }
+
   return (
     <div className="auth-form">
-      <h2>{isUpdate ? 'Update Your Profile' : 'Complete Your Profile'}</h2>
-      <p>{isUpdate ? 'Please update your information:' : 'Welcome to County Pulse! What should we call you?'}</p>
-      
+      <h2>{isUpdate ? 'Update Profile' : 'Complete Your Profile'}</h2>
       <form onSubmit={handleSubmit}>
-        <div>
+        <div className="form-group">
           <label htmlFor="displayName">Display Name</label>
           <input
             id="displayName"
@@ -76,17 +89,16 @@ export const CompleteProfile: React.FC = () => {
             onChange={(e) => setDisplayName(e.target.value)}
             required
             disabled={loading}
-            placeholder="Your name"
-            autoFocus
+            placeholder="Enter your display name"
           />
         </div>
         
-        <button type="submit" disabled={loading || !displayName || isSubmitting}>
-          {loading ? (isUpdate ? 'Updating...' : 'Creating Profile...') : 'Continue'}
+        {error && <p className="error">{error}</p>}
+        
+        <button type="submit" disabled={loading || !displayName.trim()}>
+          {loading ? 'Saving...' : 'Continue'}
         </button>
       </form>
-      
-      {error && <p className="error">{error}</p>}
     </div>
   )
 } 

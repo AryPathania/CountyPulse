@@ -1,13 +1,11 @@
 {
-  "name": "@county-pulse/pipeline",
+  "name": "@county-pulse/connectors-socrata-metadata",
   "version": "0.1.0",
   "main": "src/index.ts",
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@county-pulse/db": "workspace:*",
-    "@county-pulse/connectors-socrata-metadata": "workspace:*",
-    "openai": "^4.20.0"
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"

@@ -2,12 +2,10 @@ import { useState } from 'react'
 import { useAuth } from './AuthProvider'
 
 export const LogoutButton: React.FC = () => {
-  const { signOut, user, userProfile } = useAuth()
+  const { signOut, user } = useAuth()
   const [loading, setLoading] = useState(false)
 
   if (!user) return null
-
-  const displayName = userProfile?.display_name || user.email
 
   const handleSignOut = async () => {
     try {
@@ -23,7 +21,7 @@ export const LogoutButton: React.FC = () => {
 
   return (
     <button onClick={handleSignOut} disabled={loading}>
-      {loading ? 'Signing out...' : `Sign Out (${displayName})`}
+      {loading ? 'Signing out...' : `Sign Out (${user.email})`}
     </button>
   )
 } 

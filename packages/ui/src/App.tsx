@@ -1,18 +1,48 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './components/auth/AuthProvider'
 import { LoginForm } from './components/auth/LoginForm'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { LogoutButton } from './components/auth/LogoutButton'
-import { AuthCallback } from './pages/AuthCallback'
 import { CompleteProfile } from './pages/CompleteProfile'
+import { getUserProfileWithCompletion, type UserProfile } from '@county-pulse/db'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 
 function Dashboard() {
   const [count, setCount] = useState(0)
-  const { user, userProfile } = useAuth()
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
+  const { user } = useAuth()
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (user?.id) {
+        try {
+          const { profile, isComplete, needsUpdate } = await getUserProfileWithCompletion(user.id)
+          setUserProfile(profile)
+          
+          // If profile is incomplete or needs update, redirect to complete profile
+          if (!isComplete || needsUpdate) {
+            window.location.href = '/complete-profile'
+            return
+          }
+        } catch (error) {
+          console.error('Failed to load profile:', error)
+        }
+      }
+      setProfileLoading(false)
+    }
+    
+    loadProfile()
+  }, [user?.id])
+
+  if (profileLoading) {
+    return <div>Loading your profile...</div>
+  }
+
+  const displayName = userProfile?.display_name || user?.email
 
   return (
     <>
@@ -26,7 +56,7 @@ function Dashboard() {
       </div>
       <h1>County Pulse</h1>
       <div className="user-info">
-        <p>Welcome, {userProfile?.display_name || user?.email}!</p>
+        <p>Welcome, {displayName}!</p>
         <LogoutButton />
       </div>
       <div className="card">
@@ -48,9 +78,8 @@ function AuthenticatedApp() {
   return (
     <Router>
       <Routes>
-        {/* Auth routes - accessible without authentication */}
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/auth/complete-profile" element={
+        {/* Profile completion - accessible to authenticated users */}
+        <Route path="/complete-profile" element={
           <AuthGuard fallback={<LoginForm />}>
             <CompleteProfile />
           </AuthGuard>

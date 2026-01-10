@@ -277,13 +277,39 @@ export type Database = {
           },
         ]
       }
+      scout_feedback: {
+        Row: {
+          created_at: string | null
+          dataset_id: string
+          decision: string
+          feedback: string
+          id: number
+        }
+        Insert: {
+          created_at?: string | null
+          dataset_id: string
+          decision: string
+          feedback: string
+          id?: number
+        }
+        Update: {
+          created_at?: string | null
+          dataset_id?: string
+          decision?: string
+          feedback?: string
+          id?: number
+        }
+        Relationships: []
+      }
       sources: {
         Row: {
           code: string
           config: Json | null
           connector: string
+          discovery_reason: string | null
           fetch_interval: unknown
           id: number
+          last_discovered: string | null
           last_fetched: string | null
           name: string
           prompt_code: string | null
@@ -292,8 +318,10 @@ export type Database = {
           code: string
           config?: Json | null
           connector: string
+          discovery_reason?: string | null
           fetch_interval: unknown
           id?: number
+          last_discovered?: string | null
           last_fetched?: string | null
           name: string
           prompt_code?: string | null
@@ -302,8 +330,10 @@ export type Database = {
           code?: string
           config?: Json | null
           connector?: string
+          discovery_reason?: string | null
           fetch_interval?: unknown
           id?: number
+          last_discovered?: string | null
           last_fetched?: string | null
           name?: string
           prompt_code?: string | null

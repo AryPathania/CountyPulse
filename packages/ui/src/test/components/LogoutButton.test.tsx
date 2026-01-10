@@ -6,12 +6,9 @@ import { LogoutButton } from '../../components/auth/LogoutButton'
 // Mock auth context
 const mockAuthContext = {
   user: { id: 'test-user', email: 'test@example.com' } as any,
-  session: null,
-  userProfile: { display_name: 'Test User' } as any,
   loading: false,
   signIn: vi.fn(),
   signOut: vi.fn(),
-  refreshProfile: vi.fn(),
 }
 
 vi.mock('../../components/auth/AuthProvider', async () => {
@@ -29,21 +26,10 @@ describe('LogoutButton', () => {
     vi.clearAllMocks()
     // Reset mock context to default state
     mockAuthContext.user = { id: 'test-user', email: 'test@example.com' }
-    mockAuthContext.userProfile = { display_name: 'Test User' }
     mockAuthContext.signOut = vi.fn()
   })
 
-  it('should render logout button with user display name', () => {
-    render(<LogoutButton />)
-
-    expect(
-      screen.getByRole('button', { name: 'Sign Out (Test User)' })
-    ).toBeInTheDocument()
-  })
-
-  it('should render logout button with user email when no display name', () => {
-    mockAuthContext.userProfile = null
-
+  it('should render logout button with user email', () => {
     render(<LogoutButton />)
 
     expect(
@@ -63,7 +49,7 @@ describe('LogoutButton', () => {
     render(<LogoutButton />)
 
     const logoutButton = screen.getByRole('button', {
-      name: 'Sign Out (Test User)',
+      name: 'Sign Out (test@example.com)',
     })
     await user.click(logoutButton)
 
@@ -78,7 +64,7 @@ describe('LogoutButton', () => {
     render(<LogoutButton />)
 
     const logoutButton = screen.getByRole('button', {
-      name: 'Sign Out (Test User)',
+      name: 'Sign Out (test@example.com)',
     })
     await user.click(logoutButton)
 
@@ -97,7 +83,7 @@ describe('LogoutButton', () => {
     render(<LogoutButton />)
 
     const logoutButton = screen.getByRole('button', {
-      name: 'Sign Out (Test User)',
+      name: 'Sign Out (test@example.com)',
     })
     await user.click(logoutButton)
 
