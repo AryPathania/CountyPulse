@@ -7,6 +7,7 @@ export * from './queries/profile-completion'
 export * from './queries/bullets'
 export * from './queries/positions'
 export * from './queries/runs'
+export * from './queries/job-drafts'
 
 // Types
 export type { Database } from './types'

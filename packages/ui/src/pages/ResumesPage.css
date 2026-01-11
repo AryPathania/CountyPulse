@@ -1,0 +1,121 @@
+.resumes-page {
+  min-height: 100vh;
+  background: var(--color-bg, #000);
+  display: flex;
+  flex-direction: column;
+}
+
+.resumes-page__main {
+  flex: 1;
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.resumes-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.resumes-page__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text, #fff);
+  margin: 0;
+}
+
+.resumes-page__loading,
+.resumes-page__error {
+  text-align: center;
+  padding: 3rem;
+  color: var(--color-text-muted, #888);
+}
+
+.resumes-page__empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: var(--color-surface, #1a1a1a);
+  border-radius: 8px;
+}
+
+.resumes-page__empty p {
+  color: var(--color-text-muted, #888);
+  margin: 0 0 1.5rem;
+  font-size: 1.125rem;
+}
+
+.resumes-page__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.resumes-page__item {
+  cursor: pointer;
+}
+
+.resume-card {
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 8px;
+  padding: 1.25rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.resume-card:hover {
+  border-color: var(--color-accent, #4169e1);
+  background: var(--color-surface-elevated, #2a2a2a);
+}
+
+.resume-card__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text, #fff);
+  margin: 0 0 0.25rem;
+}
+
+.resume-card__company {
+  color: var(--color-text-muted, #888);
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+}
+
+.resume-card__date {
+  color: var(--color-text-muted, #888);
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.btn-primary {
+  padding: 0.75rem 1.5rem;
+  background: var(--color-accent, #4169e1);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover, #3457c9);
+}
+
+.btn-secondary {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  color: var(--color-text, #fff);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-secondary:hover {
+  background: var(--color-surface-elevated, #2a2a2a);
+}
