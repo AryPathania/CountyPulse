@@ -36,7 +36,7 @@ export const LoginForm: React.FC = () => {
 
   if (sent) {
     return (
-      <div className="auth-form">
+      <div className="auth-form" data-testid="login-success">
         <h2>Check Your Email</h2>
         <p>We've sent a magic link to <strong>{email}</strong></p>
         <p>Click the link in your email to continue.</p>
@@ -51,10 +51,10 @@ export const LoginForm: React.FC = () => {
   }
 
   return (
-    <div className="auth-form">
+    <div className="auth-form" data-testid="login-form">
       <h2>Welcome to Odie</h2>
       <p>Enter your email to get started</p>
-      
+
       <form onSubmit={handleSubmit}>
         <div>
           <label htmlFor="email">Email Address</label>
@@ -66,15 +66,16 @@ export const LoginForm: React.FC = () => {
             required
             disabled={loading}
             placeholder="your@email.com"
+            data-testid="login-email"
           />
         </div>
-        
-        <button type="submit" disabled={loading || !email}>
+
+        <button type="submit" disabled={loading || !email} data-testid="login-submit">
           {loading ? 'Sending...' : 'Continue'}
         </button>
       </form>
-      
-      {error && <p className="error">{error}</p>}
+
+      {error && <p className="error" data-testid="login-error">{error}</p>}
       {message && <p className="success">{message}</p>}
     </div>
   )

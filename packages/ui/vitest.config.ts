@@ -9,6 +9,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    exclude: ['node_modules', 'dist', 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'json-summary', 'html'],
@@ -23,6 +24,7 @@ export default defineConfig({
         'src/lib/supabaseClient.ts',
         'src/components/auth/AuthProvider.tsx', // Supabase integration
         '**/index.ts',
+        'e2e/**', // E2E tests have their own coverage
       ],
     },
   },

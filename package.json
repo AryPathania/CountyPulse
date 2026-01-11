@@ -10,6 +10,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
+    "test:e2e": "pnpm --filter @odie/web test:e2e",
     "no-skip": "./scripts/no-skip.sh",
     "dup:check": "jscpd --config .jscpd.json packages/",
     "quality": "pnpm lint && pnpm typecheck && pnpm no-skip && pnpm test && pnpm dup:check",

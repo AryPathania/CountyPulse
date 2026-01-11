@@ -1,4 +1,10 @@
 node_modules/
 packages/**/node_modules/
 dist/
-.env* 
+.env*
+
+# Playwright
+playwright-report/
+test-results/
+packages/ui/playwright-report/
+packages/ui/test-results/ 
