@@ -21,7 +21,7 @@ const mockIsProfileComplete = vi.fn()
 const mockGetUserProfileWithCompletion = vi.fn()
 const mockGetUserProfile = vi.fn()
 
-vi.mock('@county-pulse/db', () => ({
+vi.mock('@odie/db', () => ({
   supabase: {
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),

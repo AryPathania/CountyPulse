@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../components/auth/AuthProvider'
-import { createUserProfile, updateUserProfile, markProfileComplete, getUserProfile, type UserProfile } from '@county-pulse/db'
+import { createUserProfile, updateUserProfile, markProfileComplete, getUserProfile, type UserProfile } from '@odie/db'
 
 export const CompleteProfile: React.FC = () => {
   const [displayName, setDisplayName] = useState('')

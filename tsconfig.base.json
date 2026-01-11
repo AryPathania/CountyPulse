@@ -5,12 +5,11 @@
     "moduleResolution": "Node",
     "jsx": "react-jsx",
     "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@connectors/*": ["packages/connectors/*"],
-      "@pipeline/*": ["packages/pipeline/src/*"],
-      "@db/*": ["packages/db/migrations/*"],
-      "@functions/*": ["packages/functions/*"],
       "@ui/*": ["packages/ui/src/*"]
     }
   }

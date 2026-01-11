@@ -5,7 +5,7 @@ import { LogoutButton } from '../../components/auth/LogoutButton'
 
 // Mock auth context
 const mockAuthContext = {
-  user: { id: 'test-user', email: 'test@example.com' } as any,
+  user: { id: 'test-user', email: 'test@example.com' } as { id: string; email: string },
   loading: false,
   signIn: vi.fn(),
   signOut: vi.fn(),

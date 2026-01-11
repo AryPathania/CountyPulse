@@ -1,13 +1,16 @@
 {
-  "name": "@county-pulse/connectors-socrata-metadata",
+  "name": "@odie/shared",
   "version": "0.1.0",
   "main": "src/index.ts",
   "license": "MIT",
   "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
-    "node-fetch": "^3.3.2"
+    "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0"
+    "typescript": "~5.8.3"
   }
-} 
+}

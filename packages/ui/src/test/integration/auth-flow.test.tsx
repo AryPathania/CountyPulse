@@ -26,7 +26,7 @@ vi.mock('../../components/auth/AuthProvider', () => ({
 }))
 
 // Mock database functions
-vi.mock('@county-pulse/db', () => ({
+vi.mock('@odie/db', () => ({
   supabase: {
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
@@ -59,7 +59,7 @@ describe('Auth Flow Integration', () => {
 
   describe('CompleteProfile', () => {
     it('should create new profile and redirect to dashboard', async () => {
-      const { createUserProfile } = await import('@county-pulse/db')
+      const { createUserProfile } = await import('@odie/db')
       
       vi.mocked(createUserProfile).mockResolvedValue({
         id: 'new-profile-id',
@@ -89,7 +89,7 @@ describe('Auth Flow Integration', () => {
     })
 
     it('should prevent double submission', async () => {
-      const { createUserProfile } = await import('@county-pulse/db')
+      const { createUserProfile } = await import('@odie/db')
       
       // Make createUserProfile hang to simulate slow network
       vi.mocked(createUserProfile).mockImplementation(

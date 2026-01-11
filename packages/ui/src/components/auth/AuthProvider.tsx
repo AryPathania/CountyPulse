@@ -1,5 +1,6 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase, type User } from '@county-pulse/db'
+import { supabase, type User } from '@odie/db'
 
 interface AuthContextType {
   user: User | null

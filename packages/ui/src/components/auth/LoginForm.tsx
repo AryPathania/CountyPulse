@@ -52,7 +52,7 @@ export const LoginForm: React.FC = () => {
 
   return (
     <div className="auth-form">
-      <h2>Welcome to County Pulse</h2>
+      <h2>Welcome to Odie</h2>
       <p>Enter your email to get started</p>
       
       <form onSubmit={handleSubmit}>

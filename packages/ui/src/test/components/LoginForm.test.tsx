@@ -27,7 +27,7 @@ vi.mock('../../components/auth/AuthProvider', async () => {
 })
 
 // Still need to mock the database module to prevent initialization issues
-vi.mock('@county-pulse/db', () => ({
+vi.mock('@odie/db', () => ({
   supabase: {
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
@@ -62,7 +62,7 @@ describe('LoginForm', () => {
     mockSignIn.mockResolvedValue(undefined)
     renderLoginForm()
 
-    expect(screen.getByText('Welcome to County Pulse')).toBeInTheDocument()
+    expect(screen.getByText('Welcome to Odie')).toBeInTheDocument()
     expect(screen.getByLabelText('Email Address')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
   })
@@ -117,28 +117,29 @@ describe('LoginForm', () => {
     })
   })
 
-  it.skip('should handle auth errors', async () => {
-    // ✅ Set up error mock BEFORE component is rendered (like success test)
-    mockSignIn.mockImplementation(() => Promise.reject(new Error('Invalid email')))
-    
+  it('should handle auth errors', async () => {
+    // Set up error mock BEFORE component is rendered
+    mockSignIn.mockImplementation(() => Promise.reject(new Error('Auth failed')))
+
     renderLoginForm()
 
     const emailInput = screen.getByLabelText('Email Address')
     const submitButton = screen.getByRole('button', { name: 'Continue' })
 
-    await user.type(emailInput, 'invalid-email')
+    // Use valid email format to pass HTML5 validation
+    await user.type(emailInput, 'error@example.com')
     await user.click(submitButton)
 
     // Verify signIn was called
-    expect(mockSignIn).toHaveBeenCalledWith('invalid-email')
+    expect(mockSignIn).toHaveBeenCalledWith('error@example.com')
 
-    // Wait for the error handling to complete
+    // Wait for error message to appear
     await waitFor(() => {
-      expect(submitButton).not.toBeDisabled()
+      expect(screen.getByText('Auth failed')).toBeInTheDocument()
     })
 
     // Verify the form stays in initial state (not success state)
-    expect(screen.getByText('Welcome to County Pulse')).toBeInTheDocument()
+    expect(screen.getByText('Welcome to Odie')).toBeInTheDocument()
     expect(screen.queryByText('Check Your Email')).not.toBeInTheDocument()
   })
 
@@ -164,7 +165,7 @@ describe('LoginForm', () => {
     await user.click(tryDifferentEmailButton)
 
     // Should be back to initial form
-    expect(screen.getByText('Welcome to County Pulse')).toBeInTheDocument()
+    expect(screen.getByText('Welcome to Odie')).toBeInTheDocument()
     expect(screen.getByLabelText('Email Address')).toHaveValue('')
   })
 }) 

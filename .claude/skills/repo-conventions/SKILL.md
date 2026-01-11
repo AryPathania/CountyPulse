@@ -7,7 +7,7 @@ description: Repository conventions for DRY code, shared components, and project
 
 ## Golden rules
 - If logic will be used twice, extract it **now**.
-- UI never calls Supabase directly. UI calls `@county-pulse/db` query functions.
+- UI never calls Supabase directly. UI calls `@odie/db` query functions.
 - Keep "business logic" out of React components:
   - parsing, scoring, validation, transformations belong in pure TS modules (testable)
 

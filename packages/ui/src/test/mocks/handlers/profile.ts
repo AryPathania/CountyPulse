@@ -14,7 +14,6 @@ export const profileHandlers = [
   // Mock user_profiles select
   http.get('*/rest/v1/user_profiles', ({ request }) => {
     const url = new URL(request.url)
-    const select = url.searchParams.get('select')
     const userId = url.searchParams.get('user_id')
     
     if (userId === 'eq.test-user-id') {

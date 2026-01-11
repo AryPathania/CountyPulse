@@ -1,9 +1,12 @@
 {
-  "name": "@county-pulse/db",
+  "name": "@odie/db",
   "version": "0.1.0",
   "main": "src/index.ts",
   "license": "MIT",
   "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0"
   },

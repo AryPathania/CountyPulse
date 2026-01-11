@@ -1,6 +1,6 @@
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "CountyPulse"
+project_id = "odie-ai"
 
 [api]
 enabled = true
@@ -121,7 +121,7 @@ port = 465
 user = "resend"
 pass = "env(RESEND_API_KEY)"
 admin_email = "noreply@countypulse.com"
-sender_name = "Dev: County Pulse Auth"
+sender_name = "Odie AI"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
