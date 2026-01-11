@@ -18,6 +18,9 @@ Object.defineProperty(window, 'location', {
   writable: true,
 })
 
+// Mock scrollIntoView (not implemented in jsdom)
+Element.prototype.scrollIntoView = vi.fn()
+
 // Setup MSW
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' })

@@ -63,15 +63,15 @@ pnpm gen-types        # Generate Supabase types
 - Notes: `docs/notes.md`
 
 ## Current Phase
-**Phase 2: Data Model + DB Migrations**
-- Drop CountyPulse tables
-- Create Odie tables (candidate_profiles, positions, bullets, resumes, job_drafts, runs)
-- Add RLS policies
-- Create match_bullets SQL function for vector search
+**Phase 5: Home + JD Paste + Draft Resume**
+- Coming next
 
 ### Completed Phases
 - Phase 0.5: Schema Inventory + Repo Alignment
 - Phase 1: Foundation + Quality Gates (jscpd, no-skip, GitHub Actions, theme tokens)
+- Phase 2: Data Model + DB Migrations (6 Odie tables, RLS, match_bullets function)
+- Phase 3: Bullets Library + Shared Editor (BulletEditor, TanStack Query, 46 tests)
+- Phase 4: Interview Flow (InterviewChat, interview edge function, 63 tests)
 
 ## Environment Variables
 ```env

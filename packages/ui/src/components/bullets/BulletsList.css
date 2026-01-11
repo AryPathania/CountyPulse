@@ -1,0 +1,198 @@
+/* BulletsList Component Styles */
+
+.bullets-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  height: 100%;
+}
+
+.bullets-list--loading,
+.bullets-list--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.bullets-list__loading-message,
+.bullets-list__error-message {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+.bullets-list__error-message {
+  color: var(--color-error);
+}
+
+/* Filter section */
+.bullets-list__filter {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.bullets-list__filter-input {
+  width: 100%;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  padding-right: var(--space-2xl);
+  transition: border-color var(--transition-fast);
+}
+
+.bullets-list__filter-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-muted);
+}
+
+.bullets-list__filter-input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.bullets-list__filter-clear {
+  position: absolute;
+  right: var(--space-sm);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-md);
+  line-height: 1;
+}
+
+.bullets-list__filter-clear:hover {
+  color: var(--color-text);
+}
+
+/* Results count */
+.bullets-list__count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Empty state */
+.bullets-list__empty {
+  text-align: center;
+  padding: var(--space-xl);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+/* Items list */
+.bullets-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.bullets-list__item {
+  position: relative;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-background-elevated);
+  border: 1px solid var(--color-border-subtle);
+  transition: all var(--transition-fast);
+}
+
+.bullets-list__item:hover {
+  border-color: var(--color-border);
+}
+
+.bullets-list__item--selected {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-muted);
+}
+
+.bullets-list__item-button {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.bullets-list__item-context {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.bullets-list__item-company {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.bullets-list__item-title {
+  color: var(--color-text-subtle);
+}
+
+.bullets-list__item-text {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bullets-list__item-meta {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+}
+
+.bullets-list__item-category {
+  color: var(--color-accent);
+  background-color: var(--color-accent-muted);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-full);
+}
+
+.bullets-list__item-edited {
+  color: var(--color-text-subtle);
+  font-style: italic;
+}
+
+.bullets-list__item-delete {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-error);
+  font-size: var(--font-size-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.bullets-list__item:hover .bullets-list__item-delete {
+  opacity: 1;
+}
+
+.bullets-list__item-delete:hover {
+  background-color: var(--color-error);
+  color: var(--color-text);
+  border-color: var(--color-error);
+}

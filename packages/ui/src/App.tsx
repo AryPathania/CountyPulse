@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from './lib/queryClient'
 import { AuthProvider, useAuth } from './components/auth/AuthProvider'
 import { LoginForm } from './components/auth/LoginForm'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { LogoutButton } from './components/auth/LogoutButton'
 import { CompleteProfile } from './pages/CompleteProfile'
+import { BulletsPage } from './pages/BulletsPage'
+import { InterviewPage } from './pages/InterviewPage'
 import { getUserProfileWithCompletion, type UserProfile } from '@odie/db'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
@@ -84,7 +88,21 @@ function AuthenticatedApp() {
             <CompleteProfile />
           </AuthGuard>
         } />
-        
+
+        {/* Bullets Library */}
+        <Route path="/bullets" element={
+          <AuthGuard fallback={<LoginForm />}>
+            <BulletsPage />
+          </AuthGuard>
+        } />
+
+        {/* Interview Flow */}
+        <Route path="/interview" element={
+          <AuthGuard fallback={<LoginForm />}>
+            <InterviewPage />
+          </AuthGuard>
+        } />
+
         {/* Main app - requires authentication */}
         <Route path="/" element={
           <AuthGuard fallback={<LoginForm />}>
@@ -98,9 +116,11 @@ function AuthenticatedApp() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AuthenticatedApp />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <AuthenticatedApp />
+      </AuthProvider>
+    </QueryClientProvider>
   )
 }
 

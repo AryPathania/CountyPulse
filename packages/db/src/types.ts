@@ -7,364 +7,247 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
-      agent_runs: {
+      bullets: {
         Row: {
-          duration_ms: number | null
-          error: string | null
-          id: string
-          prompt_id: number | null
-          run_at: string | null
-          source_id: number | null
-          status: string | null
-        }
-        Insert: {
-          duration_ms?: number | null
-          error?: string | null
-          id?: string
-          prompt_id?: number | null
-          run_at?: string | null
-          source_id?: number | null
-          status?: string | null
-        }
-        Update: {
-          duration_ms?: number | null
-          error?: string | null
-          id?: string
-          prompt_id?: number | null
-          run_at?: string | null
-          source_id?: number | null
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "agent_runs_prompt_id_fkey"
-            columns: ["prompt_id"]
-            isOneToOne: false
-            referencedRelation: "prompt_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agent_runs_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "sources"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      categories: {
-        Row: {
-          id: number
-          name: string
-        }
-        Insert: {
-          id?: number
-          name: string
-        }
-        Update: {
-          id?: number
-          name?: string
-        }
-        Relationships: []
-      }
-      item_events: {
-        Row: {
-          category: string
-          metric: string
-          time: string
-          value: number | null
-        }
-        Insert: {
-          category: string
-          metric: string
-          time: string
-          value?: number | null
-        }
-        Update: {
-          category?: string
-          metric?: string
-          time?: string
-          value?: number | null
-        }
-        Relationships: []
-      }
-      item_tags: {
-        Row: {
-          cat_id: number
-          item_id: string
-        }
-        Insert: {
-          cat_id: number
-          item_id: string
-        }
-        Update: {
-          cat_id?: number
-          item_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "item_tags_cat_id_fkey"
-            columns: ["cat_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "item_tags_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "normalized_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      normalized_items: {
-        Row: {
-          category: string
+          category: string | null
+          created_at: string
+          current_text: string
           embedding: string | null
+          hard_skills: string[] | null
           id: string
-          indexed_at: string | null
-          metadata: Json | null
-          published_at: string | null
+          original_text: string
+          position_id: string
+          soft_skills: string[] | null
+          updated_at: string
+          user_id: string
+          was_edited: boolean | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          current_text: string
+          embedding?: string | null
+          hard_skills?: string[] | null
+          id?: string
+          original_text: string
+          position_id: string
+          soft_skills?: string[] | null
+          updated_at?: string
+          user_id: string
+          was_edited?: boolean | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          current_text?: string
+          embedding?: string | null
+          hard_skills?: string[] | null
+          id?: string
+          original_text?: string
+          position_id?: string
+          soft_skills?: string[] | null
+          updated_at?: string
+          user_id?: string
+          was_edited?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bullets_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidate_profiles: {
+        Row: {
+          headline: string | null
           summary: string | null
-          title: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          category: string
-          embedding?: string | null
-          id: string
-          indexed_at?: string | null
-          metadata?: Json | null
-          published_at?: string | null
+          headline?: string | null
           summary?: string | null
-          title?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          category?: string
-          embedding?: string | null
-          id?: string
-          indexed_at?: string | null
-          metadata?: Json | null
-          published_at?: string | null
+          headline?: string | null
           summary?: string | null
-          title?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "normalized_items_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "raw_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      prompt_templates: {
-        Row: {
-          code: string
-          description: string | null
-          id: number
-          template: string
-        }
-        Insert: {
-          code: string
-          description?: string | null
-          id?: number
-          template: string
-        }
-        Update: {
-          code?: string
-          description?: string | null
-          id?: number
-          template?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
-      prompt_versions: {
+      job_drafts: {
         Row: {
-          created_at: string | null
-          id: number
-          prompt_id: number | null
-          template: string
-          version_note: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: number
-          prompt_id?: number | null
-          template: string
-          version_note?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: number
-          prompt_id?: number | null
-          template?: string
-          version_note?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "prompt_versions_prompt_id_fkey"
-            columns: ["prompt_id"]
-            isOneToOne: false
-            referencedRelation: "prompt_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      raw_items: {
-        Row: {
-          external_id: string | null
-          fetched_at: string | null
+          company: string | null
+          created_at: string
+          draft_resume_id: string | null
           id: string
-          raw_payload: Json
-          source_id: number | null
+          jd_embedding: string | null
+          jd_text: string
+          job_title: string | null
+          retrieved_bullet_ids: string[] | null
+          selected_bullet_ids: string[] | null
+          user_id: string
         }
         Insert: {
-          external_id?: string | null
-          fetched_at?: string | null
+          company?: string | null
+          created_at?: string
+          draft_resume_id?: string | null
           id?: string
-          raw_payload: Json
-          source_id?: number | null
+          jd_embedding?: string | null
+          jd_text: string
+          job_title?: string | null
+          retrieved_bullet_ids?: string[] | null
+          selected_bullet_ids?: string[] | null
+          user_id: string
         }
         Update: {
-          external_id?: string | null
-          fetched_at?: string | null
+          company?: string | null
+          created_at?: string
+          draft_resume_id?: string | null
           id?: string
-          raw_payload?: Json
-          source_id?: number | null
+          jd_embedding?: string | null
+          jd_text?: string
+          job_title?: string | null
+          retrieved_bullet_ids?: string[] | null
+          selected_bullet_ids?: string[] | null
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "raw_items_source_id_fkey"
-            columns: ["source_id"]
+            foreignKeyName: "job_drafts_draft_resume_id_fkey"
+            columns: ["draft_resume_id"]
             isOneToOne: false
-            referencedRelation: "sources"
+            referencedRelation: "resumes"
             referencedColumns: ["id"]
           },
         ]
       }
-      run_feedback: {
+      positions: {
         Row: {
-          created_at: string | null
-          feedback: Json | null
-          run_id: string | null
+          company: string
+          created_at: string
+          end_date: string | null
+          id: string
+          location: string | null
+          raw_notes: string | null
+          start_date: string | null
+          title: string
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          created_at?: string | null
-          feedback?: Json | null
-          run_id?: string | null
+          company: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          raw_notes?: string | null
+          start_date?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          created_at?: string | null
-          feedback?: Json | null
-          run_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "run_feedback_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "agent_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      scout_feedback: {
-        Row: {
-          created_at: string | null
-          dataset_id: string
-          decision: string
-          feedback: string
-          id: number
-        }
-        Insert: {
-          created_at?: string | null
-          dataset_id: string
-          decision: string
-          feedback: string
-          id?: number
-        }
-        Update: {
-          created_at?: string | null
-          dataset_id?: string
-          decision?: string
-          feedback?: string
-          id?: number
+          company?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          raw_notes?: string | null
+          start_date?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
-      sources: {
+      resumes: {
         Row: {
-          code: string
-          config: Json | null
-          connector: string
-          discovery_reason: string | null
-          fetch_interval: unknown
-          id: number
-          last_discovered: string | null
-          last_fetched: string | null
+          content: Json | null
+          created_at: string
+          id: string
           name: string
-          prompt_code: string | null
+          template_id: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          code: string
-          config?: Json | null
-          connector: string
-          discovery_reason?: string | null
-          fetch_interval: unknown
-          id?: number
-          last_discovered?: string | null
-          last_fetched?: string | null
+          content?: Json | null
+          created_at?: string
+          id?: string
           name: string
-          prompt_code?: string | null
+          template_id?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          code?: string
-          config?: Json | null
-          connector?: string
-          discovery_reason?: string | null
-          fetch_interval?: unknown
-          id?: number
-          last_discovered?: string | null
-          last_fetched?: string | null
+          content?: Json | null
+          created_at?: string
+          id?: string
           name?: string
-          prompt_code?: string | null
+          template_id?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
-      summaries: {
+      runs: {
         Row: {
-          category: string
-          output: string
-          run_id: string
+          created_at: string
+          id: string
+          input: Json | null
+          latency_ms: number | null
+          model: string | null
+          output: Json | null
+          prompt_id: string | null
+          success: boolean | null
+          tokens_in: number | null
+          tokens_out: number | null
+          type: string
+          user_id: string
         }
         Insert: {
-          category: string
-          output: string
-          run_id: string
+          created_at?: string
+          id?: string
+          input?: Json | null
+          latency_ms?: number | null
+          model?: string | null
+          output?: Json | null
+          prompt_id?: string | null
+          success?: boolean | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          type: string
+          user_id: string
         }
         Update: {
-          category?: string
-          output?: string
-          run_id?: string
+          created_at?: string
+          id?: string
+          input?: Json | null
+          latency_ms?: number | null
+          model?: string | null
+          output?: Json | null
+          prompt_id?: string | null
+          success?: boolean | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          type?: string
+          user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "summaries_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "agent_runs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_profiles: {
         Row: {
@@ -396,134 +279,25 @@ export type Database = {
         }
         Relationships: []
       }
-      watches: {
-        Row: {
-          category_id: number | null
-          created_at: string | null
-          filter: Json | null
-          id: number
-          user_id: string
-        }
-        Insert: {
-          category_id?: number | null
-          created_at?: string | null
-          filter?: Json | null
-          id?: number
-          user_id: string
-        }
-        Update: {
-          category_id?: number | null
-          created_at?: string | null
-          filter?: Json | null
-          id?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "watches_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      binary_quantize: {
-        Args: { "": string } | { "": unknown }
-        Returns: unknown
-      }
-      halfvec_avg: {
-        Args: { "": number[] }
-        Returns: unknown
-      }
-      halfvec_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      halfvec_send: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      halfvec_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
-      }
-      hnsw_bit_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnsw_halfvec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnsw_sparsevec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnswhandler: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflat_bit_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflat_halfvec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflathandler: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      l2_norm: {
-        Args: { "": unknown } | { "": unknown }
-        Returns: number
-      }
-      l2_normalize: {
-        Args: { "": string } | { "": unknown } | { "": unknown }
-        Returns: unknown
-      }
-      sparsevec_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      sparsevec_send: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      sparsevec_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
-      }
-      vector_avg: {
-        Args: { "": number[] }
-        Returns: string
-      }
-      vector_dims: {
-        Args: { "": string } | { "": unknown }
-        Returns: number
-      }
-      vector_norm: {
-        Args: { "": string }
-        Returns: number
-      }
-      vector_out: {
-        Args: { "": string }
-        Returns: unknown
-      }
-      vector_send: {
-        Args: { "": string }
-        Returns: string
-      }
-      vector_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
+      match_bullets: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          match_user_id: string
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          current_text: string
+          id: string
+          position_id: string
+          similarity: number
+        }[]
       }
     }
     Enums: {
@@ -657,18 +431,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
-// Re-export common types for convenience
-export type User = {
-  id: string
-  email?: string
-  // Add other auth.users fields as needed
-}
-
-export type Session = {
-  user: User
-  // Add other session fields as needed
-}
-
-export type UserProfile = Database['public']['Tables']['user_profiles']['Row']
-

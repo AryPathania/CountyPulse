@@ -1,0 +1,150 @@
+/* BulletEditor Component Styles */
+
+.bullet-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background-color: var(--color-background-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.bullet-editor--compact {
+  padding: var(--space-md);
+  gap: var(--space-sm);
+}
+
+.bullet-editor--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.bullet-editor__placeholder {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+.bullet-editor__context {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.bullet-editor__company {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.bullet-editor__separator {
+  color: var(--color-text-subtle);
+}
+
+.bullet-editor__title {
+  color: var(--color-text-muted);
+}
+
+.bullet-editor__edited-badge {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  color: var(--color-accent);
+  background-color: var(--color-accent-muted);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  width: fit-content;
+}
+
+.bullet-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.bullet-editor__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.bullet-editor__textarea,
+.bullet-editor__input {
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  transition: border-color var(--transition-fast);
+}
+
+.bullet-editor__textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.bullet-editor__textarea:focus,
+.bullet-editor__input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-muted);
+}
+
+.bullet-editor__textarea:disabled,
+.bullet-editor__input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bullet-editor__textarea::placeholder,
+.bullet-editor__input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.bullet-editor__actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  padding-top: var(--space-sm);
+}
+
+.bullet-editor__btn {
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.bullet-editor__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bullet-editor__btn--primary {
+  background-color: var(--color-accent);
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+.bullet-editor__btn--primary:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.bullet-editor__btn--secondary {
+  background-color: transparent;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.bullet-editor__btn--secondary:hover:not(:disabled) {
+  background-color: var(--color-background-subtle);
+  border-color: var(--color-text-muted);
+}
