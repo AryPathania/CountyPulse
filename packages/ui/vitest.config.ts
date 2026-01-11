@@ -21,6 +21,8 @@ export default defineConfig({
         'src/main.tsx',
         'src/App.tsx',
         'src/lib/supabaseClient.ts',
+        'src/components/auth/AuthProvider.tsx', // Supabase integration
+        '**/index.ts',
       ],
     },
   },

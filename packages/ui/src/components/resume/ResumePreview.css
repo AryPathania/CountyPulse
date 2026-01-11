@@ -1,0 +1,90 @@
+.resume-preview {
+  padding: 2rem;
+  font-family: 'Georgia', serif;
+  color: #333;
+  background: white;
+  min-height: 100%;
+}
+
+.resume-preview__header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #333;
+}
+
+.resume-preview__name {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.resume-preview__section {
+  margin-bottom: 1.5rem;
+}
+
+.resume-preview__section-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid #999;
+  padding-bottom: 0.25rem;
+}
+
+.resume-preview__items {
+  padding-left: 0;
+}
+
+.resume-preview__position {
+  margin-bottom: 0.75rem;
+}
+
+.resume-preview__position-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.resume-preview__company {
+  font-weight: 700;
+}
+
+.resume-preview__dates {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.resume-preview__title {
+  font-style: italic;
+  color: #555;
+}
+
+.resume-preview__bullet {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.resume-preview__bullet-marker {
+  flex-shrink: 0;
+}
+
+.resume-preview__bullet-text {
+  flex: 1;
+}
+
+.resume-preview__empty {
+  text-align: center;
+  padding: 3rem;
+  color: #999;
+}
+
+.resume-preview__empty p {
+  margin: 0.5rem 0;
+}

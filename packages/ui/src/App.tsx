@@ -10,6 +10,7 @@ import { InterviewPage } from './pages/InterviewPage'
 import { HomePage } from './pages/HomePage'
 import { ResumesPage } from './pages/ResumesPage'
 import { DraftResumePage } from './pages/DraftResumePage'
+import { ResumeBuilderPage } from './pages/ResumeBuilderPage'
 import './App.css'
 
 function AuthenticatedApp() {
@@ -41,6 +42,13 @@ function AuthenticatedApp() {
         <Route path="/resumes" element={
           <AuthGuard fallback={<LoginForm />}>
             <ResumesPage />
+          </AuthGuard>
+        } />
+
+        {/* Resume Builder */}
+        <Route path="/resumes/:id/edit" element={
+          <AuthGuard fallback={<LoginForm />}>
+            <ResumeBuilderPage />
           </AuthGuard>
         } />
 
