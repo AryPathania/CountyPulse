@@ -10,9 +10,15 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
+    "no-skip": "./scripts/no-skip.sh",
+    "dup:check": "jscpd --config .jscpd.json packages/",
+    "quality": "pnpm lint && pnpm typecheck && pnpm no-skip && pnpm test && pnpm dup:check",
     "gen-types": "supabase gen types typescript --project-id cgpgnoixxghrwmfhmmqc > packages/db/src/types.ts",
     "deploy-functions": "supabase functions deploy",
     "migrate": "supabase db push",
     "setup-resend": "supabase secrets set RESEND_API_KEY=$RESEND_API_KEY --project-ref cgpgnoixxghrwmfhmmqc"
+  },
+  "devDependencies": {
+    "jscpd": "^4.0.5"
   }
 } 
