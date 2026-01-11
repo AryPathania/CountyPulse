@@ -28,6 +28,7 @@ import {
   getResumeWithBullets,
   updateResumeContent,
   updateResume,
+  logRun,
   type ResumeWithBullets,
   type ResumeContent,
   type ResumeSection,
@@ -122,8 +123,34 @@ export function ResumeBuilderPage() {
 
   // Export to PDF using browser print
   const exportToPdf = useCallback(() => {
+    // Log export telemetry
+    if (user?.id && resume) {
+      const bulletCount = resume.parsedContent.sections.reduce(
+        (count, section) => count + section.items.filter((item) => item.bulletId).length,
+        0
+      )
+
+      logRun({
+        user_id: user.id,
+        type: 'export',
+        input: {
+          resumeId: resume.id,
+          resumeName: resume.name,
+          templateId: resume.template_id ?? DEFAULT_TEMPLATE_ID,
+          bulletCount,
+          sectionCount: resume.parsedContent.sections.length,
+        },
+        output: { action: 'print_dialog_opened' },
+        success: true,
+        latency_ms: 0, // Immediate action
+      }).catch((err) => {
+        // Don't block export on telemetry failure
+        console.error('Failed to log export telemetry:', err)
+      })
+    }
+
     window.print()
-  }, [])
+  }, [user?.id, resume])
 
   // Handle drag start
   const handleDragStart = useCallback((event: DragStartEvent) => {

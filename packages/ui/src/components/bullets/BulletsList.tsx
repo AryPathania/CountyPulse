@@ -146,7 +146,12 @@ export function BulletsList({
                     <span className="bullets-list__item-category">{bullet.category}</span>
                   )}
                   {bullet.was_edited && (
-                    <span className="bullets-list__item-edited">Edited</span>
+                    <span
+                      className="bullets-list__item-edited"
+                      data-testid="bullet-edited-indicator"
+                    >
+                      Edited
+                    </span>
                   )}
                 </div>
               </button>

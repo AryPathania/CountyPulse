@@ -6,6 +6,12 @@ const mockGetSession = vi.fn()
 const mockFunctionsInvoke = vi.fn()
 const mockMatchBulletsForJd = vi.fn()
 const mockCreateJobDraft = vi.fn()
+const mockRunLoggerSuccess = vi.fn().mockResolvedValue({})
+const mockRunLoggerFailure = vi.fn().mockResolvedValue({})
+const mockCreateRunLogger = vi.fn(() => ({
+  success: mockRunLoggerSuccess,
+  failure: mockRunLoggerFailure,
+}))
 
 vi.mock('@odie/db', () => ({
   supabase: {
@@ -18,6 +24,7 @@ vi.mock('@odie/db', () => ({
   },
   matchBulletsForJd: (...args: unknown[]) => mockMatchBulletsForJd(...args),
   createJobDraft: (...args: unknown[]) => mockCreateJobDraft(...args),
+  createRunLogger: (...args: unknown[]) => mockCreateRunLogger(...args),
 }))
 
 describe('jd-processing service', () => {
@@ -76,6 +83,20 @@ describe('jd-processing service', () => {
         retrieved_bullet_ids: ['bullet-1', 'bullet-2'],
         selected_bullet_ids: ['bullet-1', 'bullet-2'],
       })
+
+      // Verify success telemetry was logged
+      expect(mockCreateRunLogger).toHaveBeenCalledWith('user-123', 'draft')
+      expect(mockRunLoggerSuccess).toHaveBeenCalledWith({
+        input: {
+          jdTextLength: 20,
+          jdTextPreview: 'Test job description',
+        },
+        output: {
+          draftId: 'draft-123',
+          matchedBulletCount: 2,
+          selectedBulletIds: ['bullet-1', 'bullet-2'],
+        },
+      })
     })
 
     it('should throw error when not authenticated', async () => {
@@ -86,6 +107,12 @@ describe('jd-processing service', () => {
       await expect(processJobDescription('user-123', 'Test JD')).rejects.toThrow(
         'Not authenticated'
       )
+
+      // Should log failure telemetry
+      expect(mockRunLoggerFailure).toHaveBeenCalledWith({
+        input: { jdTextLength: 7 },
+        error: 'Not authenticated',
+      })
     })
 
     it('should throw error when embed function fails', async () => {
@@ -101,6 +128,12 @@ describe('jd-processing service', () => {
       await expect(processJobDescription('user-123', 'Test JD')).rejects.toThrow(
         'Embedding failed'
       )
+
+      // Should log failure telemetry
+      expect(mockRunLoggerFailure).toHaveBeenCalledWith({
+        input: { jdTextLength: 7 },
+        error: 'Embedding failed',
+      })
     })
 
     it('should use mock mode when configured', async () => {

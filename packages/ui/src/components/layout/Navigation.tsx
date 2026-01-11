@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { path: '/resumes', label: 'Resumes' },
   { path: '/bullets', label: 'Bullets' },
   { path: '/interview', label: 'Interview' },
+  { path: '/telemetry', label: 'Telemetry' },
 ]
 
 export function Navigation() {

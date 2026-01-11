@@ -35,6 +35,7 @@ describe('Navigation', () => {
     expect(screen.getByTestId('nav-link-resumes')).toBeInTheDocument()
     expect(screen.getByTestId('nav-link-bullets')).toBeInTheDocument()
     expect(screen.getByTestId('nav-link-interview')).toBeInTheDocument()
+    expect(screen.getByTestId('nav-link-telemetry')).toBeInTheDocument()
   })
 
   it('should display Odie logo', () => {

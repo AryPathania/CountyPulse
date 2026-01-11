@@ -269,5 +269,23 @@ describe('BulletsList', () => {
     // bullet-1 has was_edited: true
     const bullet1 = screen.getByTestId('bullet-item-bullet-1')
     expect(bullet1).toHaveTextContent('Edited')
+
+    // Check for the specific data-testid
+    const editedIndicators = screen.getAllByTestId('bullet-edited-indicator')
+    expect(editedIndicators).toHaveLength(1)
+  })
+
+  it('should not show edited indicator for unedited bullets', () => {
+    // bullet-2 has was_edited: false
+    render(
+      <BulletsList
+        bullets={mockBullets}
+        selectedBulletId={null}
+        onSelectBullet={mockOnSelectBullet}
+      />
+    )
+
+    const bullet2 = screen.getByTestId('bullet-item-bullet-2')
+    expect(bullet2).not.toHaveTextContent('Edited')
   })
 })

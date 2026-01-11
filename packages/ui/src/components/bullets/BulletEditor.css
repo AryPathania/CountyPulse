@@ -47,6 +47,12 @@
   color: var(--color-text-muted);
 }
 
+.bullet-editor__edited-section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .bullet-editor__edited-badge {
   display: inline-block;
   font-size: var(--font-size-xs);
@@ -55,6 +61,45 @@
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-full);
   width: fit-content;
+}
+
+.bullet-editor__show-original-btn {
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-xs) var(--space-sm);
+  text-decoration: underline;
+  transition: color var(--transition-fast);
+}
+
+.bullet-editor__show-original-btn:hover {
+  color: var(--color-text);
+}
+
+.bullet-editor__original {
+  background-color: var(--color-background-subtle);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.bullet-editor__original-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+  display: block;
+  margin-bottom: var(--space-xs);
+}
+
+.bullet-editor__original-text {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-subtle);
+  font-style: italic;
+  line-height: var(--line-height-normal);
 }
 
 .bullet-editor__field {

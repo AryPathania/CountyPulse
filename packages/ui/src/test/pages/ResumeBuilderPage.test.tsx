@@ -88,10 +88,12 @@ const mockResume = {
 // Mock @odie/db
 const mockGetResumeWithBullets = vi.fn()
 const mockUpdateResumeContent = vi.fn()
+const mockLogRun = vi.fn()
 
 vi.mock('@odie/db', () => ({
   getResumeWithBullets: (...args: unknown[]) => mockGetResumeWithBullets(...args),
   updateResumeContent: (...args: unknown[]) => mockUpdateResumeContent(...args),
+  logRun: (...args: unknown[]) => mockLogRun(...args),
 }))
 
 function renderResumeBuilder(resumeId = 'resume-123') {
@@ -112,6 +114,7 @@ describe('ResumeBuilderPage', () => {
     queryClient.clear()
     mockGetResumeWithBullets.mockResolvedValue(mockResume)
     mockUpdateResumeContent.mockResolvedValue(mockResume)
+    mockLogRun.mockResolvedValue({})
   })
 
   it('should show loading state initially', () => {
@@ -330,5 +333,81 @@ describe('ResumeBuilderPage', () => {
     expect(screen.queryByTestId('builder-editor')).not.toBeInTheDocument()
     // Preview should still be visible
     expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+  })
+
+  it('should have export PDF button', async () => {
+    renderResumeBuilder()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('export-pdf')).toBeInTheDocument()
+    })
+  })
+
+  it('should log export telemetry when export button is clicked', async () => {
+    // Mock window.print
+    const printMock = vi.fn()
+    vi.spyOn(window, 'print').mockImplementation(printMock)
+
+    renderResumeBuilder()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('export-pdf')).toBeInTheDocument()
+    })
+
+    await userEvent.click(screen.getByTestId('export-pdf'))
+
+    // Verify telemetry was logged
+    expect(mockLogRun).toHaveBeenCalledWith({
+      user_id: 'test-user-id',
+      type: 'export',
+      input: {
+        resumeId: 'resume-123',
+        resumeName: 'Software Engineer Resume',
+        templateId: 'default',
+        bulletCount: 2,
+        sectionCount: 2,
+      },
+      output: { action: 'print_dialog_opened' },
+      success: true,
+      latency_ms: 0,
+    })
+
+    // Verify print was called
+    expect(printMock).toHaveBeenCalled()
+
+    vi.restoreAllMocks()
+  })
+
+  it('should not block export when telemetry logging fails', async () => {
+    // Mock window.print
+    const printMock = vi.fn()
+    vi.spyOn(window, 'print').mockImplementation(printMock)
+
+    // Make telemetry logging fail
+    mockLogRun.mockRejectedValue(new Error('Telemetry error'))
+
+    // Mock console.error to verify it's called
+    const consoleErrorMock = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    renderResumeBuilder()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('export-pdf')).toBeInTheDocument()
+    })
+
+    await userEvent.click(screen.getByTestId('export-pdf'))
+
+    // Print should still be called even if telemetry fails
+    expect(printMock).toHaveBeenCalled()
+
+    // Give time for the async error to be caught
+    await waitFor(() => {
+      expect(consoleErrorMock).toHaveBeenCalledWith(
+        'Failed to log export telemetry:',
+        expect.any(Error)
+      )
+    })
+
+    vi.restoreAllMocks()
   })
 })

@@ -70,8 +70,86 @@ describe('BulletEditor', () => {
       <BulletEditor bullet={editedBullet} onSave={mockOnSave} onCancel={mockOnCancel} />
     )
 
-    expect(screen.getByTestId('bullet-editor-edited')).toBeInTheDocument()
+    expect(screen.getByTestId('bullet-edited-badge')).toBeInTheDocument()
     expect(screen.getByText('Edited')).toBeInTheDocument()
+  })
+
+  it('should show "Show Original" button when bullet was edited', () => {
+    const editedBullet = { ...mockBullet, was_edited: true }
+    render(
+      <BulletEditor bullet={editedBullet} onSave={mockOnSave} onCancel={mockOnCancel} />
+    )
+
+    expect(screen.getByTestId('bullet-show-original')).toBeInTheDocument()
+    expect(screen.getByText('Show Original')).toBeInTheDocument()
+  })
+
+  it('should toggle original text display when clicking Show Original', async () => {
+    const editedBullet = {
+      ...mockBullet,
+      was_edited: true,
+      original_text: 'Original bullet text before editing',
+    }
+    render(
+      <BulletEditor bullet={editedBullet} onSave={mockOnSave} onCancel={mockOnCancel} />
+    )
+
+    // Original text should not be visible initially
+    expect(screen.queryByTestId('bullet-original-text')).not.toBeInTheDocument()
+
+    // Click Show Original
+    await userEvent.click(screen.getByTestId('bullet-show-original'))
+
+    // Original text should now be visible
+    expect(screen.getByTestId('bullet-original-text')).toBeInTheDocument()
+    expect(screen.getByText('Original bullet text before editing')).toBeInTheDocument()
+    expect(screen.getByText('Hide Original')).toBeInTheDocument()
+
+    // Click Hide Original
+    await userEvent.click(screen.getByTestId('bullet-show-original'))
+
+    // Original text should be hidden again
+    expect(screen.queryByTestId('bullet-original-text')).not.toBeInTheDocument()
+    expect(screen.getByText('Show Original')).toBeInTheDocument()
+  })
+
+  it('should not show Show Original button when bullet was not edited', () => {
+    const uneditedBullet = { ...mockBullet, was_edited: false }
+    render(
+      <BulletEditor bullet={uneditedBullet} onSave={mockOnSave} onCancel={mockOnCancel} />
+    )
+
+    expect(screen.queryByTestId('bullet-edited-badge')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('bullet-show-original')).not.toBeInTheDocument()
+  })
+
+  it('should reset show original state when bullet changes', async () => {
+    const editedBullet = {
+      ...mockBullet,
+      was_edited: true,
+      original_text: 'Original text',
+    }
+    const { rerender } = render(
+      <BulletEditor bullet={editedBullet} onSave={mockOnSave} onCancel={mockOnCancel} />
+    )
+
+    // Show original text
+    await userEvent.click(screen.getByTestId('bullet-show-original'))
+    expect(screen.getByTestId('bullet-original-text')).toBeInTheDocument()
+
+    // Change to a different bullet
+    const newBullet = {
+      ...editedBullet,
+      id: 'bullet-2',
+      original_text: 'Different original text',
+    }
+    rerender(
+      <BulletEditor bullet={newBullet} onSave={mockOnSave} onCancel={mockOnCancel} />
+    )
+
+    // Original text should be hidden (state reset)
+    expect(screen.queryByTestId('bullet-original-text')).not.toBeInTheDocument()
+    expect(screen.getByText('Show Original')).toBeInTheDocument()
   })
 
   it('should call onCancel when cancel button is clicked', async () => {

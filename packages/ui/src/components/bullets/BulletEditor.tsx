@@ -36,6 +36,7 @@ export function BulletEditor({
   const [category, setCategory] = useState('')
   const [hardSkills, setHardSkills] = useState('')
   const [softSkills, setSoftSkills] = useState('')
+  const [showOriginal, setShowOriginal] = useState(false)
 
   // Sync local state when bullet changes
   useEffect(() => {
@@ -44,11 +45,13 @@ export function BulletEditor({
       setCategory(bullet.category ?? '')
       setHardSkills(bullet.hard_skills?.join(', ') ?? '')
       setSoftSkills(bullet.soft_skills?.join(', ') ?? '')
+      setShowOriginal(false) // Reset show original state when bullet changes
     } else {
       setCurrentText('')
       setCategory('')
       setHardSkills('')
       setSoftSkills('')
+      setShowOriginal(false)
     }
   }, [bullet])
 
@@ -99,11 +102,29 @@ export function BulletEditor({
         </div>
       )}
 
-      {/* Edited indicator */}
+      {/* Edited indicator with show original toggle */}
       {bullet.was_edited && (
-        <span className="bullet-editor__edited-badge" data-testid="bullet-editor-edited">
-          Edited
-        </span>
+        <div className="bullet-editor__edited-section">
+          <span className="bullet-editor__edited-badge" data-testid="bullet-edited-badge">
+            Edited
+          </span>
+          <button
+            type="button"
+            className="bullet-editor__show-original-btn"
+            onClick={() => setShowOriginal(!showOriginal)}
+            data-testid="bullet-show-original"
+          >
+            {showOriginal ? 'Hide Original' : 'Show Original'}
+          </button>
+        </div>
+      )}
+
+      {/* Original text display (shown when toggled) */}
+      {bullet.was_edited && showOriginal && (
+        <div className="bullet-editor__original" data-testid="bullet-original-text">
+          <span className="bullet-editor__original-label">Original:</span>
+          <p className="bullet-editor__original-text">{bullet.original_text}</p>
+        </div>
       )}
 
       {/* Main text editor */}
