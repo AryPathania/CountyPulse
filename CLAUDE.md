@@ -22,8 +22,9 @@ packages/
 ```bash
 pnpm dev              # Start dev server
 pnpm build            # Build all packages
-pnpm test             # Run tests
-pnpm test:coverage    # Run tests with coverage
+pnpm test             # Run unit/integration tests
+pnpm test:coverage    # Run tests with coverage report
+pnpm test:e2e         # Run Playwright E2E tests
 pnpm lint             # Lint all packages
 pnpm typecheck        # Type check all packages
 pnpm gen-types        # Generate Supabase types
@@ -62,16 +63,25 @@ pnpm gen-types        # Generate Supabase types
 - DB schema: `docs/db_schema.md`
 - Notes: `docs/notes.md`
 
-## Current Phase
-**Phase 5: Home + JD Paste + Draft Resume**
-- Coming next
+## Current Status
+**MVP Feature Complete** - All phases implemented
+
+### Test Coverage
+- **284 unit/integration tests** (Vitest + Testing Library)
+- **52 E2E tests** (Playwright)
+- **92%+ code coverage**
 
 ### Completed Phases
 - Phase 0.5: Schema Inventory + Repo Alignment
 - Phase 1: Foundation + Quality Gates (jscpd, no-skip, GitHub Actions, theme tokens)
 - Phase 2: Data Model + DB Migrations (6 Odie tables, RLS, match_bullets function)
-- Phase 3: Bullets Library + Shared Editor (BulletEditor, TanStack Query, 46 tests)
-- Phase 4: Interview Flow (InterviewChat, interview edge function, 63 tests)
+- Phase 3: Bullets Library + Shared Editor (BulletEditor, TanStack Query)
+- Phase 4: Interview Flow (InterviewChat, interview edge function)
+- Phase 5: Home + JD Paste + Draft Resume
+- Phase 6: Resume Builder (DnD sections/bullets, live preview)
+- Phase 7: Templates + PDF Export (template registry, browser print)
+- Phase 8: Telemetry + Continuous Improvement (runs dashboard, bullet evolution)
+- Phase 9: Testing (Playwright E2E, screenshot on failure)
 
 ## Environment Variables
 ```env
