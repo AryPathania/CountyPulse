@@ -7,7 +7,7 @@ const createMockResume = (overrides: Partial<ResumeWithBullets> = {}): ResumeWit
   id: 'resume-123',
   user_id: 'user-123',
   name: 'Test Resume',
-  template_id: 'default',
+  template_id: 'classic_v1',
   content: { sections: [] },
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
@@ -33,11 +33,18 @@ const createMockResume = (overrides: Partial<ResumeWithBullets> = {}): ResumeWit
 })
 
 describe('ResumePreview', () => {
-  it('should render resume preview', () => {
+  it('should render resume preview container', () => {
     const resume = createMockResume()
     render(<ResumePreview resume={resume} />)
 
     expect(screen.getByTestId('resume-preview')).toBeInTheDocument()
+  })
+
+  it('should render the template component', () => {
+    const resume = createMockResume()
+    render(<ResumePreview resume={resume} />)
+
+    expect(screen.getByTestId('template-classic')).toBeInTheDocument()
   })
 
   it('should display resume name', () => {
@@ -51,7 +58,7 @@ describe('ResumePreview', () => {
     const resume = createMockResume()
     render(<ResumePreview resume={resume} />)
 
-    expect(screen.getByTestId('preview-section-experience')).toBeInTheDocument()
+    expect(screen.getByTestId('template-section-experience')).toBeInTheDocument()
     expect(screen.getByText('Experience')).toBeInTheDocument()
   })
 
@@ -59,7 +66,7 @@ describe('ResumePreview', () => {
     const resume = createMockResume()
     render(<ResumePreview resume={resume} />)
 
-    expect(screen.getByTestId('preview-bullet-bullet-1')).toBeInTheDocument()
+    expect(screen.getByTestId('template-bullet-bullet-1')).toBeInTheDocument()
     expect(screen.getByText('Led team of 5 engineers')).toBeInTheDocument()
   })
 
@@ -75,7 +82,7 @@ describe('ResumePreview', () => {
 
     render(<ResumePreview resume={resume} />)
 
-    expect(screen.getByTestId('preview-empty')).toBeInTheDocument()
+    expect(screen.getByTestId('template-empty')).toBeInTheDocument()
     expect(screen.getByText('Your resume is empty.')).toBeInTheDocument()
   })
 
@@ -96,9 +103,9 @@ describe('ResumePreview', () => {
     render(<ResumePreview resume={resume} />)
 
     // Experience section should not render (empty)
-    expect(screen.queryByTestId('preview-section-experience')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('template-section-experience')).not.toBeInTheDocument()
     // Skills section should render
-    expect(screen.getByTestId('preview-section-skills')).toBeInTheDocument()
+    expect(screen.getByTestId('template-section-skills')).toBeInTheDocument()
   })
 
   it('should display position info', () => {
@@ -146,6 +153,29 @@ describe('ResumePreview', () => {
     render(<ResumePreview resume={resume} />)
 
     // Should not crash, just not render the bullet
-    expect(screen.queryByTestId('preview-bullet-non-existent')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('template-bullet-non-existent')).not.toBeInTheDocument()
+  })
+
+  it('should use templateId prop when provided', () => {
+    const resume = createMockResume({ template_id: null })
+    render(<ResumePreview resume={resume} templateId="classic_v1" />)
+
+    expect(screen.getByTestId('template-classic')).toBeInTheDocument()
+  })
+
+  it('should fall back to classic_v1 for unknown template', () => {
+    const resume = createMockResume({ template_id: 'unknown-template' })
+    render(<ResumePreview resume={resume} />)
+
+    // Should fall back to classic template
+    expect(screen.getByTestId('template-classic')).toBeInTheDocument()
+  })
+
+  it('should handle legacy default template ID', () => {
+    const resume = createMockResume({ template_id: 'default' })
+    render(<ResumePreview resume={resume} />)
+
+    // default should map to classic_v1
+    expect(screen.getByTestId('template-classic')).toBeInTheDocument()
   })
 })

@@ -1,0 +1,81 @@
+/**
+ * Print styles for PDF export.
+ * Hide UI elements and optimize layout for printing.
+ */
+@media print {
+  /* Hide navigation and UI controls */
+  nav,
+  .navigation,
+  .resume-builder__header,
+  .resume-builder__editor,
+  .resume-builder__actions,
+  .resume-builder__inline-editor,
+  .btn-primary,
+  .btn-secondary,
+  .template-selector,
+  [data-testid="template-selector"],
+  [data-testid="export-pdf"],
+  [data-testid="toggle-preview"],
+  [data-testid="done-editing"] {
+    display: none !important;
+  }
+
+  /* Reset body and html */
+  html,
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Make resume preview take full page */
+  .resume-builder,
+  .resume-builder__content,
+  .resume-builder__preview,
+  .resume-preview {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: static !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  /* Template styling for print */
+  .classic-template,
+  [data-testid="template-classic"] {
+    padding: 0.5in !important;
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Page settings */
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+
+  /* Ensure text is black for printing */
+  * {
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Prevent page breaks inside elements */
+  .classic-template__section,
+  .classic-template__position,
+  .classic-template__bullet {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Allow page breaks between sections */
+  .classic-template__section {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

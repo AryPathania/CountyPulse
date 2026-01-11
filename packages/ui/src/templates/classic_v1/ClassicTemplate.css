@@ -1,0 +1,90 @@
+.classic-template {
+  padding: 2rem;
+  font-family: 'Georgia', serif;
+  color: #333;
+  background: white;
+  min-height: 100%;
+}
+
+.classic-template__header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #333;
+}
+
+.classic-template__name {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.classic-template__section {
+  margin-bottom: 1.5rem;
+}
+
+.classic-template__section-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid #999;
+  padding-bottom: 0.25rem;
+}
+
+.classic-template__items {
+  padding-left: 0;
+}
+
+.classic-template__position {
+  margin-bottom: 0.75rem;
+}
+
+.classic-template__position-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.classic-template__company {
+  font-weight: 700;
+}
+
+.classic-template__dates {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.classic-template__title {
+  font-style: italic;
+  color: #555;
+}
+
+.classic-template__bullet {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.classic-template__bullet-marker {
+  flex-shrink: 0;
+}
+
+.classic-template__bullet-text {
+  flex: 1;
+}
+
+.classic-template__empty {
+  text-align: center;
+  padding: 3rem;
+  color: #999;
+}
+
+.classic-template__empty p {
+  margin: 0.5rem 0;
+}

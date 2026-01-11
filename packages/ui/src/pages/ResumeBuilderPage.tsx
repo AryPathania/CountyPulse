@@ -21,10 +21,13 @@ import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
 import { SortableSection } from '../components/resume/SortableSection'
 import { ResumePreview } from '../components/resume/ResumePreview'
+import { TemplateSelector } from '../components/resume/TemplateSelector'
 import { BulletEditor } from '../components/bullets'
+import { DEFAULT_TEMPLATE_ID } from '../templates'
 import {
   getResumeWithBullets,
   updateResumeContent,
+  updateResume,
   type ResumeWithBullets,
   type ResumeContent,
   type ResumeSection,
@@ -98,6 +101,29 @@ export function ResumeBuilderPage() {
     },
     [id]
   )
+
+  // Handle template change
+  const handleTemplateChange = useCallback(
+    async (templateId: string) => {
+      if (!id || !resume) return
+
+      setIsSaving(true)
+      try {
+        await updateResume(id, { template_id: templateId })
+        setResume({ ...resume, template_id: templateId })
+      } catch (err) {
+        console.error('Failed to update template:', err)
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [id, resume]
+  )
+
+  // Export to PDF using browser print
+  const exportToPdf = useCallback(() => {
+    window.print()
+  }, [])
 
   // Handle drag start
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -294,6 +320,7 @@ export function ResumeBuilderPage() {
 
   const activeItem = getActiveItem()
   const editingBullet = editingBulletId ? getBulletById(editingBulletId) : null
+  const currentTemplateId = resume.template_id ?? DEFAULT_TEMPLATE_ID
 
   return (
     <div className="resume-builder" data-testid="resume-builder">
@@ -305,6 +332,18 @@ export function ResumeBuilderPage() {
           {isSaving && <span className="resume-builder__saving">Saving...</span>}
         </div>
         <div className="resume-builder__actions">
+          <TemplateSelector
+            selectedId={currentTemplateId}
+            onSelect={handleTemplateChange}
+            disabled={isSaving}
+          />
+          <button
+            onClick={exportToPdf}
+            className="btn-secondary"
+            data-testid="export-pdf"
+          >
+            Export PDF
+          </button>
           <button
             onClick={() => setIsPreviewMode(!isPreviewMode)}
             className="btn-secondary"
@@ -403,7 +442,7 @@ export function ResumeBuilderPage() {
           className={`resume-builder__preview ${isPreviewMode ? 'resume-builder__preview--full' : ''}`}
           data-testid="builder-preview"
         >
-          <ResumePreview resume={resume} />
+          <ResumePreview resume={resume} templateId={currentTemplateId} />
         </div>
       </main>
     </div>

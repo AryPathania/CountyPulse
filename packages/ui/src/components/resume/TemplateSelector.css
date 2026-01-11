@@ -1,0 +1,37 @@
+.template-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.template-selector__label {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.template-selector__select {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 4px;
+  background: var(--color-bg, #000);
+  color: var(--color-text, #fff);
+  font-size: 0.875rem;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.template-selector__select:hover:not(:disabled) {
+  border-color: var(--color-accent, #4169e1);
+}
+
+.template-selector__select:focus {
+  outline: none;
+  border-color: var(--color-accent, #4169e1);
+  box-shadow: 0 0 0 2px rgba(65, 105, 225, 0.2);
+}
+
+.template-selector__select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
