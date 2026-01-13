@@ -13,7 +13,7 @@ Odie AI is an AI-powered resume builder that helps candidates craft tailored res
 ## Package Structure
 ```
 packages/
-├── web/     # @odie/web - React frontend
+├── ui/      # @odie/ui - React frontend
 ├── db/      # @odie/db - Supabase client + queries
 └── shared/  # @odie/shared - Contracts, validators, pure logic
 ```
@@ -46,7 +46,7 @@ pnpm gen-types        # Generate Supabase types
 - **Bullet Edits**: Global (no per-resume overrides in MVP)
 
 ## Conventions
-- UI components: `packages/web/src/components/`
+- UI components: `packages/ui/src/components/`
 - Query functions: `packages/db/src/queries/`
 - Contracts/schemas: `packages/shared/src/contracts/`
 - Tests co-located or in `test/` directories

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../components/auth/AuthProvider'
+import { Navigation } from '../components/layout'
 import { InterviewChat } from '../components/interview/InterviewChat'
 import { createPositionWithBullets } from '@odie/db'
 import type { ExtractedInterviewData } from '@odie/shared'
@@ -72,6 +73,7 @@ export function InterviewPage() {
 
   return (
     <div className="interview-page" data-testid="interview-page">
+      <Navigation />
       <div className="interview-page__container">
         {isSaving && (
           <div className="interview-page__saving" data-testid="interview-saving">

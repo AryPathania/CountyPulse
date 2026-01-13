@@ -1,4 +1,6 @@
 import { test } from '@playwright/test'
+import { mockAuthState } from './fixtures/auth'
+import { setupApiMocks } from './fixtures/mock-data'
 
 /**
  * Screenshot capture utility for visual verification.
@@ -29,33 +31,11 @@ test.describe('Screenshot Capture', () => {
   })
 
   test('capture bullets page (mocked auth)', async ({ page }) => {
-    // Mock authenticated session
-    await page.route('**/auth/v1/user', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'test-user-id',
-          email: 'test@example.com',
-          aud: 'authenticated',
-          role: 'authenticated',
-        }),
-      })
-    })
-
-    // Mock bullets data
-    await page.route('**/rest/v1/odie_bullets*', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([]),
-      })
-    })
+    await mockAuthState(page)
+    await setupApiMocks(page)
 
     await page.goto('/bullets')
-
-    // Wait for page content
-    await page.waitForTimeout(500)
+    await page.waitForSelector('[data-testid="bullets-page"]')
 
     await page.screenshot({
       path: 'screenshots/bullets-page.png',
@@ -64,23 +44,12 @@ test.describe('Screenshot Capture', () => {
   })
 
   test('capture interview page (mocked auth)', async ({ page }) => {
-    // Mock authenticated session
-    await page.route('**/auth/v1/user', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'test-user-id',
-          email: 'test@example.com',
-          aud: 'authenticated',
-          role: 'authenticated',
-        }),
-      })
-    })
+    await mockAuthState(page)
 
     await page.goto('/interview')
+    await page.waitForSelector('[data-testid="interview-page"]')
 
-    // Wait for page content
+    // Wait for initial render to settle (no scroll animations)
     await page.waitForTimeout(500)
 
     await page.screenshot({
@@ -90,33 +59,11 @@ test.describe('Screenshot Capture', () => {
   })
 
   test('capture resumes page (mocked auth)', async ({ page }) => {
-    // Mock authenticated session
-    await page.route('**/auth/v1/user', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'test-user-id',
-          email: 'test@example.com',
-          aud: 'authenticated',
-          role: 'authenticated',
-        }),
-      })
-    })
-
-    // Mock resumes data
-    await page.route('**/rest/v1/odie_resumes*', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([]),
-      })
-    })
+    await mockAuthState(page)
+    await setupApiMocks(page)
 
     await page.goto('/resumes')
-
-    // Wait for page content
-    await page.waitForTimeout(500)
+    await page.waitForSelector('[data-testid="resumes-page"]')
 
     await page.screenshot({
       path: 'screenshots/resumes-page.png',

@@ -22,7 +22,7 @@ export function InterviewChat({ onComplete, onCancel, config }: InterviewChatPro
   const [isComplete, setIsComplete] = useState(false)
   const [extractedData, setExtractedData] = useState<ExtractedInterviewData>({ positions: [] })
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Initialize chat with greeting
@@ -34,15 +34,18 @@ export function InterviewChat({ onComplete, onCancel, config }: InterviewChatPro
     setMessages([initialMessage])
   }, [config?.useMock])
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages change (within container only, not page)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
   }, [messages])
 
   // Focus input when not loading
   useEffect(() => {
     if (!isLoading && !isComplete) {
-      inputRef.current?.focus()
+      inputRef.current?.focus({ preventScroll: true })
     }
   }, [isLoading, isComplete])
 
@@ -163,7 +166,7 @@ export function InterviewChat({ onComplete, onCancel, config }: InterviewChatPro
         </div>
       </div>
 
-      <div className="messages-container" data-testid="interview-messages">
+      <div className="messages-container" data-testid="interview-messages" ref={messagesContainerRef}>
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -186,7 +189,6 @@ export function InterviewChat({ onComplete, onCancel, config }: InterviewChatPro
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {error && (
