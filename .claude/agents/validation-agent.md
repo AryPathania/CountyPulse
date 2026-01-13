@@ -41,6 +41,20 @@ Mission: block merges that increase complexity.
 4) Dead code cleanup
 - remove unused exports, orphaned utilities
 
+5) Visual regression check (for UX fixes)
+- Request debug-agent to run playwright-screenshots skill
+- Compare before/after screenshots if available
+- Verify visual changes match intent
+- See `.claude/skills/visual-validation/SKILL.md`
+
+6) Backend validation (for DB fixes)
+- Delegate to db-agent (which has Supabase MCP) to verify:
+  - Migrations created in `supabase/migrations/`
+  - Types regenerated via `pnpm gen-types`
+  - `docs/db_schema.md` updated
+  - RLS policies work correctly
+- Review db-agent's validation report
+
 ## Output
 - a short report for the Orchestrator:
   - violations found

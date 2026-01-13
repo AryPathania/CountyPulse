@@ -39,3 +39,11 @@ Rules:
 - How many templates in MVP? **1** - classic_v1 only
 - JD ingestion: **Pasted text only** - no file upload in MVP
 
+---
+
+## Debug Workflow
+- All fixes go through `debug-agent`
+- 4 phases: Understand → Plan → Execute → Validate
+- Quality rules: `docs/code-quality-rules.md`
+- Visual validation: `playwright-screenshots` + `visual-validation` skills
+

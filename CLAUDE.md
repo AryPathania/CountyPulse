@@ -92,6 +92,13 @@ pnpm gen-types        # Generate Supabase types
 
 ## Skills
 - `playwright-screenshots`: Capture screenshots for visual UI verification
+- `visual-validation`: Before/after screenshot comparison for UX validation
+
+## Debugging Workflow
+Use `debug-agent` for all bug fixes and feedback implementation.
+- 4 phases: Understand → Plan → Execute → Validate
+- See `.claude/agents/debug-agent.md` for full workflow
+- See `docs/code-quality-rules.md` for quality standards
 
 ## Environment Variables
 ```env
