@@ -171,35 +171,6 @@
   border-radius: 24px;
 }
 
-.btn-primary {
-  background: var(--color-accent, #4169e1);
-  color: white;
-  border: none;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-accent-hover, #3457c9);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: transparent;
-  color: var(--color-text, #fff);
-  border: 1px solid var(--color-border, #333);
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  background: var(--color-surface-elevated, #2a2a2a);
-}
 
 .extracted-preview {
   padding: 1rem;

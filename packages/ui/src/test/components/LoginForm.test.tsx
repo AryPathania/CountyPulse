@@ -62,8 +62,8 @@ describe('LoginForm', () => {
     mockSignIn.mockResolvedValue(undefined)
     renderLoginForm()
 
-    expect(screen.getByText('Welcome to Odie')).toBeInTheDocument()
-    expect(screen.getByLabelText('Email Address')).toBeInTheDocument()
+    expect(screen.getByText('Welcome to Odie AI')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('your@email.com')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument()
   })
 
@@ -71,7 +71,7 @@ describe('LoginForm', () => {
     mockSignIn.mockResolvedValue(undefined)
     renderLoginForm()
 
-    const emailInput = screen.getByLabelText('Email Address')
+    const emailInput = screen.getByPlaceholderText('your@email.com')
     await user.type(emailInput, 'test@example.com')
 
     expect(emailInput).toHaveValue('test@example.com')
@@ -79,34 +79,28 @@ describe('LoginForm', () => {
 
   it('should submit form and show success message', async () => {
     mockSignIn.mockResolvedValue(undefined)
-    console.log('Success test: mockSignIn setup with:', mockSignIn.mockResolvedValue.toString())
-    
+
     renderLoginForm()
 
-    const emailInput = screen.getByLabelText('Email Address')
+    const emailInput = screen.getByPlaceholderText('your@email.com')
     const submitButton = screen.getByRole('button', { name: 'Continue' })
 
     await user.type(emailInput, 'test@example.com')
-    
-    console.log('Success test: Before click, mockSignIn calls:', mockSignIn.mock.calls.length)
     await user.click(submitButton)
-    console.log('Success test: After click, mockSignIn calls:', mockSignIn.mock.calls.length)
 
     await waitFor(() => {
-      console.log('Success test: In waitFor, mockSignIn calls:', mockSignIn.mock.calls.length)
       expect(mockSignIn).toHaveBeenCalledWith('test@example.com')
       expect(screen.getByText('Check Your Email')).toBeInTheDocument()
-      expect(screen.getByText(/We've sent a magic link to/)).toBeInTheDocument()
+      expect(screen.getByText(/We have sent a magic link to/)).toBeInTheDocument()
     })
   })
 
   it('should disable submit button when loading', async () => {
-    // ✅ Now this works - we can control the mock per test
     mockSignIn.mockImplementation(() => new Promise(() => {})) // Never resolves
 
     renderLoginForm()
 
-    const emailInput = screen.getByLabelText('Email Address')
+    const emailInput = screen.getByPlaceholderText('your@email.com')
     const submitButton = screen.getByRole('button', { name: 'Continue' })
 
     await user.type(emailInput, 'test@example.com')
@@ -123,7 +117,7 @@ describe('LoginForm', () => {
 
     renderLoginForm()
 
-    const emailInput = screen.getByLabelText('Email Address')
+    const emailInput = screen.getByPlaceholderText('your@email.com')
     const submitButton = screen.getByRole('button', { name: 'Continue' })
 
     // Use valid email format to pass HTML5 validation
@@ -139,7 +133,7 @@ describe('LoginForm', () => {
     })
 
     // Verify the form stays in initial state (not success state)
-    expect(screen.getByText('Welcome to Odie')).toBeInTheDocument()
+    expect(screen.getByText('Welcome to Odie AI')).toBeInTheDocument()
     expect(screen.queryByText('Check Your Email')).not.toBeInTheDocument()
   })
 
@@ -147,7 +141,7 @@ describe('LoginForm', () => {
     mockSignIn.mockResolvedValue(undefined)
     renderLoginForm()
 
-    const emailInput = screen.getByLabelText('Email Address')
+    const emailInput = screen.getByPlaceholderText('your@email.com')
     const submitButton = screen.getByRole('button', { name: 'Continue' })
 
     // Submit initial email
@@ -165,7 +159,7 @@ describe('LoginForm', () => {
     await user.click(tryDifferentEmailButton)
 
     // Should be back to initial form
-    expect(screen.getByText('Welcome to Odie')).toBeInTheDocument()
-    expect(screen.getByLabelText('Email Address')).toHaveValue('')
+    expect(screen.getByText('Welcome to Odie AI')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('your@email.com')).toHaveValue('')
   })
 }) 

@@ -36,28 +36,31 @@ export const LoginForm: React.FC = () => {
 
   if (sent) {
     return (
-      <div className="auth-form" data-testid="login-success">
-        <h2>Check Your Email</h2>
-        <p>We've sent a magic link to <strong>{email}</strong></p>
-        <p>Click the link in your email to continue.</p>
-        
-        <button onClick={handleStartOver} className="secondary">
-          Try Different Email
-        </button>
-        
-        {message && <p className="success">{message}</p>}
+      <div className="login-page" data-testid="login-success">
+        <div className="login-form">
+          <h1 className="login-form__title">Check Your Email</h1>
+          <p className="login-form__subtitle">
+            We have sent a magic link to <strong>{email}</strong>
+          </p>
+          <p className="login-form__subtitle">Click the link in your email to continue.</p>
+
+          <button onClick={handleStartOver} className="login-form__button login-form__button--secondary">
+            Try Different Email
+          </button>
+
+          {message && <p className="login-form__success">{message}</p>}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="auth-form" data-testid="login-form">
-      <h2>Welcome to Odie</h2>
-      <p>Enter your email to get started</p>
+    <div className="login-page" data-testid="login-form">
+      <div className="login-form">
+        <h1 className="login-form__title">Welcome to Odie AI</h1>
+        <p className="login-form__subtitle">Enter your email to get started</p>
 
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="email">Email Address</label>
+        <form onSubmit={handleSubmit} className="login-form__form">
           <input
             id="email"
             type="email"
@@ -66,17 +69,23 @@ export const LoginForm: React.FC = () => {
             required
             disabled={loading}
             placeholder="your@email.com"
+            className="login-form__input"
             data-testid="login-email"
           />
-        </div>
 
-        <button type="submit" disabled={loading || !email} data-testid="login-submit">
-          {loading ? 'Sending...' : 'Continue'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={loading || !email}
+            className="login-form__button"
+            data-testid="login-submit"
+          >
+            {loading ? 'Sending...' : 'Continue'}
+          </button>
+        </form>
 
-      {error && <p className="error" data-testid="login-error">{error}</p>}
-      {message && <p className="success">{message}</p>}
+        {error && <p className="login-form__error" data-testid="login-error">{error}</p>}
+        {message && <p className="login-form__success">{message}</p>}
+      </div>
     </div>
   )
 } 

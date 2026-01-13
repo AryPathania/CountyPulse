@@ -7,4 +7,5 @@ dist/
 playwright-report/
 test-results/
 packages/ui/playwright-report/
-packages/ui/test-results/ 
+packages/ui/test-results/
+screenshots/ 

@@ -7,6 +7,7 @@ export interface BulletsListProps {
   selectedBulletId: string | null
   onSelectBullet: (bulletId: string) => void
   onDeleteBullet?: (bulletId: string) => void
+  onAddBullet?: () => void
   loading?: boolean
   error?: Error | null
 }
@@ -19,6 +20,7 @@ export function BulletsList({
   selectedBulletId,
   onSelectBullet,
   onDeleteBullet,
+  onAddBullet,
   loading = false,
   error = null,
 }: BulletsListProps) {
@@ -73,25 +75,38 @@ export function BulletsList({
 
   return (
     <div className="bullets-list" data-testid="bullets-list">
-      {/* Filter input */}
-      <div className="bullets-list__filter">
-        <input
-          type="text"
-          className="bullets-list__filter-input"
-          placeholder="Filter bullets..."
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-          data-testid="bullets-list-filter"
-        />
-        {filterText && (
+      {/* Filter input with add button */}
+      <div className="bullets-list__filter-row">
+        <div className="bullets-list__filter">
+          <input
+            type="text"
+            className="bullets-list__filter-input"
+            placeholder="Filter bullets..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+            data-testid="bullets-list-filter"
+          />
+          {filterText && (
+            <button
+              type="button"
+              className="bullets-list__filter-clear"
+              onClick={() => setFilterText('')}
+              aria-label="Clear filter"
+              data-testid="bullets-list-filter-clear"
+            >
+              x
+            </button>
+          )}
+        </div>
+        {onAddBullet && (
           <button
             type="button"
-            className="bullets-list__filter-clear"
-            onClick={() => setFilterText('')}
-            aria-label="Clear filter"
-            data-testid="bullets-list-filter-clear"
+            className="bullets-list__add-btn"
+            onClick={onAddBullet}
+            aria-label="Add bullet"
+            data-testid="add-bullet-btn"
           >
-            x
+            +
           </button>
         )}
       </div>

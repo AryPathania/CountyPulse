@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useAuth } from '../components/auth/AuthProvider'
+import { Navigation } from '../components/layout/Navigation'
 import { BulletsList, BulletEditor } from '../components/bullets'
 import { useBullets, useUpdateBullet, useDeleteBullet } from '../queries/bullets'
 import type { BulletWithPosition } from '@odie/db'
@@ -84,8 +85,14 @@ export function BulletsPage() {
     [deleteBulletMutation, selectedBulletId]
   )
 
+  const handleAddBullet = useCallback(() => {
+    // TODO: Implement add bullet modal/form
+    console.log('Add bullet clicked')
+  }, [])
+
   return (
     <div className="bullets-page" data-testid="bullets-page">
+      <Navigation />
       <header className="bullets-page__header">
         <h1 className="bullets-page__title">Bullets Library</h1>
         <p className="bullets-page__subtitle">
@@ -101,6 +108,7 @@ export function BulletsPage() {
             selectedBulletId={selectedBulletId}
             onSelectBullet={handleSelectBullet}
             onDeleteBullet={handleDelete}
+            onAddBullet={handleAddBullet}
             loading={isLoading}
             error={error instanceof Error ? error : null}
           />

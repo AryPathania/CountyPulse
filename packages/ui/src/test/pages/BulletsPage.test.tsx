@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { queryClient } from '../../lib/queryClient'
 import { BulletsPage } from '../../pages/BulletsPage'
 
@@ -73,9 +74,11 @@ vi.mock('../../queries/bullets', () => ({
 
 function renderBulletsPage() {
   return render(
-    <QueryClientProvider client={queryClient}>
-      <BulletsPage />
-    </QueryClientProvider>
+    <MemoryRouter initialEntries={['/bullets']}>
+      <QueryClientProvider client={queryClient}>
+        <BulletsPage />
+      </QueryClientProvider>
+    </MemoryRouter>
   )
 }
 

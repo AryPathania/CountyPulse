@@ -177,31 +177,3 @@
   white-space: pre-wrap;
 }
 
-.btn-primary {
-  padding: 0.75rem 1.5rem;
-  background: var(--color-accent, #4169e1);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btn-primary:hover {
-  background: var(--color-accent-hover, #3457c9);
-}
-
-.btn-secondary {
-  padding: 0.75rem 1.5rem;
-  background: transparent;
-  color: var(--color-text, #fff);
-  border: 1px solid var(--color-border, #333);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.btn-secondary:hover {
-  background: var(--color-surface-elevated, #2a2a2a);
-}

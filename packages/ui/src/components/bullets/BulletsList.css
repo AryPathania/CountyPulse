@@ -26,10 +26,38 @@
 }
 
 /* Filter section */
+.bullets-list__filter-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
 .bullets-list__filter {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1;
+}
+
+.bullets-list__add-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+  color: var(--color-text);
+  border: none;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.bullets-list__add-btn:hover {
+  background-color: var(--color-accent-hover);
 }
 
 .bullets-list__filter-input {

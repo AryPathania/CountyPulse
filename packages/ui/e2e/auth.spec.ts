@@ -15,7 +15,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/')
 
     // Verify login form content
-    await expect(page.getByText('Welcome to Odie')).toBeVisible()
+    await expect(page.getByText('Welcome to Odie AI')).toBeVisible()
     await expect(page.getByText('Enter your email to get started')).toBeVisible()
     await expect(page.getByPlaceholder('your@email.com')).toBeVisible()
   })
@@ -61,7 +61,7 @@ test.describe('Authentication Flow', () => {
 
     // Should show success state (magic link sent)
     await expect(page.getByTestId('login-success')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByRole('heading', { name: 'Check Your Email' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Check Your Email' })).toBeVisible()
     await expect(page.getByText('test@example.com')).toBeVisible()
   })
 

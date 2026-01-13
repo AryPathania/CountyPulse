@@ -46,6 +46,7 @@ const mockBullets: BulletWithPosition[] = [
 describe('BulletsList', () => {
   const mockOnSelectBullet = vi.fn()
   const mockOnDeleteBullet = vi.fn()
+  const mockOnAddBullet = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -287,5 +288,44 @@ describe('BulletsList', () => {
 
     const bullet2 = screen.getByTestId('bullet-item-bullet-2')
     expect(bullet2).not.toHaveTextContent('Edited')
+  })
+
+  it('should render add bullet button when onAddBullet is provided', () => {
+    render(
+      <BulletsList
+        bullets={mockBullets}
+        selectedBulletId={null}
+        onSelectBullet={mockOnSelectBullet}
+        onAddBullet={mockOnAddBullet}
+      />
+    )
+
+    expect(screen.getByTestId('add-bullet-btn')).toBeInTheDocument()
+  })
+
+  it('should not render add bullet button when onAddBullet is not provided', () => {
+    render(
+      <BulletsList
+        bullets={mockBullets}
+        selectedBulletId={null}
+        onSelectBullet={mockOnSelectBullet}
+      />
+    )
+
+    expect(screen.queryByTestId('add-bullet-btn')).not.toBeInTheDocument()
+  })
+
+  it('should call onAddBullet when add button is clicked', async () => {
+    render(
+      <BulletsList
+        bullets={mockBullets}
+        selectedBulletId={null}
+        onSelectBullet={mockOnSelectBullet}
+        onAddBullet={mockOnAddBullet}
+      />
+    )
+
+    await userEvent.click(screen.getByTestId('add-bullet-btn'))
+    expect(mockOnAddBullet).toHaveBeenCalledTimes(1)
   })
 })
