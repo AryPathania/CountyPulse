@@ -11,7 +11,7 @@ Use **jscpd** and fail CI if duplication exceeds a tiny threshold.
 Suggested config:
 - ignore generated files (`types.ts`)
 - ignore `dist/`, `.turbo/`
-- start with threshold ~2–3% (tight), adjust if noisy
+- start with threshold ~1% (tight), adjust if noisy
 
 ## No skipped tests
 - enforce with a simple grep gate in CI:

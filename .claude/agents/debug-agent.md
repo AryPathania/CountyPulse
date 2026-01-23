@@ -95,7 +95,7 @@ Execute these 4 phases for EVERY fix:
 ```bash
 pnpm lint && pnpm typecheck
 pnpm test:coverage  # >90%
-pnpm dup:check      # <3%
+pnpm dup:check      # <1%
 pnpm test:e2e       # All pass
 ```
 

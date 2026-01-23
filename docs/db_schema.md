@@ -4,7 +4,7 @@ This file is the human-readable source of truth for table/column names, relation
 
 **Updated by:** DB Agent only
 **Updated when:** any migration changes schema
-**Last updated:** 2026-01-10 (migrations 016-019)
+**Last updated:** 2026-01-20 (migration 20260120000000)
 
 ---
 
@@ -114,6 +114,7 @@ This file is the human-readable source of truth for table/column names, relation
 | original_text | text | no | - |
 | current_text | text | no | - |
 | was_edited | boolean | generated | original_text IS DISTINCT FROM current_text |
+| is_draft | boolean | no | false |
 | embedding | vector(1536) | yes | - |
 | created_at | timestamptz | no | now() |
 | updated_at | timestamptz | no | now() |
@@ -126,6 +127,7 @@ This file is the human-readable source of truth for table/column names, relation
 **Indexes:**
 - `bullets_user_position_idx` on `(user_id, position_id)`
 - `bullets_user_category_idx` on `(user_id, category)`
+- `bullets_user_is_draft_idx` on `(user_id, is_draft)`
 - `bullets_embedding_idx` IVFFlat on `(embedding vector_cosine_ops)` with lists=100
 
 **RLS:**
@@ -133,6 +135,7 @@ This file is the human-readable source of truth for table/column names, relation
 
 **Notes:**
 - `was_edited` is a generated column that tracks if user modified the LLM output
+- `is_draft` is true while bullet is being captured during interview, false after interview completes
 - Embedding is populated asynchronously after bullet creation
 
 ---

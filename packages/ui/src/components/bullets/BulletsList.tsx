@@ -160,6 +160,14 @@ export function BulletsList({
                   {bullet.category && (
                     <span className="bullets-list__item-category">{bullet.category}</span>
                   )}
+                  {bullet.is_draft && (
+                    <span
+                      className="bullets-list__item-draft"
+                      data-testid="draft-badge"
+                    >
+                      Draft
+                    </span>
+                  )}
                   {bullet.was_edited && (
                     <span
                       className="bullets-list__item-edited"

@@ -22,6 +22,7 @@ export type Database = {
           embedding: string | null
           hard_skills: string[] | null
           id: string
+          is_draft: boolean
           original_text: string
           position_id: string
           soft_skills: string[] | null
@@ -36,6 +37,7 @@ export type Database = {
           embedding?: string | null
           hard_skills?: string[] | null
           id?: string
+          is_draft?: boolean
           original_text: string
           position_id: string
           soft_skills?: string[] | null
@@ -50,6 +52,7 @@ export type Database = {
           embedding?: string | null
           hard_skills?: string[] | null
           id?: string
+          is_draft?: boolean
           original_text?: string
           position_id?: string
           soft_skills?: string[] | null

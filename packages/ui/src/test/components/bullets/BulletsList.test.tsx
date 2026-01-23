@@ -3,11 +3,12 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BulletsList } from '../../../components/bullets/BulletsList'
 import type { BulletWithPosition } from '@odie/db'
+import { createMockBullet, TEST_USER_ID } from '../../fixtures'
 
 const mockBullets: BulletWithPosition[] = [
-  {
+  createMockBullet({
     id: 'bullet-1',
-    user_id: 'user-1',
+    user_id: TEST_USER_ID,
     position_id: 'position-1',
     original_text: 'Led team of 5 engineers',
     current_text: 'Led team of 5 engineers to deliver project on time',
@@ -15,17 +16,15 @@ const mockBullets: BulletWithPosition[] = [
     hard_skills: ['Python', 'SQL'],
     soft_skills: ['Leadership', 'Communication'],
     was_edited: true,
-    embedding: null,
-    created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-02T00:00:00Z',
     position: {
       company: 'Acme Corp',
       title: 'Tech Lead',
     },
-  },
-  {
+  }),
+  createMockBullet({
     id: 'bullet-2',
-    user_id: 'user-1',
+    user_id: TEST_USER_ID,
     position_id: 'position-2',
     original_text: 'Built REST API',
     current_text: 'Built REST API serving 1M requests/day',
@@ -33,14 +32,11 @@ const mockBullets: BulletWithPosition[] = [
     hard_skills: ['Node.js', 'PostgreSQL'],
     soft_skills: ['Problem Solving'],
     was_edited: false,
-    embedding: null,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
     position: {
       company: 'TechCo',
       title: 'Backend Engineer',
     },
-  },
+  }),
 ]
 
 describe('BulletsList', () => {
@@ -327,5 +323,96 @@ describe('BulletsList', () => {
 
     await userEvent.click(screen.getByTestId('add-bullet-btn'))
     expect(mockOnAddBullet).toHaveBeenCalledTimes(1)
+  })
+
+  describe('draft badge', () => {
+    it('renders draft badge when bullet.is_draft is true', () => {
+      const draftBullets: BulletWithPosition[] = [
+        createMockBullet({
+          id: 'bullet-draft',
+          original_text: 'Draft bullet text',
+          current_text: 'Draft bullet text',
+          category: 'Technical',
+          hard_skills: ['React'],
+          soft_skills: null,
+          is_draft: true,
+          position: {
+            company: 'Draft Corp',
+            title: 'Developer',
+          },
+        }),
+      ]
+
+      render(
+        <BulletsList
+          bullets={draftBullets}
+          selectedBulletId={null}
+          onSelectBullet={mockOnSelectBullet}
+        />
+      )
+
+      const draftBadge = screen.getByTestId('draft-badge')
+      expect(draftBadge).toBeInTheDocument()
+      expect(draftBadge).toHaveTextContent('Draft')
+    })
+
+    it('does not render draft badge when bullet.is_draft is false', () => {
+      const nonDraftBullets: BulletWithPosition[] = [
+        createMockBullet({
+          id: 'bullet-final',
+          original_text: 'Final bullet text',
+          current_text: 'Final bullet text',
+          category: 'Technical',
+          hard_skills: ['React'],
+          soft_skills: null,
+          is_draft: false,
+          position: {
+            company: 'Final Corp',
+            title: 'Developer',
+          },
+        }),
+      ]
+
+      render(
+        <BulletsList
+          bullets={nonDraftBullets}
+          selectedBulletId={null}
+          onSelectBullet={mockOnSelectBullet}
+        />
+      )
+
+      expect(screen.queryByTestId('draft-badge')).not.toBeInTheDocument()
+    })
+
+    it('shows both draft and edited badges when applicable', () => {
+      const mixedBullets: BulletWithPosition[] = [
+        createMockBullet({
+          id: 'bullet-draft-edited',
+          original_text: 'Original text',
+          current_text: 'Edited text',
+          category: 'Technical',
+          hard_skills: null,
+          soft_skills: null,
+          was_edited: true,
+          is_draft: true,
+          updated_at: '2024-01-02T00:00:00Z',
+          position: {
+            company: 'Mixed Corp',
+            title: 'Developer',
+          },
+        }),
+      ]
+
+      render(
+        <BulletsList
+          bullets={mixedBullets}
+          selectedBulletId={null}
+          onSelectBullet={mockOnSelectBullet}
+        />
+      )
+
+      expect(screen.getByTestId('draft-badge')).toBeInTheDocument()
+      expect(screen.getByTestId('bullet-edited-indicator')).toBeInTheDocument()
+    })
   })
 })

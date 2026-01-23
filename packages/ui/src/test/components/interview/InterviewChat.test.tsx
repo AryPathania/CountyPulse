@@ -230,4 +230,147 @@ describe('InterviewChat', () => {
       expect(preview).toHaveTextContent('1 bullets')
     })
   })
+
+  describe('persistence features', () => {
+    it('renders persistence notice with correct text', () => {
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+        />
+      )
+
+      const notice = screen.getByTestId('persistence-notice')
+      expect(notice).toBeInTheDocument()
+      expect(notice).toHaveTextContent('Your progress is saved in this browser only')
+    })
+
+    it('uses initialMessages when provided', () => {
+      const initialMessages = [
+        {
+          id: 'msg-1',
+          role: 'assistant' as const,
+          content: 'Restored greeting message',
+          timestamp: '2024-01-15T10:00:00Z',
+        },
+        {
+          id: 'msg-2',
+          role: 'user' as const,
+          content: 'Restored user message',
+          timestamp: '2024-01-15T10:01:00Z',
+        },
+      ]
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+          initialMessages={initialMessages}
+        />
+      )
+
+      // Should display the restored messages instead of default greeting
+      expect(screen.getByText('Restored greeting message')).toBeInTheDocument()
+      expect(screen.getByText('Restored user message')).toBeInTheDocument()
+      // Should NOT show default greeting
+      expect(screen.queryByText(/I'm Odie/)).not.toBeInTheDocument()
+    })
+
+    it('uses initialExtractedData when provided', () => {
+      const initialExtractedData = {
+        positions: [
+          {
+            position: {
+              company: 'Restored Corp',
+              title: 'Restored Engineer',
+            },
+            bullets: [
+              { text: 'Restored bullet 1' },
+              { text: 'Restored bullet 2' },
+            ],
+          },
+        ],
+      }
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+          initialExtractedData={initialExtractedData}
+        />
+      )
+
+      // Preview should show the restored position
+      const preview = screen.getByTestId('interview-preview')
+      expect(preview).toBeInTheDocument()
+      expect(preview).toHaveTextContent('Restored Corp')
+      expect(preview).toHaveTextContent('Restored Engineer')
+      expect(preview).toHaveTextContent('2 bullets')
+    })
+
+    it('calls onStateChange when messages change', async () => {
+      const mockOnStateChange = vi.fn()
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+          onStateChange={mockOnStateChange}
+        />
+      )
+
+      // Initial message triggers onStateChange
+      await waitFor(() => {
+        expect(mockOnStateChange).toHaveBeenCalled()
+      })
+
+      // Send a message
+      await userEvent.type(screen.getByTestId('interview-input'), 'Test message')
+      await userEvent.click(screen.getByTestId('interview-send'))
+
+      // Should have been called again with updated messages
+      await waitFor(() => {
+        expect(mockOnStateChange.mock.calls.length).toBeGreaterThan(1)
+        // Last call should include the user message
+        const lastCall = mockOnStateChange.mock.calls[mockOnStateChange.mock.calls.length - 1]
+        const messages = lastCall[0]
+        expect(messages.some((m: { content: string }) => m.content === 'Test message')).toBe(true)
+      })
+    })
+
+    it('calls onStateChange when extractedData changes', async () => {
+      const mockOnStateChange = vi.fn()
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+          onStateChange={mockOnStateChange}
+        />
+      )
+
+      // Trigger position extraction
+      await userEvent.type(screen.getByTestId('interview-input'), 'Acme Corp, Software Engineer')
+      await userEvent.click(screen.getByTestId('interview-send'))
+
+      // Wait for extraction to happen
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-preview')).toBeInTheDocument()
+      })
+
+      // onStateChange should have been called with extracted data
+      await waitFor(() => {
+        const calls = mockOnStateChange.mock.calls
+        const lastCall = calls[calls.length - 1]
+        const extractedData = lastCall[1]
+        expect(extractedData.positions.length).toBeGreaterThan(0)
+        expect(extractedData.positions[0].position.company).toBe('Acme Corp')
+      })
+    })
+  })
 })

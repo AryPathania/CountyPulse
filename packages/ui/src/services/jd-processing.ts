@@ -1,4 +1,5 @@
 import { supabase, createJobDraft, matchBulletsForJd, createRunLogger } from '@odie/db'
+import { toPgVector } from '@odie/shared'
 
 export interface JdProcessingResult {
   draftId: string
@@ -71,13 +72,10 @@ export async function processJobDescription(
     const matchedBulletIds = matches.map((m) => m.id)
 
     // Step 3: Create job draft record
-    // Convert embedding array to pgvector format string
-    const embeddingString = `[${embedding.join(',')}]`
-
     const draft = await createJobDraft({
       user_id: userId,
       jd_text: jdText,
-      jd_embedding: embeddingString,
+      jd_embedding: toPgVector(embedding),
       retrieved_bullet_ids: matchedBulletIds,
       selected_bullet_ids: matchedBulletIds.slice(0, 10), // Pre-select top 10
     })

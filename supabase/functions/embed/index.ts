@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { extractBearerToken } from '../_shared/auth.ts'
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -31,7 +32,7 @@ serve(async (req) => {
 
     // Verify JWT and get user
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const token = authHeader.replace('Bearer ', '')
+    const token = extractBearerToken(authHeader)
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
 
     if (authError || !user) {

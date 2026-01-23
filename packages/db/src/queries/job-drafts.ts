@@ -1,5 +1,6 @@
 import { supabase } from '../client'
 import type { Database } from '../types'
+import { toPgVector } from '@odie/shared'
 
 type JobDraft = Database['public']['Tables']['job_drafts']['Row']
 type NewJobDraft = Database['public']['Tables']['job_drafts']['Insert']
@@ -146,11 +147,8 @@ export async function matchBulletsForJd(
   matchCount: number = 50,
   matchThreshold: number = 0.5
 ): Promise<Array<{ id: string; current_text: string; category: string | null; similarity: number }>> {
-  // Convert embedding array to pgvector format string
-  const embeddingString = `[${jdEmbedding.join(',')}]`
-
   const { data, error } = await supabase.rpc('match_bullets', {
-    query_embedding: embeddingString,
+    query_embedding: toPgVector(jdEmbedding),
     match_user_id: userId,
     match_count: matchCount,
     match_threshold: matchThreshold,

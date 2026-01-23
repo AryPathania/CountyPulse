@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { BulletWithPosition } from '@odie/db'
+import { parseSkills, joinSkills } from '@odie/shared'
 import './BulletEditor.css'
 
 export interface BulletEditorProps {
@@ -43,8 +44,8 @@ export function BulletEditor({
     if (bullet) {
       setCurrentText(bullet.current_text)
       setCategory(bullet.category ?? '')
-      setHardSkills(bullet.hard_skills?.join(', ') ?? '')
-      setSoftSkills(bullet.soft_skills?.join(', ') ?? '')
+      setHardSkills(joinSkills(bullet.hard_skills))
+      setSoftSkills(joinSkills(bullet.soft_skills))
       setShowOriginal(false) // Reset show original state when bullet changes
     } else {
       setCurrentText('')
@@ -66,13 +67,6 @@ export function BulletEditor({
     )
   }
 
-  const parseSkills = (input: string): string[] => {
-    return input
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0)
-  }
-
   const handleSave = () => {
     onSave({
       current_text: currentText,
@@ -85,8 +79,8 @@ export function BulletEditor({
   const hasChanges =
     currentText !== bullet.current_text ||
     category !== (bullet.category ?? '') ||
-    hardSkills !== (bullet.hard_skills?.join(', ') ?? '') ||
-    softSkills !== (bullet.soft_skills?.join(', ') ?? '')
+    hardSkills !== joinSkills(bullet.hard_skills) ||
+    softSkills !== joinSkills(bullet.soft_skills)
 
   return (
     <div

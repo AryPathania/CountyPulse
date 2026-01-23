@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { extractBearerToken } from '../_shared/auth.ts'
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -18,11 +19,13 @@ Your goal is to extract:
 
 Guidelines:
 - Ask about one position at a time, starting with the most recent
-- For each position, probe for specific achievements with metrics
+- For each position, probe for specific achievements with concrete details: scale (users, transactions, data volume), tech stack, team size, timeline, business impact ($, %, time saved). Ask follow-up questions like "How many users?", "What technologies?", "Regional or global?" to transform vague statements into impressive STAR bullets.
 - Convert stories into STAR format bullets (Situation, Task, Action, Result)
 - Extract quantifiable metrics when possible (%, $, time saved, users, etc.)
 - Categorize bullets (Leadership, Frontend, Backend, Data, Communication, etc.)
 - Identify hard skills (Python, React, SQL, etc.) and soft skills (teamwork, communication, etc.)
+- Dig for details until you have enough to write impressive STAR bullets, then ask if they want to add more about this position or move on. Respect their choice to move on.
+- If the user mentioned multiple positions, internships, or education earlier, circle back to cover each one before ending.
 
 Response format:
 Always respond with valid JSON in this structure:
@@ -32,6 +35,11 @@ Always respond with valid JSON in this structure:
   "extractedBullets": [{ "text": "STAR bullet", "category": "...", "hardSkills": [...], "softSkills": [...] }] | null,
   "shouldContinue": true/false
 }
+
+When to end (shouldContinue: false):
+- Only after explicitly asking "Is there anything else you'd like to add, or are you ready to wrap up?"
+- Only after the user confirms they're done
+- Never end if the user mentioned experiences (positions, internships, education) that haven't been explored yet
 
 When shouldContinue is false, summarize what was collected.
 Never invent metrics - ask follow-up questions when details are missing.`
@@ -62,7 +70,7 @@ serve(async (req) => {
 
     // Verify JWT and get user
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const token = authHeader.replace('Bearer ', '')
+    const token = extractBearerToken(authHeader)
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
 
     if (authError || !user) {

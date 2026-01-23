@@ -143,3 +143,53 @@ export async function deleteBullet(bulletId: string): Promise<void> {
     throw error
   }
 }
+
+/**
+ * Create a draft bullet (during interview)
+ */
+export async function createDraftBullet(
+  bullet: Omit<NewBullet, 'is_draft' | 'embedding'>
+): Promise<Bullet> {
+  const { data, error } = await supabase
+    .from('bullets')
+    .insert({ ...bullet, is_draft: true })
+    .select()
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+/**
+ * Finalize draft bullets (mark as non-draft after interview completes)
+ */
+export async function finalizeDraftBullets(bulletIds: string[]): Promise<void> {
+  if (bulletIds.length === 0) return
+
+  const { error } = await supabase
+    .from('bullets')
+    .update({ is_draft: false })
+    .in('id', bulletIds)
+
+  if (error) {
+    throw error
+  }
+}
+
+/**
+ * Delete orphaned draft bullets for a user (cleanup)
+ */
+export async function deleteOrphanedDrafts(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('bullets')
+    .delete()
+    .eq('user_id', userId)
+    .eq('is_draft', true)
+
+  if (error) {
+    throw error
+  }
+}

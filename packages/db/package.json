@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@odie/shared": "workspace:*",
     "@supabase/supabase-js": "^2.0.0"
   },
   "devDependencies": {

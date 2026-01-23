@@ -11,7 +11,7 @@ This document defines the quality standards enforced across the Odie AI codebase
 **Why it matters**: Inconsistencies in behavior always trace back to duplicate code. When similar features behave differently, there's likely duplicated implementations.
 
 **Detection**:
-- `pnpm dup:check` (jscpd with <3% threshold)
+- `pnpm dup:check` (jscpd with <1% threshold)
 
 **Fix**:
 - Extract to shared helper/component
@@ -113,7 +113,7 @@ pnpm typecheck
 # Unit/integration tests with coverage (>90%)
 pnpm test:coverage
 
-# Code duplication (<3%)
+# Code duplication (<1%)
 pnpm dup:check
 
 # E2E tests
@@ -131,7 +131,7 @@ pnpm quality
 | Metric | Threshold | Command |
 |--------|-----------|---------|
 | Test Coverage | >90% | `pnpm test:coverage` |
-| Code Duplication | <3% | `pnpm dup:check` |
+| Code Duplication | <1% | `pnpm dup:check` |
 | Skipped Tests | 0 | `pnpm no-skip` |
 | Lint Errors | 0 | `pnpm lint` |
 | Type Errors | 0 | `pnpm typecheck` |

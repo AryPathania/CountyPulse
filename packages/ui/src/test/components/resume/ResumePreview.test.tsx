@@ -1,36 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ResumePreview } from '../../../components/resume/ResumePreview'
-import type { ResumeWithBullets } from '@odie/db'
-
-const createMockResume = (overrides: Partial<ResumeWithBullets> = {}): ResumeWithBullets => ({
-  id: 'resume-123',
-  user_id: 'user-123',
-  name: 'Test Resume',
-  template_id: 'classic_v1',
-  content: { sections: [] },
-  created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-01T00:00:00Z',
-  parsedContent: {
-    sections: [
-      {
-        id: 'experience',
-        title: 'Experience',
-        items: [{ type: 'bullet', bulletId: 'bullet-1' }],
-      },
-    ],
-  },
-  bullets: [
-    {
-      id: 'bullet-1',
-      current_text: 'Led team of 5 engineers',
-      category: 'Leadership',
-      position: { id: 'pos-1', company: 'Tech Corp', title: 'Lead Engineer' },
-    },
-  ],
-  positions: [],
-  ...overrides,
-})
+import { createMockResume } from '../../fixtures'
 
 describe('ResumePreview', () => {
   it('should render resume preview container', () => {

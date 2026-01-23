@@ -3,25 +3,16 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BulletEditor } from '../../../components/bullets/BulletEditor'
 import type { BulletWithPosition } from '@odie/db'
+import { createMockBullet } from '../../fixtures'
 
-const mockBullet: BulletWithPosition = {
-  id: 'bullet-1',
-  user_id: 'user-1',
-  position_id: 'position-1',
+const mockBullet: BulletWithPosition = createMockBullet({
   original_text: 'Original bullet text',
   current_text: 'Current bullet text',
   category: 'Leadership',
   hard_skills: ['Python', 'SQL'],
   soft_skills: ['Communication', 'Teamwork'],
   was_edited: false,
-  embedding: null,
-  created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-01T00:00:00Z',
-  position: {
-    company: 'Acme Corp',
-    title: 'Software Engineer',
-  },
-}
+})
 
 describe('BulletEditor', () => {
   const mockOnSave = vi.fn()

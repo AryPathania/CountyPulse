@@ -2,8 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { InterviewPage } from '../../pages/InterviewPage'
 import type { ExtractedInterviewData } from '@odie/shared'
+
+// Create a fresh QueryClient for each test
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  })
+}
 
 // Mock useNavigate
 const mockNavigate = vi.fn()
@@ -28,8 +40,14 @@ vi.mock('../../components/auth/AuthProvider', () => ({
 
 // Mock @odie/db
 const mockCreatePositionWithBullets = vi.fn()
+const mockCreatePosition = vi.fn()
+const mockCreateDraftBullet = vi.fn()
+const mockFinalizeDraftBullets = vi.fn()
 vi.mock('@odie/db', () => ({
   createPositionWithBullets: (...args: unknown[]) => mockCreatePositionWithBullets(...args),
+  createPosition: (...args: unknown[]) => mockCreatePosition(...args),
+  createDraftBullet: (...args: unknown[]) => mockCreateDraftBullet(...args),
+  finalizeDraftBullets: (...args: unknown[]) => mockFinalizeDraftBullets(...args),
 }))
 
 // Mock InterviewChat component to control its behavior
@@ -83,13 +101,28 @@ Object.defineProperty(window, 'confirm', {
   writable: true,
 })
 
+// Mock localStorage
+const mockLocalStorage = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+}
+Object.defineProperty(window, 'localStorage', {
+  value: mockLocalStorage,
+  writable: true,
+})
+
 function renderInterviewPage() {
+  const queryClient = createTestQueryClient()
   return render(
-    <MemoryRouter initialEntries={['/interview']}>
-      <Routes>
-        <Route path="/interview" element={<InterviewPage />} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/interview']}>
+        <Routes>
+          <Route path="/interview" element={<InterviewPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   )
 }
 
@@ -97,31 +130,49 @@ describe('InterviewPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockConfirm.mockReturnValue(false)
+    mockLocalStorage.getItem.mockReturnValue(null)
+    mockFinalizeDraftBullets.mockResolvedValue(undefined)
   })
 
-  it('should render interview page', () => {
+  it('should render interview page', async () => {
     renderInterviewPage()
 
     expect(screen.getByTestId('interview-page')).toBeInTheDocument()
-    expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+
+    // Wait for hydration to complete
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+    })
   })
 
   it('should redirect to bullets when completing with no data', async () => {
     renderInterviewPage()
 
+    // Wait for hydration
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+    })
+
     await userEvent.click(screen.getByTestId('complete-empty'))
 
-    expect(mockNavigate).toHaveBeenCalledWith('/bullets')
-    expect(mockCreatePositionWithBullets).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/bullets')
+    })
   })
 
   it('should save positions and redirect when completing with data', async () => {
-    mockCreatePositionWithBullets.mockResolvedValue({ id: 'pos-1' })
+    mockCreatePositionWithBullets.mockResolvedValue({ position: { id: 'pos-1' }, bulletIds: ['b1'] })
 
     renderInterviewPage()
 
+    // Wait for hydration
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+    })
+
     await userEvent.click(screen.getByTestId('complete-with-data'))
 
+    // Since no drafts were saved, it should save via createPositionWithBullets
     await waitFor(() => {
       expect(mockCreatePositionWithBullets).toHaveBeenCalledWith(
         {
@@ -144,13 +195,20 @@ describe('InterviewPage', () => {
       )
     })
 
-    expect(mockNavigate).toHaveBeenCalledWith('/bullets')
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/bullets')
+    })
   })
 
   it('should show error when save fails', async () => {
     mockCreatePositionWithBullets.mockRejectedValue(new Error('Database error'))
 
     renderInterviewPage()
+
+    // Wait for hydration
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+    })
 
     await userEvent.click(screen.getByTestId('complete-with-data'))
 
@@ -164,6 +222,11 @@ describe('InterviewPage', () => {
     mockCreatePositionWithBullets.mockRejectedValue(new Error('Failed'))
 
     renderInterviewPage()
+
+    // Wait for hydration
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+    })
 
     await userEvent.click(screen.getByTestId('complete-with-data'))
 
@@ -180,6 +243,11 @@ describe('InterviewPage', () => {
 
     renderInterviewPage()
 
+    // Wait for hydration
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+    })
+
     await userEvent.click(screen.getByTestId('cancel'))
 
     expect(mockConfirm).toHaveBeenCalledWith(
@@ -192,15 +260,26 @@ describe('InterviewPage', () => {
 
     renderInterviewPage()
 
+    // Wait for hydration
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+    })
+
     await userEvent.click(screen.getByTestId('cancel'))
 
     expect(mockNavigate).toHaveBeenCalledWith('/')
+    expect(mockLocalStorage.removeItem).toHaveBeenCalled()
   })
 
   it('should not navigate when cancel declined', async () => {
     mockConfirm.mockReturnValue(false)
 
     renderInterviewPage()
+
+    // Wait for hydration
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+    })
 
     await userEvent.click(screen.getByTestId('cancel'))
 

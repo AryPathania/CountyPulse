@@ -12,27 +12,53 @@ export interface InterviewChatProps {
   onComplete: (data: ExtractedInterviewData) => void
   onCancel: () => void
   config?: InterviewServiceConfig
+  initialMessages?: ChatMessage[]
+  initialExtractedData?: ExtractedInterviewData
+  onStateChange?: (
+    messages: ChatMessage[],
+    extractedData: ExtractedInterviewData
+  ) => void
 }
 
-export function InterviewChat({ onComplete, onCancel, config }: InterviewChatProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+export function InterviewChat({
+  onComplete,
+  onCancel,
+  config,
+  initialMessages,
+  initialExtractedData,
+  onStateChange,
+}: InterviewChatProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages ?? [])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isComplete, setIsComplete] = useState(false)
-  const [extractedData, setExtractedData] = useState<ExtractedInterviewData>({ positions: [] })
+  const [extractedData, setExtractedData] = useState<ExtractedInterviewData>(
+    initialExtractedData ?? { positions: [] }
+  )
+  const [hasInitialized, setHasInitialized] = useState(!!initialMessages?.length)
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Initialize chat with greeting
+  // Initialize chat with greeting (only if no initial messages provided)
   useEffect(() => {
+    if (hasInitialized) return
+
     if (config?.useMock) {
       resetMockState()
     }
     const initialMessage = getInitialMessage()
     setMessages([initialMessage])
-  }, [config?.useMock])
+    setHasInitialized(true)
+  }, [config?.useMock, hasInitialized])
+
+  // Notify parent when state changes for persistence
+  useEffect(() => {
+    if (onStateChange && messages.length > 0) {
+      onStateChange(messages, extractedData)
+    }
+  }, [messages, extractedData, onStateChange])
 
   // Scroll to bottom when messages change (within container only, not page)
   useEffect(() => {
@@ -164,6 +190,11 @@ export function InterviewChat({ onComplete, onCancel, config }: InterviewChatPro
             Cancel
           </button>
         </div>
+      </div>
+
+      <div className="interview-persistence-notice" data-testid="persistence-notice">
+        <span className="notice-icon">*</span>
+        <span>Your progress is saved in this browser only</span>
       </div>
 
       <div className="messages-container" data-testid="interview-messages" ref={messagesContainerRef}>
