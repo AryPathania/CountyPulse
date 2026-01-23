@@ -139,9 +139,13 @@ export function InterviewChat({
           if (prev.positions.length === 0) return prev
           const updated = [...prev.positions]
           const lastIndex = updated.length - 1
+          // Deduplicate: only add bullets whose text doesn't already exist
+          const existingTexts = new Set(updated[lastIndex].bullets.map((b) => b.text))
+          const newBullets = result.extractedBullets!.filter((b) => !existingTexts.has(b.text))
+          if (newBullets.length === 0) return prev
           updated[lastIndex] = {
             ...updated[lastIndex],
-            bullets: [...updated[lastIndex].bullets, ...result.extractedBullets!],
+            bullets: [...updated[lastIndex].bullets, ...newBullets],
           }
           return { positions: updated }
         })

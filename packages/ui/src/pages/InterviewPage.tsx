@@ -36,6 +36,10 @@ export function InterviewPage() {
   // Track previously saved bullets to avoid duplicates
   const previouslySavedBulletsRef = useRef<Set<string>>(new Set())
 
+  // Refs to track current values for localStorage persistence without causing callback recreation
+  const savedBulletIdsRef = useRef<string[]>([])
+  const savedPositionMapRef = useRef<Map<string, string>>(new Map())
+
   // Load initial state from localStorage on mount
   useEffect(() => {
     if (isHydrated && user?.id && !hasLoadedInitialState) {
@@ -43,6 +47,7 @@ export function InterviewPage() {
       if (stored) {
         setInitialState(stored)
         setSavedBulletIds(stored.savedBulletIds)
+        savedBulletIdsRef.current = stored.savedBulletIds
         // Rebuild position map from saved IDs
         const posMap = new Map<string, string>()
         stored.savedPositionIds.forEach((id, idx) => {
@@ -53,6 +58,7 @@ export function InterviewPage() {
           }
         })
         setSavedPositionMap(posMap)
+        savedPositionMapRef.current = posMap
         // Mark all previously saved bullets as already tracked
         stored.savedBulletIds.forEach((id) => previouslySavedBulletsRef.current.add(id))
       }
@@ -83,6 +89,7 @@ export function InterviewPage() {
             })
             positionId = created.id
             setSavedPositionMap((prev) => new Map(prev).set(positionKey, positionId!))
+            savedPositionMapRef.current = new Map(savedPositionMapRef.current).set(positionKey, positionId!)
           } catch (err) {
             console.error('Failed to create position:', err)
             continue
@@ -109,6 +116,7 @@ export function InterviewPage() {
             })
             previouslySavedBulletsRef.current.add(bulletKey)
             setSavedBulletIds((prev) => [...prev, created.id])
+            savedBulletIdsRef.current = [...savedBulletIdsRef.current, created.id]
 
             // Invalidate bullets query so BulletsPage shows the draft
             queryClient.invalidateQueries({ queryKey: ['bullets'] })
@@ -118,15 +126,15 @@ export function InterviewPage() {
         }
       }
 
-      // Save state to localStorage
+      // Save state to localStorage (use refs to avoid callback recreation)
       saveState({
         messages: messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
         extractedData,
-        savedBulletIds,
-        savedPositionIds: Array.from(savedPositionMap.values()),
+        savedBulletIds: savedBulletIdsRef.current,
+        savedPositionIds: Array.from(savedPositionMapRef.current.values()),
       })
     },
-    [user?.id, savedBulletIds, savedPositionMap, saveState, queryClient]
+    [user?.id, saveState, queryClient]
   )
 
   const handleComplete = useCallback(

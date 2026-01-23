@@ -8,4 +8,8 @@ playwright-report/
 test-results/
 packages/ui/playwright-report/
 packages/ui/test-results/
-screenshots/ 
+screenshots/
+
+# Test coverage
+coverage/
+packages/*/coverage/ 
