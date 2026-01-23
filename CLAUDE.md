@@ -67,9 +67,9 @@ pnpm gen-types        # Generate Supabase types
 **MVP Feature Complete** - All phases implemented + UI polish
 
 ### Test Coverage
-- **287 unit/integration tests** (Vitest + Testing Library)
-- **56 E2E tests** (Playwright)
-- **92%+ code coverage**
+- **397 unit/integration tests** (Vitest + Testing Library)
+- **73 E2E tests** (Playwright)
+- **91%+ code coverage**
 
 ### Completed Phases
 - Phase 0.5: Schema Inventory + Repo Alignment
@@ -82,6 +82,7 @@ pnpm gen-types        # Generate Supabase types
 - Phase 7: Templates + PDF Export (template registry, browser print)
 - Phase 8: Telemetry + Continuous Improvement (runs dashboard, bullet evolution)
 - Phase 9: Testing (Playwright E2E, screenshot on failure)
+- Phase 10: Voice Interview (Whisper STT, OpenAI TTS, voice controls)
 - UI Polish: Login centering, nav styling, bullets page navigation
 
 ## UI/UX Conventions
@@ -93,6 +94,7 @@ pnpm gen-types        # Generate Supabase types
 ## Skills
 - `playwright-screenshots`: Capture screenshots for visual UI verification
 - `visual-validation`: Before/after screenshot comparison for UX validation
+- `voice-interview`: Voice input/output patterns for interview feature
 
 ## Debugging Workflow
 Use `debug-agent` for all bug fixes and feedback implementation.

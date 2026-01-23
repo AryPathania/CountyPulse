@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import type { ChatMessage, ExtractedInterviewData } from '@odie/shared'
 import {
   sendInterviewMessage,
@@ -6,7 +6,12 @@ import {
   resetMockState,
   type InterviewServiceConfig,
 } from '../../services/interview'
+import { useVoiceInput } from '../../hooks/useVoiceInput'
+import { useVoiceOutput } from '../../hooks/useVoiceOutput'
+import { useVoiceSettings } from '../../hooks/useVoiceSettings'
+import { VoiceControls } from './VoiceControls'
 import './InterviewChat.css'
+import './VoiceControls.css'
 
 export interface InterviewChatProps {
   onComplete: (data: ExtractedInterviewData) => void
@@ -40,6 +45,38 @@ export function InterviewChat({
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Voice settings and hooks
+  const { settings: voiceSettings, setInputEnabled, setOutputEnabled, setVoice } = useVoiceSettings()
+
+  const handleTranscript = useCallback((text: string) => {
+    setInput((prev) => (prev ? `${prev} ${text}` : text))
+    inputRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  const { isRecording, isTranscribing, startRecording, stopRecording } = useVoiceInput({
+    onTranscript: handleTranscript,
+  })
+
+  const { isSpeaking, speak, stop: stopSpeaking } = useVoiceOutput({
+    voice: voiceSettings.voice,
+  })
+
+  const handleMicClick = useCallback(() => {
+    if (isRecording) {
+      stopRecording()
+    } else {
+      startRecording()
+    }
+  }, [isRecording, startRecording, stopRecording])
+
+  const handleSpeak = useCallback((text: string) => {
+    if (isSpeaking) {
+      stopSpeaking()
+    } else {
+      speak(text)
+    }
+  }, [isSpeaking, speak, stopSpeaking])
 
   // Initialize chat with greeting (only if no initial messages provided)
   useEffect(() => {
@@ -104,6 +141,11 @@ export function InterviewChat({
       }
 
       setMessages((prev) => [...prev, assistantMessage])
+
+      // Auto-play AI response if voice output is enabled
+      if (voiceSettings.outputEnabled) {
+        speak(result.response)
+      }
 
       // Handle extracted data
       if (result.extractedPosition) {
@@ -201,6 +243,23 @@ export function InterviewChat({
         <span>Your progress is saved in this browser only</span>
       </div>
 
+      <VoiceControls
+        inputEnabled={voiceSettings.inputEnabled}
+        outputEnabled={voiceSettings.outputEnabled}
+        voice={voiceSettings.voice}
+        isRecording={isRecording}
+        onInputToggle={() => setInputEnabled(!voiceSettings.inputEnabled)}
+        onOutputToggle={() => setOutputEnabled(!voiceSettings.outputEnabled)}
+        onVoiceChange={setVoice}
+        onMicClick={handleMicClick}
+      />
+
+      {isTranscribing && (
+        <div className="transcribing-indicator" data-testid="transcribing-indicator">
+          Transcribing...
+        </div>
+      )}
+
       <div className="messages-container" data-testid="interview-messages" ref={messagesContainerRef}>
         {messages.map((msg) => (
           <div
@@ -211,7 +270,23 @@ export function InterviewChat({
             <div className="message-avatar">
               {msg.role === 'assistant' ? '🤖' : '👤'}
             </div>
-            <div className="message-content">{msg.content}</div>
+            <div className="message-content">
+              {msg.content}
+              {msg.role === 'assistant' && voiceSettings.outputEnabled && (
+                <button
+                  type="button"
+                  className={`speak-button ${isSpeaking ? 'speaking' : ''}`}
+                  onClick={() => handleSpeak(msg.content)}
+                  data-testid="speak-button"
+                  aria-label={isSpeaking ? 'Stop speaking' : 'Speak message'}
+                  title={isSpeaking ? 'Stop speaking' : 'Speak message'}
+                >
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
         ))}
         {isLoading && (

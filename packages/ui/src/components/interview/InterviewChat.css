@@ -213,3 +213,27 @@
   color: var(--color-text-muted, #888);
   margin-left: 0.5rem;
 }
+
+/* Transcribing indicator */
+.transcribing-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin: 0 1rem;
+  background: var(--color-accent-muted, rgba(65, 105, 225, 0.25));
+  border-radius: 4px;
+  color: var(--color-accent, #4169e1);
+  font-size: 0.875rem;
+  animation: pulse-transcribing 1.5s infinite;
+}
+
+@keyframes pulse-transcribing {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
