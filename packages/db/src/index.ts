@@ -1,5 +1,5 @@
 // Database client and utilities
-export { supabase, testConnection } from './client'
+export { supabase } from './client'
 
 // Query functions
 export * from './queries/users'

@@ -72,13 +72,3 @@ export async function updateUserProfile(
   return data
 }
 
-/**
- * Check if a user profile exists by email
- * Note: This checks for existing user profiles, not auth.users directly
- */
-export async function checkUserProfileExists(email: string): Promise<{ exists: boolean; profile?: UserProfile }> {
-  // First, try to get the user by email from auth (this requires admin privileges)
-  // Since we can't access auth.users directly, we'll handle this in the auth flow
-  // For now, we'll return a simple response
-  return { exists: false }
-} 

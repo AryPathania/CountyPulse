@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { processJobDescription, extractJobMetadata } from '../../services/jd-processing'
+import { processJobDescription } from '../../services/jd-processing'
 
 // Mock @odie/db
 const mockGetSession = vi.fn()
@@ -193,69 +193,4 @@ describe('jd-processing service', () => {
     })
   })
 
-  describe('extractJobMetadata', () => {
-    it('should extract job title from first line', () => {
-      const jdText = `Senior Software Engineer
-      We are looking for a senior engineer to join our team.`
-
-      const result = extractJobMetadata(jdText)
-
-      expect(result.jobTitle).toBe('Senior Software Engineer')
-    })
-
-    it('should extract company name with "at" pattern', () => {
-      const jdText = `Software Engineer
-      Join us at Google.`
-
-      const result = extractJobMetadata(jdText)
-
-      expect(result.company).toBe('Google')
-    })
-
-    it('should extract company name with "@" pattern', () => {
-      const jdText = `Software Engineer
-      Position @ Microsoft`
-
-      const result = extractJobMetadata(jdText)
-
-      expect(result.company).toBe('Microsoft')
-    })
-
-    it('should extract company name with "for" pattern', () => {
-      const jdText = `Software Engineer
-      We are hiring for Amazon Web Services`
-
-      const result = extractJobMetadata(jdText)
-
-      expect(result.company).toBe('Amazon Web Services')
-    })
-
-    it('should truncate long job titles', () => {
-      const longTitle = 'A'.repeat(150)
-      const jdText = `${longTitle}
-      Some description here.`
-
-      const result = extractJobMetadata(jdText)
-
-      expect(result.jobTitle?.length).toBe(100)
-    })
-
-    it('should handle empty JD text', () => {
-      const result = extractJobMetadata('')
-
-      expect(result.jobTitle).toBeUndefined()
-      expect(result.company).toBeUndefined()
-    })
-
-    it('should handle JD without company pattern', () => {
-      const jdText = `Software Engineer
-      We need an experienced developer.
-      Must have 5 years of experience.`
-
-      const result = extractJobMetadata(jdText)
-
-      expect(result.jobTitle).toBe('Software Engineer')
-      expect(result.company).toBeUndefined()
-    })
-  })
 })

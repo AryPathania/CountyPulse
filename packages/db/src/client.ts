@@ -30,14 +30,3 @@ if (!config.url || !config.key) {
 
 export const supabase = createClient<Database>(config.url, config.key)
 
-// Verify connectivity by querying user_profiles table
-export const testConnection = async () => {
-  try {
-    const { data, error } = await supabase.from('user_profiles').select('*').limit(1)
-    if (error) throw error
-    return data
-  } catch (error) {
-    console.error('Supabase connection failed:', error)
-    throw error
-  }
-} 

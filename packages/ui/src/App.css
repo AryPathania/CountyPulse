@@ -214,21 +214,6 @@
   margin-top: var(--space-sm);
 }
 
-.user-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-xl);
-  padding: var(--space-md);
-  background-color: var(--color-background-subtle);
-  border-radius: var(--radius-md);
-}
-
-.user-info p {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
 /* Enhanced auth form styles */
 .auth-form h2 {
   margin-bottom: var(--space-md);
@@ -243,16 +228,6 @@
 
 .auth-form strong {
   color: var(--color-text);
-}
-
-.form-actions {
-  display: flex;
-  gap: var(--space-md);
-  margin-top: var(--space-md);
-}
-
-.form-actions button {
-  flex: 1;
 }
 
 .auth-form button.secondary {

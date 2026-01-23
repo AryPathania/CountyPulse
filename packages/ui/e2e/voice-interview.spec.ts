@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/auth'
-import { mockAuthState, TEST_USER } from './fixtures/auth'
+import { mockAuthState } from './fixtures/auth'
 import { setupApiMocks } from './fixtures/mock-data'
 
 /**

@@ -127,24 +127,3 @@ async function getMockResult(userId: string, jdText: string): Promise<JdProcessi
   }
 }
 
-/**
- * Extract job title and company from JD text (simple heuristic)
- */
-export function extractJobMetadata(jdText: string): { jobTitle?: string; company?: string } {
-  const lines = jdText.split('\n').filter((l) => l.trim())
-
-  // Simple heuristic: first non-empty line might be title
-  const jobTitle = lines[0]?.trim().slice(0, 100)
-
-  // Look for company name patterns
-  let company: string | undefined
-  for (const line of lines.slice(0, 5)) {
-    const companyMatch = line.match(/(?:at|@|for)\s+([A-Z][A-Za-z0-9\s&]+)/i)
-    if (companyMatch) {
-      company = companyMatch[1].trim()
-      break
-    }
-  }
-
-  return { jobTitle, company }
-}
