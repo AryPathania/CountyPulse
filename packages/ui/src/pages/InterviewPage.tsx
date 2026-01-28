@@ -59,8 +59,9 @@ export function InterviewPage() {
         })
         setSavedPositionMap(posMap)
         savedPositionMapRef.current = posMap
-        // Mark all previously saved bullets as already tracked
-        stored.savedBulletIds.forEach((id) => previouslySavedBulletsRef.current.add(id))
+        // Restore bulletKeys for deduplication (not UUIDs)
+        const bulletKeys = stored.savedBulletKeys ?? []
+        bulletKeys.forEach((key) => previouslySavedBulletsRef.current.add(key))
       }
       setHasLoadedInitialState(true)
     }
@@ -131,6 +132,7 @@ export function InterviewPage() {
         messages: messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
         extractedData,
         savedBulletIds: savedBulletIdsRef.current,
+        savedBulletKeys: Array.from(previouslySavedBulletsRef.current),
         savedPositionIds: Array.from(savedPositionMapRef.current.values()),
       })
     },

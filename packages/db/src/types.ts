@@ -302,6 +302,10 @@ export type Database = {
           similarity: number
         }[]
       }
+      reset_account_data: {
+        Args: { target_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

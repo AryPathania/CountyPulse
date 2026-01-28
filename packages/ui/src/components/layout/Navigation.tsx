@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { path: '/bullets', label: 'Bullets' },
   { path: '/interview', label: 'Interview' },
   { path: '/telemetry', label: 'Telemetry' },
+  { path: '/settings', label: 'Settings' },
 ]
 
 export function Navigation() {

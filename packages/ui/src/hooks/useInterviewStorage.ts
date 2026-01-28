@@ -22,6 +22,7 @@ export interface InterviewStorageState {
     }>
   }
   savedBulletIds: string[]
+  savedBulletKeys: string[] // bulletKeys for deduplication: `${company}|${title}|${text}`
   savedPositionIds: string[]
   lastUpdated: string
 }

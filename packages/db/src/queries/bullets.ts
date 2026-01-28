@@ -100,7 +100,7 @@ export async function createBullet(bullet: NewBullet): Promise<Bullet> {
 
 /**
  * Update a bullet (current_text, category, skills)
- * Automatically sets was_edited to true if current_text changes
+ * Note: was_edited is a generated column computed from original_text vs current_text
  */
 export async function updateBullet(
   bulletId: string,
@@ -109,11 +109,6 @@ export async function updateBullet(
   const updateData: UpdateBullet = {
     ...updates,
     updated_at: new Date().toISOString(),
-  }
-
-  // Mark as edited if text changed
-  if (updates.current_text !== undefined) {
-    updateData.was_edited = true
   }
 
   const { data, error } = await supabase

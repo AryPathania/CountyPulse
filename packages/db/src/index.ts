@@ -9,6 +9,7 @@ export * from './queries/positions'
 export * from './queries/runs'
 export * from './queries/job-drafts'
 export * from './queries/resumes'
+export * from './queries/account'
 
 // Types
 export type { Database } from './types'

@@ -12,6 +12,7 @@ import { ResumesPage } from './pages/ResumesPage'
 import { DraftResumePage } from './pages/DraftResumePage'
 import { ResumeBuilderPage } from './pages/ResumeBuilderPage'
 import { TelemetryPage } from './pages/TelemetryPage'
+import { SettingsPage } from './pages/SettingsPage'
 import './App.css'
 
 function AuthenticatedApp() {
@@ -64,6 +65,13 @@ function AuthenticatedApp() {
         <Route path="/telemetry" element={
           <AuthGuard fallback={<LoginForm />}>
             <TelemetryPage />
+          </AuthGuard>
+        } />
+
+        {/* Settings */}
+        <Route path="/settings" element={
+          <AuthGuard fallback={<LoginForm />}>
+            <SettingsPage />
           </AuthGuard>
         } />
 
