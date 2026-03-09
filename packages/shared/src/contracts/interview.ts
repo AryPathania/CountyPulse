@@ -87,3 +87,16 @@ export const ExtractedInterviewDataSchema = z.object({
 })
 
 export type ExtractedInterviewData = z.infer<typeof ExtractedInterviewDataSchema>
+
+// Interview configuration for tuning prompt behavior
+export const InterviewConfigSchema = z.object({
+  metricsEmphasis: z.enum(['low', 'medium', 'high']).default('high'),
+  followUpDepth: z.number().min(1).max(10).default(3),
+  explorationStyle: z.enum(['focused', 'balanced', 'exploratory']).default('exploratory'),
+  minBulletsPerPosition: z.number().min(1).max(10).default(4),
+  maxMessagesInContext: z.number().min(5).max(100).default(20),
+  temperature: z.number().min(0).max(2).default(0.7),
+  maxTokens: z.number().min(500).max(4000).default(2000),
+})
+
+export type InterviewConfig = z.infer<typeof InterviewConfigSchema>

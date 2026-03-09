@@ -23,11 +23,11 @@ export interface InterviewResult {
  */
 const MOCK_RESPONSES: Record<number, InterviewStepResponse> = {
   0: {
-    response: "Hi! I'm Odie, your AI career coach. I'll help you build a comprehensive profile for your resume. Let's start with your most recent position. What company are you working at or did you last work at, and what's your title?",
+    response: "Hi! I'm Odie, and I'm really excited to learn about your career. I'd love to start with what you're doing now or your most recent role — what company are you at, and what's your title?",
     shouldContinue: true,
   },
   1: {
-    response: "Great! You worked at Acme Corp as a Software Engineer. When did you start and end this role? And what city was it in?",
+    response: "Acme Corp, nice! And Software Engineer — that covers a lot of ground. When did you start there, and are you still in that role? And where is the team based?",
     extractedPosition: {
       company: 'Acme Corp',
       title: 'Software Engineer',
@@ -35,7 +35,7 @@ const MOCK_RESPONSES: Record<number, InterviewStepResponse> = {
     shouldContinue: true,
   },
   2: {
-    response: "Perfect, I have that noted. Now tell me about 3-6 key achievements or projects from this role. What was one impactful project you worked on? Include any metrics like time saved, users impacted, or revenue generated.",
+    response: "Got it — two years in San Francisco. That's a solid stint. I'd love to hear about the work itself. What's a project or accomplishment from Acme Corp that you're especially proud of?",
     extractedPosition: {
       company: 'Acme Corp',
       title: 'Software Engineer',
@@ -46,7 +46,7 @@ const MOCK_RESPONSES: Record<number, InterviewStepResponse> = {
     shouldContinue: true,
   },
   3: {
-    response: "Excellent! That's a strong accomplishment. You reduced API latency by 40% and improved user engagement. What other achievements would you like to highlight from Acme Corp?",
+    response: "A 40% latency reduction is really impressive! I'd love to understand the technical side — what was causing the bottleneck, and what approach did you take to fix it? Do you remember what the response times were before and after?",
     extractedBullets: [
       {
         text: 'Reduced API response latency by 40% through implementing Redis caching and query optimization, resulting in 25% improvement in user engagement metrics',
@@ -59,7 +59,7 @@ const MOCK_RESPONSES: Record<number, InterviewStepResponse> = {
     shouldContinue: true,
   },
   4: {
-    response: "Two great bullets from Acme Corp! Would you like to add any more achievements from this role, or shall we move on to discuss another position?",
+    response: "Migrating from a monolith to microservices is a huge undertaking — going from 2-hour deploys to 15 minutes must have changed how the whole team worked. How large was the engineering team, and what was your specific role in driving that migration?",
     extractedBullets: [
       {
         text: 'Led migration of legacy monolith to microservices architecture, reducing deployment time from 2 hours to 15 minutes and enabling 10x faster feature releases',
@@ -72,11 +72,11 @@ const MOCK_RESPONSES: Record<number, InterviewStepResponse> = {
     shouldContinue: true,
   },
   5: {
-    response: "Perfect! I've captured your profile. You have 1 position with 2 strong STAR-format bullets. Your bullets showcase Backend and Leadership skills. Would you like to add another position, or are we done for now?",
+    response: "Those are two really strong accomplishments. I'm curious — was there anything else at Acme Corp that you're proud of? Maybe something involving mentoring, a difficult technical challenge, or a project that had a big impact on customers?",
     shouldContinue: true,
   },
   6: {
-    response: "Great! Your interview is complete. I've captured:\n\n**Acme Corp - Software Engineer** (Jan 2022 - Jan 2024)\n- 2 bullets showcasing Backend and Leadership skills\n\nYou can now view and edit your bullets in the Bullets Library, or start drafting a tailored resume.",
+    response: "Thanks so much for sharing all of that! We covered your time at Acme Corp as a Software Engineer, including your API performance work and the microservices migration. Is there anything else you'd like to add about your career, or are you happy to wrap up?",
     shouldContinue: false,
   },
 }

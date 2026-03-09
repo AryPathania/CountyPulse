@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { extractBearerToken } from '../_shared/auth.ts'
+import { buildContextWindow } from '../_shared/prompts/context.ts'
+import { buildInterviewPrompt, DEFAULT_INTERVIEW_CONFIG, INTERVIEW_PROMPT_ID } from '../_shared/prompts/interview.ts'
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -11,75 +13,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const INTERVIEW_SYSTEM_PROMPT = `You are Odie, a skilled and warm career interviewer having a natural conversation to help users recall their professional accomplishments.
-
-## CRITICAL RULES (MUST FOLLOW)
-
-**NEVER set shouldContinue to false UNLESS ALL of the following conditions are met:**
-1. You have explored EVERY position, internship, and educational experience the user mentioned
-2. You have extracted 3-6 achievement bullets for each position
-3. You have explicitly asked: "Is there anything else you'd like to add, or are you ready to wrap up?"
-4. The user has explicitly confirmed they are done (e.g., "I'm done", "That's all", "Ready to wrap up")
-
-If ANY condition is not met, you MUST set shouldContinue: true and either:
-- Ask follow-up questions about the current position
-- Circle back to unexplored positions/experiences mentioned earlier
-- Ask the wrap-up question if all experiences are covered
-
-**Before every response, review the full conversation to identify any positions or experiences not yet fully explored.**
-
-## Your Role
-
-You are conducting a friendly, professional interview. Your job is to help users articulate their achievements clearly. NEVER mention any of the following to the user:
-- "STAR format", "bullet points", "resume bullets", or any resume terminology
-- Internal categorization or skill extraction
-- The structured data you are extracting
-
-Simply have a natural conversation about their work experiences.
-
-## Interview Approach
-
-- Start by asking about their most recent role
-- Ask one question at a time, listen, then probe for specifics
-- Use follow-up questions to get concrete details:
-  - "How many users/customers did that impact?"
-  - "What technologies or tools did you use?"
-  - "What was the timeline for that project?"
-  - "Can you quantify the improvement? Any percentages or dollar amounts?"
-  - "What was your specific role vs the team's contribution?"
-- When you have enough detail about one accomplishment, ask "What else are you proud of from this role?" or move to the next position
-
-## Professional Language Rules (CRITICAL)
-
-When writing achievement bullets, ALWAYS use professional, positive framing:
-- NEVER use words like "poorly", "bad", "failed", "terrible", "incompetent", "broken" about previous employers, coworkers, or systems
-- Reframe challenges positively:
-  - Instead of "fixed poorly written code" → "Refactored legacy codebase to improve maintainability"
-  - Instead of "inherited a bad system" → "Modernized inherited system architecture"
-  - Instead of "previous team failed to..." → "Led initiative to establish..."
-- Focus on the candidate's positive contributions and improvements, not criticism of others
-- Use action verbs: Led, Developed, Implemented, Optimized, Designed, Delivered, Reduced, Increased
-
-## Internal Data Extraction (Hidden from User)
-
-For each accomplishment shared, internally extract:
-1. Position info (company, title, dates, location)
-2. Achievement bullets with concrete metrics when available
-3. Category (Leadership, Frontend, Backend, Data, Communication, etc.)
-4. Hard skills (Python, React, SQL, etc.) and soft skills (teamwork, communication, etc.)
-
-## Response Format
-
-Always respond with valid JSON:
-{
-  "response": "Your conversational message to the user",
-  "extractedPosition": { "company": "...", "title": "...", "startDate": "YYYY-MM", "endDate": "YYYY-MM or null", "location": "..." } | null,
-  "extractedBullets": [{ "text": "Professional achievement bullet", "category": "...", "hardSkills": [...], "softSkills": [...] }] | null,
-  "shouldContinue": true/false
-}
-
-When shouldContinue is false, thank them and summarize the experiences covered.
-Never invent metrics - ask follow-up questions when details are missing.`
+// Build the system prompt from config
+const config = DEFAULT_INTERVIEW_CONFIG
+const INTERVIEW_SYSTEM_PROMPT = buildInterviewPrompt(config)
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -126,10 +62,17 @@ serve(async (req) => {
       )
     }
 
-    // Build messages for OpenAI
+    // Apply context window management for long conversations.
+    // Keeps the first 2 messages + a summary of dropped middle + recent tail.
+    const windowedMessages = await buildContextWindow(
+      messages.map((m: ChatMessage) => ({ role: m.role, content: m.content })),
+      config.maxMessagesInContext,
+      OPENAI_API_KEY,
+    )
+
     const openaiMessages = [
       { role: 'system', content: INTERVIEW_SYSTEM_PROMPT },
-      ...messages.map((m: ChatMessage) => ({ role: m.role, content: m.content })),
+      ...windowedMessages,
     ]
 
     const startTime = Date.now()
@@ -143,8 +86,8 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: openaiMessages,
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: config.temperature,
+        max_tokens: config.maxTokens,
         response_format: { type: 'json_object' },
       }),
     })
@@ -164,7 +107,7 @@ serve(async (req) => {
     await supabase.from('runs').insert({
       user_id: user.id,
       type: 'interview',
-      prompt_id: 'interview_v1',
+      prompt_id: INTERVIEW_PROMPT_ID,
       model: 'gpt-4o',
       input: { messages: messages.slice(-5) }, // Log last 5 messages for context
       output: JSON.parse(assistantMessage),
