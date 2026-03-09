@@ -32,10 +32,22 @@ export async function logRun(run: NewRun): Promise<Run> {
 export function createRunLogger(userId: string, type: RunType, promptId?: string) {
   const startTime = Date.now()
 
+  function buildEntry(success: boolean, output: Json, params: { model?: string; input?: Json; tokensIn?: number; tokensOut?: number }): NewRun {
+    return {
+      user_id: userId,
+      type,
+      prompt_id: promptId ?? null,
+      model: params.model ?? null,
+      input: params.input ?? null,
+      output,
+      success,
+      latency_ms: Date.now() - startTime,
+      tokens_in: params.tokensIn ?? null,
+      tokens_out: params.tokensOut ?? null,
+    }
+  }
+
   return {
-    /**
-     * Log successful completion
-     */
     async success(params: {
       model?: string
       input?: Json
@@ -43,42 +55,15 @@ export function createRunLogger(userId: string, type: RunType, promptId?: string
       tokensIn?: number
       tokensOut?: number
     }): Promise<Run> {
-      const latencyMs = Date.now() - startTime
-      return logRun({
-        user_id: userId,
-        type,
-        prompt_id: promptId ?? null,
-        model: params.model ?? null,
-        input: params.input ?? null,
-        output: params.output ?? null,
-        success: true,
-        latency_ms: latencyMs,
-        tokens_in: params.tokensIn ?? null,
-        tokens_out: params.tokensOut ?? null,
-      })
+      return logRun(buildEntry(true, params.output ?? null, params))
     },
 
-    /**
-     * Log failure
-     */
     async failure(params: {
       model?: string
       input?: Json
       error: string
     }): Promise<Run> {
-      const latencyMs = Date.now() - startTime
-      return logRun({
-        user_id: userId,
-        type,
-        prompt_id: promptId ?? null,
-        model: params.model ?? null,
-        input: params.input ?? null,
-        output: { error: params.error },
-        success: false,
-        latency_ms: latencyMs,
-        tokens_in: null,
-        tokens_out: null,
-      })
+      return logRun(buildEntry(false, { error: params.error }, { model: params.model, input: params.input }))
     },
   }
 }

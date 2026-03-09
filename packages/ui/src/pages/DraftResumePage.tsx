@@ -3,7 +3,8 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
 import { getJobDraftWithBullets, type JobDraftWithBullets } from '@odie/db'
-import { processJobDescription } from '../services/jd-processing'
+import { processJobDescription, analyzeJobDescriptionGaps, type GapAnalysisServiceResult } from '../services/jd-processing'
+import { GapAnalysis } from '../components/draft/GapAnalysis'
 import './DraftResumePage.css'
 
 /**
@@ -21,6 +22,8 @@ export function DraftResumePage() {
   const [draft, setDraft] = useState<JobDraftWithBullets | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [gapData, setGapData] = useState<GapAnalysisServiceResult | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   // Get JD text from navigation state (for new drafts)
   const jdTextFromState = (location.state as { jdText?: string } | null)?.jdText
@@ -63,6 +66,25 @@ export function DraftResumePage() {
 
     loadOrCreateDraft()
   }, [id, jdTextFromState, user?.id, navigate])
+
+  // Run gap analysis after draft loads
+  useEffect(() => {
+    if (!draft?.jd_text || !user?.id) return
+
+    const runGapAnalysis = async () => {
+      setIsAnalyzing(true)
+      try {
+        const result = await analyzeJobDescriptionGaps(user.id, draft.jd_text, draft.id)
+        setGapData(result)
+      } catch (err) {
+        console.error('Gap analysis failed:', err)
+      } finally {
+        setIsAnalyzing(false)
+      }
+    }
+
+    runGapAnalysis()
+  }, [draft?.id, draft?.jd_text, user?.id])
 
   const handleCreateResume = useCallback(() => {
     if (draft?.id) {
@@ -169,6 +191,25 @@ export function DraftResumePage() {
               </div>
             )}
           </section>
+
+          {isAnalyzing && (
+            <div className="draft-page__analyzing" data-testid="gap-loading">
+              <div className="spinner" />
+              <p>Analyzing requirements...</p>
+            </div>
+          )}
+
+          {gapData && (
+            <GapAnalysis
+              jobTitle={gapData.jobTitle}
+              company={gapData.company}
+              covered={gapData.covered}
+              gaps={gapData.gaps}
+              totalRequirements={gapData.totalRequirements}
+              coveredCount={gapData.coveredCount}
+              interviewContext={gapData.interviewContext}
+            />
+          )}
 
           {draft?.jd_text && (
             <aside className="draft-page__jd">

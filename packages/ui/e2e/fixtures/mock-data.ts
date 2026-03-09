@@ -125,6 +125,20 @@ export const MOCK_RESUMES = [
 /**
  * Set up API mocks for Supabase REST API.
  */
+function mockCreate(route: { request: () => { postDataJSON: () => Record<string, unknown> }; fulfill: (opts: Record<string, unknown>) => Promise<void> }, prefix: string) {
+  const body = route.request().postDataJSON()
+  return route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify([{
+      id: `${prefix}-new-${Date.now()}`,
+      ...body,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }]),
+  })
+}
+
 export async function setupApiMocks(page: Page) {
   // Mock bullets list
   await page.route('**/rest/v1/bullets*', async (route) => {
@@ -147,7 +161,6 @@ export async function setupApiMocks(page: Page) {
         })
       }
     } else if (method === 'PATCH') {
-      // Return updated bullet
       const body = route.request().postDataJSON()
       await route.fulfill({
         status: 200,
@@ -160,18 +173,7 @@ export async function setupApiMocks(page: Page) {
         body: '',
       })
     } else if (method === 'POST') {
-      const body = route.request().postDataJSON()
-      const newBullet = {
-        id: 'bullet-new-' + Date.now(),
-        ...body,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      await route.fulfill({
-        status: 201,
-        contentType: 'application/json',
-        body: JSON.stringify([newBullet]),
-      })
+      await mockCreate(route, 'bullet')
     } else {
       await route.continue()
     }
@@ -206,18 +208,7 @@ export async function setupApiMocks(page: Page) {
         body: JSON.stringify(MOCK_RESUMES),
       })
     } else if (method === 'POST') {
-      const body = route.request().postDataJSON()
-      const newResume = {
-        id: 'resume-new-' + Date.now(),
-        ...body,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-      await route.fulfill({
-        status: 201,
-        contentType: 'application/json',
-        body: JSON.stringify([newResume]),
-      })
+      await mockCreate(route, 'resume')
     } else if (method === 'PATCH') {
       const body = route.request().postDataJSON()
       await route.fulfill({

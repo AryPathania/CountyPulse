@@ -24,8 +24,6 @@ export function HomePage() {
       setError(null)
 
       try {
-        // TODO: Call JD processing service
-        // For now, navigate to a placeholder
         navigate('/resumes/draft', { state: { jdText: jdText.trim() } })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to process job description')
