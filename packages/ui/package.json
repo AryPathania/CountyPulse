@@ -25,6 +25,7 @@
     "@odie/db": "workspace:*",
     "@odie/shared": "workspace:*",
     "@tanstack/react-query": "^5.90.16",
+    "pdfjs-dist": "^5.5.207",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^6.8.1"

@@ -96,12 +96,12 @@ export type Database = {
           company: string | null
           created_at: string
           draft_resume_id: string | null
-          gap_analysis: Record<string, unknown> | null
+          gap_analysis: Json | null
           id: string
           jd_embedding: string | null
           jd_text: string
           job_title: string | null
-          parsed_requirements: Record<string, unknown> | null
+          parsed_requirements: Json | null
           retrieved_bullet_ids: string[] | null
           selected_bullet_ids: string[] | null
           user_id: string
@@ -110,12 +110,12 @@ export type Database = {
           company?: string | null
           created_at?: string
           draft_resume_id?: string | null
-          gap_analysis?: Record<string, unknown> | null
+          gap_analysis?: Json | null
           id?: string
           jd_embedding?: string | null
           jd_text: string
           job_title?: string | null
-          parsed_requirements?: Record<string, unknown> | null
+          parsed_requirements?: Json | null
           retrieved_bullet_ids?: string[] | null
           selected_bullet_ids?: string[] | null
           user_id: string
@@ -124,12 +124,12 @@ export type Database = {
           company?: string | null
           created_at?: string
           draft_resume_id?: string | null
-          gap_analysis?: Record<string, unknown> | null
+          gap_analysis?: Json | null
           id?: string
           jd_embedding?: string | null
           jd_text?: string
           job_title?: string | null
-          parsed_requirements?: Record<string, unknown> | null
+          parsed_requirements?: Json | null
           retrieved_bullet_ids?: string[] | null
           selected_bullet_ids?: string[] | null
           user_id?: string
@@ -254,6 +254,39 @@ export type Database = {
           tokens_in?: number | null
           tokens_out?: number | null
           type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      uploaded_resumes: {
+        Row: {
+          created_at: string
+          extracted_text: string | null
+          file_hash: string
+          file_name: string
+          id: string
+          parsed_data: Json | null
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          extracted_text?: string | null
+          file_hash: string
+          file_name: string
+          id?: string
+          parsed_data?: Json | null
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          extracted_text?: string | null
+          file_hash?: string
+          file_name?: string
+          id?: string
+          parsed_data?: Json | null
+          storage_path?: string
           user_id?: string
         }
         Relationships: []

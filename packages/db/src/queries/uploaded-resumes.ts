@@ -1,31 +1,10 @@
 import { supabase } from '../client'
+import type { Database, Json } from '../types'
 
-// NOTE: The uploaded_resumes table exists (migration 022) but types have not
-// been regenerated yet. We use inline types and cast through `unknown` to
-// satisfy the compiler until `pnpm gen-types` is run.
+export type UploadedResume = Database['public']['Tables']['uploaded_resumes']['Row']
+type NewUploadedResume = Database['public']['Tables']['uploaded_resumes']['Insert']
 
-export interface UploadedResume {
-  id: string
-  user_id: string
-  file_name: string
-  file_hash: string
-  storage_path: string
-  extracted_text: string | null
-  parsed_data: Record<string, unknown> | null
-  created_at: string
-}
-
-interface NewUploadedResume {
-  user_id: string
-  file_name: string
-  file_hash: string
-  storage_path: string
-  extracted_text?: string | null
-  parsed_data?: Record<string, unknown> | null
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- table not yet in generated types
-const table = () => (supabase as any).from('uploaded_resumes')
+const table = () => supabase.from('uploaded_resumes')
 
 /**
  * Create a new uploaded resume record
@@ -37,7 +16,7 @@ export async function createUploadedResume(data: NewUploadedResume): Promise<Upl
     .single()
 
   if (error) throw error
-  return result as unknown as UploadedResume
+  return result
 }
 
 /**
@@ -54,7 +33,7 @@ export async function getUploadedResumeByHash(
     .maybeSingle()
 
   if (error) throw error
-  return data as unknown as UploadedResume | null
+  return data
 }
 
 /**
@@ -67,7 +46,7 @@ export async function getUploadedResumes(userId: string): Promise<UploadedResume
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  return (data ?? []) as unknown as UploadedResume[]
+  return data ?? []
 }
 
 /**
@@ -94,7 +73,7 @@ export async function uploadResumeFile(
  */
 export async function updateUploadedResumeParsedData(
   resumeId: string,
-  parsedData: Record<string, unknown>
+  parsedData: Json
 ): Promise<void> {
   const { error } = await table()
     .update({ parsed_data: parsedData })

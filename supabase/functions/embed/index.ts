@@ -1,114 +1,37 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { extractBearerToken } from '../_shared/auth.ts'
-
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { withMiddleware, jsonResponse, fetchOpenAI, logRun } from '../_shared/middleware.ts'
+import type { HandlerContext } from '../_shared/middleware.ts'
 
 interface EmbedRequest {
   texts: string[]
   type: 'jd' | 'bullet'
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+withMiddleware(async (req: Request, ctx: HandlerContext) => {
+  const { texts, type } = await req.json() as EmbedRequest
+
+  if (!Array.isArray(texts) || texts.length === 0) {
+    return jsonResponse({ error: 'texts must be a non-empty array of strings' }, 400)
   }
 
-  try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+  const { data, latencyMs } = await fetchOpenAI(
+    'https://api.openai.com/v1/embeddings',
+    ctx.openaiKey,
+    { model: 'text-embedding-3-small', input: texts.map(t => t.slice(0, 8000)), dimensions: 1536 },
+  )
 
-    // Verify JWT and get user
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    const token = extractBearerToken(authHeader)
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  const embeddings: number[][] = data.data.map((d: { embedding: number[] }) => d.embedding)
 
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+  await logRun(ctx.supabase, {
+    user_id: ctx.user.id as string,
+    type: 'embed',
+    prompt_id: 'text-embedding-3-small',
+    model: 'text-embedding-3-small',
+    input: { texts_count: texts.length, first_text: texts[0].slice(0, 500), type },
+    output: { count: embeddings.length, dimensions: embeddings[0]?.length },
+    latency_ms: latencyMs,
+    tokens_in: data.usage?.total_tokens ?? null,
+    tokens_out: null,
+  })
 
-    const { texts, type } = await req.json() as EmbedRequest
-
-    if (!Array.isArray(texts) || texts.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'texts must be a non-empty array of strings' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    if (!OPENAI_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const startTime = Date.now()
-
-    // Call OpenAI embeddings API
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: texts.map(t => t.slice(0, 8000)),
-        dimensions: 1536,
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`OpenAI API error: ${response.status} ${errorText}`)
-    }
-
-    const data = await response.json()
-    const latencyMs = Date.now() - startTime
-
-    const embeddings: number[][] = data.data.map((d: any) => d.embedding)
-    const usage = data.usage
-
-    // Log the run for telemetry
-    await supabase.from('runs').insert({
-      user_id: user.id,
-      type: 'embed',
-      prompt_id: 'text-embedding-3-small',
-      model: 'text-embedding-3-small',
-      input: { texts_count: texts.length, first_text: texts[0].slice(0, 500), type },
-      output: { count: embeddings.length, dimensions: embeddings[0]?.length },
-      success: true,
-      latency_ms: latencyMs,
-      tokens_in: usage?.total_tokens ?? null,
-      tokens_out: null,
-    })
-
-    return new Response(
-      JSON.stringify({ embeddings }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-
-  } catch (error) {
-    console.error('Embed function error:', error)
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
+  return jsonResponse({ embeddings })
 })

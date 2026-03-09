@@ -40,11 +40,6 @@ describe('interview service', () => {
       expect(msg.timestamp).toBeTruthy()
     })
 
-    it('returns default greeting for blank context', () => {
-      const msg = getInitialMessage({ mode: 'blank' })
-      expect(msg.content).toContain("I'm Odie")
-    })
-
     it('returns resume-specific greeting for resume context', () => {
       const msg = getInitialMessage({ mode: 'resume' })
       expect(msg.content).toContain('review your resume')

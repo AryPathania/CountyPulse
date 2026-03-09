@@ -13,7 +13,7 @@ export * from './queries/resumes'
 export * from './queries/account'
 
 // Types
-export type { Database } from './types'
+export type { Database, Json } from './types'
 export type { User, Session } from '@supabase/supabase-js'
 
 // Odie Resume types
@@ -26,6 +26,7 @@ export type Bullet = Database['public']['Tables']['bullets']['Row']
 export type Resume = Database['public']['Tables']['resumes']['Row']
 export type JobDraft = Database['public']['Tables']['job_drafts']['Row']
 export type Run = Database['public']['Tables']['runs']['Row']
+export type UploadedResume = Database['public']['Tables']['uploaded_resumes']['Row']
 
 // Insert types for creating records
 export type NewCandidateProfile = Database['public']['Tables']['candidate_profiles']['Insert']

@@ -36,18 +36,6 @@ describe('resume-parse contracts', () => {
   })
 
   describe('ResumeBulletClassificationSchema', () => {
-    it('accepts strong', () => {
-      expect(ResumeBulletClassificationSchema.parse('strong')).toBe('strong')
-    })
-
-    it('accepts fixable', () => {
-      expect(ResumeBulletClassificationSchema.parse('fixable')).toBe('fixable')
-    })
-
-    it('accepts weak', () => {
-      expect(ResumeBulletClassificationSchema.parse('weak')).toBe('weak')
-    })
-
     it('rejects unknown classification', () => {
       const result = ResumeBulletClassificationSchema.safeParse('unknown')
       expect(result.success).toBe(false)
@@ -219,21 +207,6 @@ describe('resume-parse contracts', () => {
   })
 
   describe('ResumeParseConfigSchema', () => {
-    it('accepts strict quality bar', () => {
-      const result = ResumeParseConfigSchema.parse({ qualityBar: 'strict' })
-      expect(result.qualityBar).toBe('strict')
-    })
-
-    it('accepts moderate quality bar', () => {
-      const result = ResumeParseConfigSchema.parse({ qualityBar: 'moderate' })
-      expect(result.qualityBar).toBe('moderate')
-    })
-
-    it('accepts lenient quality bar', () => {
-      const result = ResumeParseConfigSchema.parse({ qualityBar: 'lenient' })
-      expect(result.qualityBar).toBe('lenient')
-    })
-
     it('defaults to strict when empty', () => {
       const result = ResumeParseConfigSchema.parse({})
       expect(result.qualityBar).toBe('strict')

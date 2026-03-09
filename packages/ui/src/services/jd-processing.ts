@@ -1,6 +1,6 @@
 import { supabase, createJobDraft, matchBulletsForJd, createRunLogger, matchBulletsPerRequirement, updateJobDraftRequirements } from '@odie/db'
 import { toPgVector } from '@odie/shared'
-import type { InterviewContext } from '@odie/shared'
+import type { InterviewContext, JdRequirement } from '@odie/shared'
 
 export interface JdProcessingResult {
   draftId: string
@@ -128,7 +128,7 @@ async function getMockResult(userId: string, jdText: string): Promise<JdProcessi
   }
 }
 
-export interface GapAnalysisResult {
+export interface GapAnalysisServiceResult {
   draftId: string
   jobTitle: string
   company: string | null
@@ -144,11 +144,6 @@ export interface GapAnalysisResult {
   interviewContext: InterviewContext | null
 }
 
-interface ParsedRequirement {
-  description: string
-  category: string
-  importance: string
-}
 
 /**
  * Process a JD with per-requirement gap analysis:
@@ -162,9 +157,7 @@ export async function analyzeJobDescriptionGaps(
   userId: string,
   jdText: string,
   draftId: string
-): Promise<GapAnalysisResult> {
-  console.log('[jd-gaps] Starting gap analysis')
-
+): Promise<GapAnalysisServiceResult> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not authenticated')
 
@@ -178,14 +171,13 @@ export async function analyzeJobDescriptionGaps(
   }
 
   const { jobTitle, company, requirements } = parseResponse.data
-  console.log('[jd-gaps] Parsed requirements:', requirements?.length)
 
   if (!requirements || requirements.length === 0) {
     throw new Error('No requirements extracted from job description')
   }
 
   // 2. Batch embed all requirements
-  const typedRequirements = requirements as ParsedRequirement[]
+  const typedRequirements = requirements as JdRequirement[]
   const requirementTexts = typedRequirements.map(r => r.description)
   const embedResponse = await supabase.functions.invoke('embed', {
     body: { texts: requirementTexts, type: 'jd' },
@@ -231,7 +223,6 @@ export async function analyzeJobDescriptionGaps(
     }))
 
   // 5. Store results on job_drafts
-  const parsedRequirements = requirements
   const gapAnalysis = {
     jobTitle,
     company,
@@ -244,7 +235,7 @@ export async function analyzeJobDescriptionGaps(
     coveredCount: covered.length,
   }
 
-  await updateJobDraftRequirements(draftId, parsedRequirements, gapAnalysis)
+  await updateJobDraftRequirements(draftId, requirements, gapAnalysis)
 
   // 6. Build gap interview context (only if there are gaps)
   let interviewContext: InterviewContext | null = null
@@ -266,8 +257,6 @@ export async function analyzeJobDescriptionGaps(
       company,
     }
   }
-
-  console.log('[jd-gaps] Analysis complete:', covered.length, 'covered,', gaps.length, 'gaps')
 
   return {
     draftId,

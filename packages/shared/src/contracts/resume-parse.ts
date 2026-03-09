@@ -68,12 +68,16 @@ export type ParsedResumePosition = z.infer<typeof ParsedResumePositionSchema>
 
 // --- Top-level parse output ---
 
+export const SkillsSchema = z.object({
+  hard: z.array(z.string()),
+  soft: z.array(z.string()),
+})
+
+export type Skills = z.infer<typeof SkillsSchema>
+
 export const ResumeParseOutputSchema = z.object({
   positions: z.array(ParsedResumePositionSchema),
-  skills: z.object({
-    hard: z.array(z.string()),
-    soft: z.array(z.string()),
-  }),
+  skills: SkillsSchema,
   education: z.array(ResumeEducationSchema).default([]),
   summary: z.string().nullish(),
 })

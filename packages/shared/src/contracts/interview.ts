@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ResumeEducationSchema } from './resume-parse'
+import { ResumeEducationSchema, SkillsSchema } from './resume-parse'
 
 /**
  * Interview contract schemas for LLM output validation
@@ -107,10 +107,7 @@ export const ResumeContextSchema = z.object({
     suggestedQuestion: z.string(),
   })),
   positions: z.array(PositionSchema),
-  skills: z.object({
-    hard: z.array(z.string()),
-    soft: z.array(z.string()),
-  }),
+  skills: SkillsSchema,
   education: z.array(ResumeEducationSchema).default([]),
 })
 

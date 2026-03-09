@@ -1,5 +1,5 @@
 import { supabase } from '../client'
-import type { Database } from '../types'
+import type { Database, Json } from '../types'
 import { toPgVector } from '@odie/shared'
 
 type JobDraft = Database['public']['Tables']['job_drafts']['Row']
@@ -210,8 +210,8 @@ export async function matchBulletsPerRequirement(
  */
 export async function updateJobDraftRequirements(
   draftId: string,
-  parsedRequirements: Record<string, unknown> | null,
-  gapAnalysis: Record<string, unknown> | null
+  parsedRequirements: Json | null,
+  gapAnalysis: Json | null
 ): Promise<JobDraft> {
   const { data, error } = await supabase
     .from('job_drafts')

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
 import { getJobDrafts, type JobDraft, getUploadedResumes, type UploadedResume } from '@odie/db'
+import { ResumeContextSchema } from '@odie/shared'
 import './ResumesPage.css'
 
 /**
@@ -85,16 +86,23 @@ export function ResumesPage() {
                           {new Date(resume.created_at).toLocaleDateString()}
                         </span>
                       </div>
-                      {resume.parsed_data && (
-                        <button
-                          onClick={() => navigate('/interview', {
-                            state: { interviewContext: { mode: 'resume', ...resume.parsed_data } }
-                          })}
-                          className="btn-secondary resumes-page__card-action"
-                        >
-                          Start Interview
-                        </button>
-                      )}
+                      {resume.parsed_data && (() => {
+                        const parsed = ResumeContextSchema.safeParse({
+                          mode: 'resume',
+                          ...resume.parsed_data,
+                        })
+                        if (!parsed.success) return null
+                        return (
+                          <button
+                            onClick={() => navigate('/interview', {
+                              state: { interviewContext: parsed.data }
+                            })}
+                            className="btn-secondary resumes-page__card-action"
+                          >
+                            Start Interview
+                          </button>
+                        )
+                      })()}
                     </div>
                   ))}
                 </div>

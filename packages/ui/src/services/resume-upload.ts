@@ -1,10 +1,11 @@
-import { supabase } from '@odie/db'
 import {
+  supabase,
   createUploadedResume,
   getUploadedResumeByHash,
   uploadResumeFile,
   createPositionWithBullets,
 } from '@odie/db'
+import type { Json } from '@odie/db'
 import type { InterviewContext, ResumeParseOutput } from '@odie/shared'
 import { ResumeParseOutputSchema } from '@odie/shared'
 
@@ -41,12 +42,10 @@ async function extractPdfText(file: File): Promise<string> {
   try {
     const mod = await import('../lib/pdf-extract')
     const text = await mod.extractTextFromPdf(file)
-    console.log('[resume-upload] Client extraction result:', text.length, 'chars')
     if (text.length >= 50) {
       return text
     }
   } catch {
-    console.log('[resume-upload] Client extraction unavailable, trying server fallback')
   }
 
   // Server-side fallback
@@ -61,9 +60,7 @@ async function extractPdfText(file: File): Promise<string> {
     throw new Error(response.error.message || 'Server PDF extraction failed')
   }
 
-  const serverText = response.data?.text || ''
-  console.log('[resume-upload] Server fallback extraction:', serverText.length, 'chars')
-  return serverText
+  return response.data?.text || ''
 }
 
 /**
@@ -81,8 +78,6 @@ export async function uploadAndParseResume(
   userId: string,
   file: File
 ): Promise<ResumeUploadResult> {
-  console.log('[resume-upload] Starting upload for file:', file.name)
-
   // 1. Validate file size
   if (file.size > MAX_FILE_SIZE) {
     throw new Error('File must be under 10MB')
@@ -94,7 +89,6 @@ export async function uploadAndParseResume(
   // 3. Check for duplicate
   const existing = await getUploadedResumeByHash(userId, fileHash)
   if (existing?.parsed_data) {
-    console.log('[resume-upload] Dedup hit, returning cached result')
     const parsedData = ResumeParseOutputSchema.parse(existing.parsed_data)
     return buildResult(existing.id, parsedData)
   }
@@ -123,7 +117,6 @@ export async function uploadAndParseResume(
 
   const parsed = ResumeParseOutputSchema.safeParse(parseResponse.data)
   if (!parsed.success) {
-    console.error('[resume-upload] Invalid parse response:', parsed.error)
     throw new Error('Invalid response format from resume parser')
   }
 
@@ -136,7 +129,7 @@ export async function uploadAndParseResume(
     file_hash: fileHash,
     storage_path: storagePath,
     extracted_text: extractedText,
-    parsed_data: parsedData as unknown as Record<string, unknown>,
+    parsed_data: parsedData as unknown as Json,
   })
 
   // 8. Create positions + strong/fixable bullets in DB
