@@ -1,8 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { extractBearerToken } from '../_shared/auth.ts'
-import { buildContextWindow } from '../_shared/prompts/context.ts'
-import { buildInterviewPrompt, DEFAULT_INTERVIEW_CONFIG, INTERVIEW_PROMPT_ID } from '../_shared/prompts/interview.ts'
+import { buildJdParsePrompt, JD_PARSE_PROMPT_ID } from '../_shared/prompts/jd-parse.ts'
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -13,15 +12,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-}
-
-interface InterviewRequest {
-  messages: ChatMessage[]
-  userId: string
-  context?: { mode: string; [key: string]: unknown }
+interface ParseJdRequest {
+  text: string
 }
 
 serve(async (req) => {
@@ -38,7 +30,6 @@ serve(async (req) => {
       )
     }
 
-    // Verify JWT and get user
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const token = extractBearerToken(authHeader)
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
@@ -50,18 +41,15 @@ serve(async (req) => {
       )
     }
 
-    const { messages, context } = await req.json() as InterviewRequest
+    const { text } = await req.json() as ParseJdRequest
+    console.log('[parse-jd] Parsing JD text, length:', text?.length)
 
-    // Build config with context (if provided)
-    const config = {
-      ...DEFAULT_INTERVIEW_CONFIG,
-      ...(context ? { context } : {}),
+    if (!text || typeof text !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'JD text is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
-
-    // Build prompt per-request (parameterized by context)
-    const systemPrompt = buildInterviewPrompt(config)
-
-    console.log('[interview] Context mode:', context?.mode || 'blank')
 
     if (!OPENAI_API_KEY) {
       return new Response(
@@ -70,19 +58,7 @@ serve(async (req) => {
       )
     }
 
-    // Apply context window management for long conversations.
-    // Keeps the first 2 messages + a summary of dropped middle + recent tail.
-    const windowedMessages = await buildContextWindow(
-      messages.map((m: ChatMessage) => ({ role: m.role, content: m.content })),
-      config.maxMessagesInContext,
-      OPENAI_API_KEY,
-    )
-
-    const openaiMessages = [
-      { role: 'system', content: systemPrompt },
-      ...windowedMessages,
-    ]
-
+    const systemPrompt = buildJdParsePrompt()
     const startTime = Date.now()
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -93,31 +69,34 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'gpt-4o',
-        messages: openaiMessages,
-        temperature: config.temperature,
-        max_tokens: config.maxTokens,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: text },
+        ],
+        temperature: 0.2,
+        max_tokens: 3000,
         response_format: { type: 'json_object' },
       }),
     })
 
     if (!response.ok) {
       const errorText = await response.text()
+      console.error('[parse-jd] OpenAI API error:', response.status)
       throw new Error(`OpenAI API error: ${response.status} ${errorText}`)
     }
 
     const data = await response.json()
     const latencyMs = Date.now() - startTime
-
     const assistantMessage = data.choices[0].message.content
     const usage = data.usage
 
-    // Log the run for telemetry
+    // Log telemetry
     await supabase.from('runs').insert({
       user_id: user.id,
-      type: 'interview',
-      prompt_id: INTERVIEW_PROMPT_ID,
+      type: 'parse-jd',
+      prompt_id: JD_PARSE_PROMPT_ID,
       model: 'gpt-4o',
-      input: { messages: messages.slice(-5) }, // Log last 5 messages for context
+      input: { text_length: text.length },
       output: JSON.parse(assistantMessage),
       success: true,
       latency_ms: latencyMs,
@@ -125,7 +104,6 @@ serve(async (req) => {
       tokens_out: usage?.completion_tokens ?? null,
     })
 
-    // Parse and validate the response
     let parsedResponse
     try {
       parsedResponse = JSON.parse(assistantMessage)
@@ -133,13 +111,15 @@ serve(async (req) => {
       throw new Error('Failed to parse LLM response as JSON')
     }
 
+    console.log('[parse-jd] Success, requirements:', parsedResponse.requirements?.length)
+
     return new Response(
       JSON.stringify(parsedResponse),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Interview function error:', error)
+    console.error('[parse-jd] Error:', error instanceof Error ? error.message : 'Unknown error')
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

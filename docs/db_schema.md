@@ -4,7 +4,7 @@ This file is the human-readable source of truth for table/column names, relation
 
 **Updated by:** DB Agent only
 **Updated when:** any migration changes schema
-**Last updated:** 2026-01-20 (migration 20260120000000)
+**Last updated:** 2026-03-09 (migrations 022, 023)
 
 ---
 
@@ -185,6 +185,8 @@ This file is the human-readable source of truth for table/column names, relation
 | retrieved_bullet_ids | uuid[] | yes | '{}' |
 | selected_bullet_ids | uuid[] | yes | '{}' |
 | draft_resume_id | uuid | yes | - |
+| parsed_requirements | jsonb | yes | - |
+| gap_analysis | jsonb | yes | - |
 | created_at | timestamptz | no | now() |
 
 **Constraints:**
@@ -201,6 +203,42 @@ This file is the human-readable source of truth for table/column names, relation
 **Notes:**
 - `retrieved_bullet_ids` stores top 50 matches for debugging/audit
 - `selected_bullet_ids` stores final chosen set for the draft
+- `parsed_requirements` stores LLM-extracted requirements from JD text (added migration 023)
+- `gap_analysis` stores per-requirement match/gap results for "What's Missing" feature (added migration 023)
+
+---
+
+### uploaded_resumes
+
+**Purpose:** Uploaded PDF metadata, extracted text, and cached LLM parse results for resume upload feature
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | no | gen_random_uuid() |
+| user_id | uuid | no | - |
+| file_name | text | no | - |
+| file_hash | text | no | - |
+| storage_path | text | no | - |
+| extracted_text | text | yes | - |
+| parsed_data | jsonb | yes | - |
+| created_at | timestamptz | no | now() |
+
+**Constraints:**
+- PK: `id`
+- FK: `user_id -> auth.users(id) ON DELETE CASCADE`
+- UNIQUE: `(user_id, file_hash)` (dedup same file per user)
+
+**Indexes:**
+- `uploaded_resumes_user_idx` on `(user_id)`
+- `uploaded_resumes_user_hash_idx` UNIQUE on `(user_id, file_hash)`
+
+**RLS:**
+- SELECT/INSERT/UPDATE/DELETE: `user_id = auth.uid()`
+
+**Notes:**
+- `file_hash` enables deduplication: same user uploading the same file reuses the existing row
+- `extracted_text` is populated after PDF text extraction
+- `parsed_data` caches LLM parse results (positions, bullets, skills) to avoid re-parsing
 
 ---
 

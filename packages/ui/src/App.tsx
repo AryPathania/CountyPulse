@@ -13,6 +13,7 @@ import { DraftResumePage } from './pages/DraftResumePage'
 import { ResumeBuilderPage } from './pages/ResumeBuilderPage'
 import { TelemetryPage } from './pages/TelemetryPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { ResumeUploadPage } from './pages/ResumeUploadPage'
 import './App.css'
 
 function AuthenticatedApp() {
@@ -72,6 +73,13 @@ function AuthenticatedApp() {
         <Route path="/settings" element={
           <AuthGuard fallback={<LoginForm />}>
             <SettingsPage />
+          </AuthGuard>
+        } />
+
+        {/* Resume Upload */}
+        <Route path="/upload-resume" element={
+          <AuthGuard fallback={<LoginForm />}>
+            <ResumeUploadPage />
           </AuthGuard>
         } />
 

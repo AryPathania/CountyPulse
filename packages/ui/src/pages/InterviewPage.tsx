@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../components/auth/AuthProvider'
 import { Navigation } from '../components/layout'
@@ -22,6 +22,8 @@ import './InterviewPage.css'
 export function InterviewPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const interviewContext = (location.state as { interviewContext?: { mode: string; [key: string]: unknown } } | null)?.interviewContext
   const queryClient = useQueryClient()
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -238,6 +240,7 @@ export function InterviewPage() {
           <InterviewChat
             onComplete={handleComplete}
             onCancel={handleCancel}
+            config={{ context: interviewContext }}
             initialMessages={
               initialState?.messages.map((m, idx) => ({
                 id: `restored-${idx}`,

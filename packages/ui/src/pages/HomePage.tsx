@@ -93,6 +93,14 @@ export function HomePage() {
             >
               View Bullets Library
             </button>
+            <button
+              type="button"
+              onClick={() => navigate('/upload-resume')}
+              className="home-page__link"
+              data-testid="upload-resume"
+            >
+              Upload Resume
+            </button>
           </div>
         </div>
       </main>

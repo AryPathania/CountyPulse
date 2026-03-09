@@ -12,7 +12,7 @@ const corsHeaders = {
 }
 
 interface EmbedRequest {
-  text: string
+  texts: string[]
   type: 'jd' | 'bullet'
 }
 
@@ -42,11 +42,11 @@ serve(async (req) => {
       )
     }
 
-    const { text, type } = await req.json() as EmbedRequest
+    const { texts, type } = await req.json() as EmbedRequest
 
-    if (!text || typeof text !== 'string') {
+    if (!Array.isArray(texts) || texts.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Text is required' }),
+        JSON.stringify({ error: 'texts must be a non-empty array of strings' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -69,7 +69,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'text-embedding-3-small',
-        input: text.slice(0, 8000), // Limit input length
+        input: texts.map(t => t.slice(0, 8000)),
         dimensions: 1536,
       }),
     })
@@ -82,7 +82,7 @@ serve(async (req) => {
     const data = await response.json()
     const latencyMs = Date.now() - startTime
 
-    const embedding = data.data[0].embedding
+    const embeddings: number[][] = data.data.map((d: any) => d.embedding)
     const usage = data.usage
 
     // Log the run for telemetry
@@ -91,8 +91,8 @@ serve(async (req) => {
       type: 'embed',
       prompt_id: 'text-embedding-3-small',
       model: 'text-embedding-3-small',
-      input: { text: text.slice(0, 500), type }, // Truncate for logging
-      output: { dimensions: embedding.length },
+      input: { texts_count: texts.length, first_text: texts[0].slice(0, 500), type },
+      output: { count: embeddings.length, dimensions: embeddings[0]?.length },
       success: true,
       latency_ms: latencyMs,
       tokens_in: usage?.total_tokens ?? null,
@@ -100,7 +100,7 @@ serve(async (req) => {
     })
 
     return new Response(
-      JSON.stringify({ embedding }),
+      JSON.stringify({ embeddings }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 

@@ -1,0 +1,128 @@
+.gap-analysis {
+  margin-top: 1.5rem;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.gap-analysis__header {
+  margin-bottom: 1rem;
+}
+
+.gap-analysis__title {
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+
+.gap-analysis__summary {
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.gap-analysis__section {
+  margin-bottom: 1rem;
+}
+
+.gap-analysis__section-title {
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+}
+
+.gap-analysis__section-title--gap {
+  color: #e74c3c;
+}
+
+.gap-analysis__section-title--covered {
+  color: #2ecc71;
+}
+
+.gap-analysis__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.gap-analysis__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.25rem;
+  flex-wrap: wrap;
+  cursor: pointer;
+}
+
+.gap-analysis__item--gap {
+  background: rgba(231, 76, 60, 0.05);
+}
+
+.gap-analysis__item--covered {
+  background: rgba(46, 204, 113, 0.05);
+}
+
+.gap-analysis__badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  font-weight: bold;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.gap-analysis__badge--gap {
+  background: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+}
+
+.gap-analysis__badge--covered {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+}
+
+.gap-analysis__description {
+  flex: 1;
+}
+
+.gap-analysis__category {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.gap-analysis__importance {
+  color: #e74c3c;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.gap-analysis__match-count {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.gap-analysis__matches {
+  width: 100%;
+  list-style: none;
+  padding: 0.5rem 0 0 1.5rem;
+  margin: 0;
+}
+
+.gap-analysis__match {
+  font-size: 0.85rem;
+  color: #ccc;
+  padding: 0.25rem 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.gap-analysis__similarity {
+  color: #2ecc71;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.gap-analysis__actions {
+  margin-top: 1rem;
+  text-align: center;
+}

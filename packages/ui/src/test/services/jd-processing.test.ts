@@ -40,7 +40,7 @@ describe('jd-processing service', () => {
       })
 
       mockFunctionsInvoke.mockResolvedValue({
-        data: { embedding: new Array(1536).fill(0.1) },
+        data: { embeddings: [new Array(1536).fill(0.1)] },
         error: null,
       })
 
@@ -64,7 +64,7 @@ describe('jd-processing service', () => {
 
       // Verify embed function was called
       expect(mockFunctionsInvoke).toHaveBeenCalledWith('embed', {
-        body: { text: 'Test job description', type: 'jd' },
+        body: { texts: ['Test job description'], type: 'jd' },
       })
 
       // Verify bullet matching was called
@@ -163,7 +163,7 @@ describe('jd-processing service', () => {
       })
 
       mockFunctionsInvoke.mockResolvedValue({
-        data: { embedding: new Array(1536).fill(0.1) },
+        data: { embeddings: [new Array(1536).fill(0.1)] },
         error: null,
       })
 

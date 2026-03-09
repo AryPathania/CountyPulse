@@ -9,6 +9,7 @@ import { InterviewStepResponseSchema } from '@odie/shared'
 
 export interface InterviewServiceConfig {
   useMock?: boolean
+  context?: { mode: string; [key: string]: unknown }
 }
 
 export interface InterviewResult {
@@ -112,7 +113,7 @@ export async function sendInterviewMessage(
 
   // Call the interview edge function
   const response = await supabase.functions.invoke('interview', {
-    body: { messages },
+    body: { messages, context: config.context },
   })
 
   if (response.error) {
@@ -152,11 +153,19 @@ function getMockResponse(): InterviewResult {
 /**
  * Get the initial greeting message from Odie
  */
-export function getInitialMessage(): ChatMessage {
+export function getInitialMessage(context?: { mode: string; [key: string]: unknown }): ChatMessage {
+  let content = MOCK_RESPONSES[0].response
+
+  if (context?.mode === 'resume') {
+    content = "Hi! I've had a chance to review your resume, and I can see you have some impressive experience. I'd love to dig deeper into a few areas. First, let me confirm — does the experience I've pulled from your resume look accurate, or is there anything you'd like to correct or add?"
+  } else if (context?.mode === 'gaps') {
+    content = "Hi! I've been looking at the job you're interested in, and I noticed a few areas where we might be able to strengthen your profile. I'd love to explore your experience in those areas — sometimes people have relevant accomplishments they haven't thought to highlight. Ready to dive in?"
+  }
+
   return {
     id: 'initial',
     role: 'assistant',
-    content: MOCK_RESPONSES[0].response,
+    content,
     timestamp: new Date().toISOString(),
   }
 }

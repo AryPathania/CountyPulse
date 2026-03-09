@@ -44,12 +44,46 @@ pnpm gen-types        # Generate Supabase types
 - **Embeddings**: pgvector inside Supabase (no external vector DB in MVP)
 - **PDF Export**: Browser print-to-PDF (native)
 - **Bullet Edits**: Global (no per-resume overrides in MVP)
+- **PDF Import**: Client-side pdfjs-dist with server-side Deno fallback (`extract-pdf` edge function)
+- **Interview Context**: Discriminated union (`blank` | `resume` | `gaps`) parameterizes interview prompt
+- **Bullet Quality Rules**: Shared prompt section in `supabase/functions/_shared/prompts/bullet-quality.ts`
+- **Resume Dedup**: SHA-256 file hash with unique index on `(user_id, file_hash)`
 
 ## Conventions
 - UI components: `packages/ui/src/components/`
 - Query functions: `packages/db/src/queries/`
 - Contracts/schemas: `packages/shared/src/contracts/`
 - Tests co-located or in `test/` directories
+- Edge functions: `supabase/functions/`
+- Shared prompts: `supabase/functions/_shared/prompts/`
+- UI services: `packages/ui/src/services/`
+
+## Routes
+- `/` — Home (JD paste + quick actions)
+- `/interview` — Interview chat (accepts `interviewContext` in route state)
+- `/bullets` — Bullets library
+- `/resumes` — Resumes list (created + uploaded)
+- `/resumes/:id` — Resume builder
+- `/draft/:id` — Draft resume from JD (with gap analysis)
+- `/upload-resume` — PDF resume upload
+- `/telemetry` — Runs dashboard
+
+## Edge Functions
+- `interview` — Conversational interview (context-aware: blank/resume/gaps)
+- `embed` — Batch text embeddings (`texts: string[]` → `embeddings: number[][]`)
+- `parse-resume` — LLM resume parsing (positions, bullets with quality classification)
+- `parse-jd` — JD requirement extraction (structured requirements with importance)
+- `extract-pdf` — Server-side PDF text extraction (fallback)
+
+## DB Tables (Odie)
+- `user_profiles` — Account metadata
+- `candidate_profiles` — Resume header (headline, summary)
+- `positions` — Work experience entries
+- `bullets` — STAR bullets with embeddings
+- `resumes` — Curated bullet selections
+- `job_drafts` — JD + retrieval + gap analysis (`parsed_requirements`, `gap_analysis`)
+- `uploaded_resumes` — PDF uploads with cached parse results
+- `runs` — LLM telemetry
 
 ## Theme
 - Background: black
@@ -64,10 +98,10 @@ pnpm gen-types        # Generate Supabase types
 - Notes: `docs/notes.md`
 
 ## Current Status
-**MVP Feature Complete** - All phases implemented + UI polish
+**MVP Feature Complete** - All phases implemented + UI polish + resume upload + gap analysis
 
 ### Test Coverage
-- **397 unit/integration tests** (Vitest + Testing Library)
+- **569 unit/integration tests** (Vitest + Testing Library)
 - **73 E2E tests** (Playwright)
 - **91%+ code coverage**
 
@@ -84,6 +118,8 @@ pnpm gen-types        # Generate Supabase types
 - Phase 9: Testing (Playwright E2E, screenshot on failure)
 - Phase 10: Voice Interview (Whisper STT, OpenAI TTS, voice controls)
 - UI Polish: Login centering, nav styling, bullets page navigation
+- Phase 11: Resume Upload ("Start with Resume" — PDF upload, parse, interview with context)
+- Phase 12: Gap Analysis ("What's Missing" — JD requirement parsing, per-requirement matching, gap interview)
 
 ## UI/UX Conventions
 - **Navigation**: Transparent background, bottom border only, full width

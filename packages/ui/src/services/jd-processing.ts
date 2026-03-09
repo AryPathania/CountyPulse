@@ -1,5 +1,6 @@
-import { supabase, createJobDraft, matchBulletsForJd, createRunLogger } from '@odie/db'
+import { supabase, createJobDraft, matchBulletsForJd, createRunLogger, matchBulletsPerRequirement, updateJobDraftRequirements } from '@odie/db'
 import { toPgVector } from '@odie/shared'
+import type { InterviewContext } from '@odie/shared'
 
 export interface JdProcessingResult {
   draftId: string
@@ -54,7 +55,7 @@ export async function processJobDescription(
   try {
     // Step 1: Generate embedding for JD
     const embedResponse = await supabase.functions.invoke('embed', {
-      body: { text: jdText, type: 'jd' },
+      body: { texts: [jdText], type: 'jd' },
     })
 
     if (embedResponse.error) {
@@ -65,7 +66,7 @@ export async function processJobDescription(
       throw new Error(embedResponse.error.message || 'Failed to generate embedding')
     }
 
-    const { embedding } = embedResponse.data
+    const embedding = embedResponse.data.embeddings[0]
 
     // Step 2: Match bullets using vector similarity
     const matches = await matchBulletsForJd(userId, embedding, 50, 0.3)
@@ -124,6 +125,159 @@ async function getMockResult(userId: string, jdText: string): Promise<JdProcessi
   return {
     draftId: draft.id,
     matchedBulletIds: MOCK_BULLET_MATCHES.map((m) => m.id),
+  }
+}
+
+export interface GapAnalysisResult {
+  draftId: string
+  jobTitle: string
+  company: string | null
+  covered: Array<{
+    requirement: { description: string; category: string; importance: 'must_have' | 'nice_to_have' }
+    matchedBullets: Array<{ id: string; text: string; similarity: number }>
+  }>
+  gaps: Array<{
+    requirement: { description: string; category: string; importance: 'must_have' | 'nice_to_have' }
+  }>
+  totalRequirements: number
+  coveredCount: number
+  interviewContext: InterviewContext | null
+}
+
+interface ParsedRequirement {
+  description: string
+  category: string
+  importance: string
+}
+
+/**
+ * Process a JD with per-requirement gap analysis:
+ * 1. Parse JD into requirements
+ * 2. Embed each requirement
+ * 3. Match bullets per requirement
+ * 4. Classify covered vs gap
+ * 5. Build gap interview context
+ */
+export async function analyzeJobDescriptionGaps(
+  userId: string,
+  jdText: string,
+  draftId: string
+): Promise<GapAnalysisResult> {
+  console.log('[jd-gaps] Starting gap analysis')
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Not authenticated')
+
+  // 1. Parse JD into requirements
+  const parseResponse = await supabase.functions.invoke('parse-jd', {
+    body: { text: jdText },
+  })
+
+  if (parseResponse.error) {
+    throw new Error(parseResponse.error.message || 'JD parsing failed')
+  }
+
+  const { jobTitle, company, requirements } = parseResponse.data
+  console.log('[jd-gaps] Parsed requirements:', requirements?.length)
+
+  if (!requirements || requirements.length === 0) {
+    throw new Error('No requirements extracted from job description')
+  }
+
+  // 2. Batch embed all requirements
+  const typedRequirements = requirements as ParsedRequirement[]
+  const requirementTexts = typedRequirements.map(r => r.description)
+  const embedResponse = await supabase.functions.invoke('embed', {
+    body: { texts: requirementTexts, type: 'jd' },
+  })
+
+  if (embedResponse.error) {
+    throw new Error(embedResponse.error.message || 'Failed to embed requirements')
+  }
+
+  const embeddings: number[][] = embedResponse.data.embeddings
+
+  // 3. Per-requirement matching
+  const requirementsWithEmbeddings = typedRequirements.map((req, i) => ({
+    description: req.description,
+    category: req.category,
+    importance: req.importance,
+    embedding: embeddings[i],
+  }))
+
+  const matchResults = await matchBulletsPerRequirement(
+    userId,
+    requirementsWithEmbeddings,
+    5, // top 5 matches per requirement
+    0.4  // lower threshold for gap detection
+  )
+
+  // 4. Classify covered vs gap
+  const covered = matchResults
+    .filter(r => r.isCovered)
+    .map(r => ({
+      requirement: r.requirement,
+      matchedBullets: r.matches.map(m => ({
+        id: m.id,
+        text: m.current_text,
+        similarity: m.similarity,
+      })),
+    }))
+
+  const gaps = matchResults
+    .filter(r => !r.isCovered)
+    .map(r => ({
+      requirement: r.requirement,
+    }))
+
+  // 5. Store results on job_drafts
+  const parsedRequirements = requirements
+  const gapAnalysis = {
+    jobTitle,
+    company,
+    covered: covered.map(c => ({
+      requirement: c.requirement,
+      matchedBulletIds: c.matchedBullets.map(b => b.id),
+    })),
+    gaps: gaps.map(g => g.requirement),
+    totalRequirements: requirements.length,
+    coveredCount: covered.length,
+  }
+
+  await updateJobDraftRequirements(draftId, parsedRequirements, gapAnalysis)
+
+  // 6. Build gap interview context (only if there are gaps)
+  let interviewContext: InterviewContext | null = null
+  if (gaps.length > 0) {
+    const existingBulletSummary = covered
+      .flatMap(c => c.matchedBullets.map(b => b.text))
+      .slice(0, 10)
+      .join('; ')
+
+    interviewContext = {
+      mode: 'gaps',
+      gaps: gaps.map(g => ({
+        requirement: g.requirement.description,
+        category: g.requirement.category,
+        importance: g.requirement.importance,
+      })),
+      existingBulletSummary: existingBulletSummary || 'No existing bullets matched.',
+      jobTitle,
+      company,
+    }
+  }
+
+  console.log('[jd-gaps] Analysis complete:', covered.length, 'covered,', gaps.length, 'gaps')
+
+  return {
+    draftId,
+    jobTitle,
+    company,
+    covered,
+    gaps,
+    totalRequirements: requirements.length,
+    coveredCount: covered.length,
+    interviewContext,
   }
 }
 

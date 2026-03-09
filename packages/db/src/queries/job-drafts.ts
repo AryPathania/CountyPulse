@@ -160,3 +160,69 @@ export async function matchBulletsForJd(
 
   return data ?? []
 }
+
+/**
+ * Match bullets against individual JD requirements.
+ * Calls match_bullets RPC for each requirement's embedding.
+ */
+export async function matchBulletsPerRequirement(
+  userId: string,
+  requirements: Array<{
+    description: string
+    category: string
+    importance: 'must_have' | 'nice_to_have'
+    embedding: number[]
+  }>,
+  matchCount: number = 10,
+  matchThreshold: number = 0.5
+): Promise<
+  Array<{
+    requirement: { description: string; category: string; importance: 'must_have' | 'nice_to_have' }
+    matches: Array<{
+      id: string
+      current_text: string
+      category: string | null
+      similarity: number
+    }>
+    isCovered: boolean
+  }>
+> {
+  const results = await Promise.all(
+    requirements.map(async (req) => {
+      const matches = await matchBulletsForJd(userId, req.embedding, matchCount, matchThreshold)
+      return {
+        requirement: {
+          description: req.description,
+          category: req.category,
+          importance: req.importance,
+        },
+        matches,
+        isCovered: matches.length > 0,
+      }
+    })
+  )
+
+  return results
+}
+
+/**
+ * Update a job draft with parsed requirements and gap analysis
+ */
+export async function updateJobDraftRequirements(
+  draftId: string,
+  parsedRequirements: Record<string, unknown> | null,
+  gapAnalysis: Record<string, unknown> | null
+): Promise<JobDraft> {
+  const { data, error } = await supabase
+    .from('job_drafts')
+    .update({
+      parsed_requirements: parsedRequirements,
+      gap_analysis: gapAnalysis,
+    })
+    .eq('id', draftId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}

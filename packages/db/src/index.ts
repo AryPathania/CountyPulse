@@ -8,6 +8,7 @@ export * from './queries/bullets'
 export * from './queries/positions'
 export * from './queries/runs'
 export * from './queries/job-drafts'
+export * from './queries/uploaded-resumes'
 export * from './queries/resumes'
 export * from './queries/account'
 

@@ -96,10 +96,12 @@ export type Database = {
           company: string | null
           created_at: string
           draft_resume_id: string | null
+          gap_analysis: Record<string, unknown> | null
           id: string
           jd_embedding: string | null
           jd_text: string
           job_title: string | null
+          parsed_requirements: Record<string, unknown> | null
           retrieved_bullet_ids: string[] | null
           selected_bullet_ids: string[] | null
           user_id: string
@@ -108,10 +110,12 @@ export type Database = {
           company?: string | null
           created_at?: string
           draft_resume_id?: string | null
+          gap_analysis?: Record<string, unknown> | null
           id?: string
           jd_embedding?: string | null
           jd_text: string
           job_title?: string | null
+          parsed_requirements?: Record<string, unknown> | null
           retrieved_bullet_ids?: string[] | null
           selected_bullet_ids?: string[] | null
           user_id: string
@@ -120,10 +124,12 @@ export type Database = {
           company?: string | null
           created_at?: string
           draft_resume_id?: string | null
+          gap_analysis?: Record<string, unknown> | null
           id?: string
           jd_embedding?: string | null
           jd_text?: string
           job_title?: string | null
+          parsed_requirements?: Record<string, unknown> | null
           retrieved_bullet_ids?: string[] | null
           selected_bullet_ids?: string[] | null
           user_id?: string

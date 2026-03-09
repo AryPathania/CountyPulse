@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ResumeEducationSchema } from './resume-parse'
 
 /**
  * Interview contract schemas for LLM output validation
@@ -88,6 +89,57 @@ export const ExtractedInterviewDataSchema = z.object({
 
 export type ExtractedInterviewData = z.infer<typeof ExtractedInterviewDataSchema>
 
+// Interview context schemas for different interview modes
+
+// Blank context: no prior data, start from scratch
+export const BlankContextSchema = z.object({
+  mode: z.literal('blank'),
+})
+
+export type BlankContext = z.infer<typeof BlankContextSchema>
+
+// Resume context: pre-populated from parsed resume data
+export const ResumeContextSchema = z.object({
+  mode: z.literal('resume'),
+  strongBullets: z.array(BulletSchema),
+  weakBullets: z.array(z.object({
+    originalText: z.string(),
+    suggestedQuestion: z.string(),
+  })),
+  positions: z.array(PositionSchema),
+  skills: z.object({
+    hard: z.array(z.string()),
+    soft: z.array(z.string()),
+  }),
+  education: z.array(ResumeEducationSchema).default([]),
+})
+
+export type ResumeContext = z.infer<typeof ResumeContextSchema>
+
+// Gap context: fill gaps between resume and job description
+export const GapContextSchema = z.object({
+  mode: z.literal('gaps'),
+  gaps: z.array(z.object({
+    requirement: z.string(),
+    category: z.string(),
+    importance: z.enum(['must_have', 'nice_to_have']),
+  })),
+  existingBulletSummary: z.string(),
+  jobTitle: z.string(),
+  company: z.string().nullish(),
+})
+
+export type GapContext = z.infer<typeof GapContextSchema>
+
+// Discriminated union of all interview context modes
+export const InterviewContextSchema = z.discriminatedUnion('mode', [
+  BlankContextSchema,
+  ResumeContextSchema,
+  GapContextSchema,
+])
+
+export type InterviewContext = z.infer<typeof InterviewContextSchema>
+
 // Interview configuration for tuning prompt behavior
 export const InterviewConfigSchema = z.object({
   metricsEmphasis: z.enum(['low', 'medium', 'high']).default('high'),
@@ -97,6 +149,7 @@ export const InterviewConfigSchema = z.object({
   maxMessagesInContext: z.number().min(5).max(100).default(20),
   temperature: z.number().min(0).max(2).default(0.7),
   maxTokens: z.number().min(500).max(4000).default(2000),
+  context: InterviewContextSchema.default({ mode: 'blank' }),
 })
 
 export type InterviewConfig = z.infer<typeof InterviewConfigSchema>

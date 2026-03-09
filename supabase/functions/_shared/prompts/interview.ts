@@ -10,9 +10,42 @@
  * edge functions cannot resolve the pnpm workspace.
  */
 
+import { buildBulletQualityRules } from './bullet-quality.ts'
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+interface WeakBullet {
+  originalText: string
+  suggestedQuestion: string
+}
+
+interface InterviewPosition {
+  company: string
+  title: string
+  location?: string | null
+  startDate?: string | null
+  endDate?: string | null
+}
+
+interface ResumeContext {
+  mode: 'resume'
+  strongBullets: Array<{ text: string; category?: string | null }>
+  weakBullets: WeakBullet[]
+  positions: InterviewPosition[]
+  skills: { hard: string[]; soft: string[] }
+}
+
+interface GapContext {
+  mode: 'gaps'
+  gaps: Array<{ requirement: string; category: string; importance: 'must_have' | 'nice_to_have' }>
+  existingBulletSummary: string
+  jobTitle: string
+  company?: string | null
+}
+
+type InterviewContext = { mode: 'blank' } | ResumeContext | GapContext
 
 /**
  * Interview configuration for tuning prompt behavior.
@@ -27,6 +60,7 @@ export interface InterviewConfig {
   maxMessagesInContext: number
   temperature: number
   maxTokens: number
+  context: InterviewContext
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +75,7 @@ export const DEFAULT_INTERVIEW_CONFIG: InterviewConfig = {
   maxMessagesInContext: 20,
   temperature: 0.7,
   maxTokens: 2000,
+  context: { mode: 'blank' },
 }
 
 /** Prompt version identifier logged in the `runs` table for telemetry. */
@@ -82,6 +117,67 @@ function buildCriticalRulesSection(config: InterviewConfig): string {
    - The user has explicitly confirmed they are done
 
 5. **Before every response:** Review the full conversation to identify unexplored positions or experiences. If any exist, ask about them before considering wrapping up.`
+}
+
+function buildResumeContextSection(context: ResumeContext): string {
+  const positionSummary = context.positions
+    .map(p => `- ${p.title} at ${p.company}${p.startDate ? ` (${p.startDate} - ${p.endDate || 'present'})` : ''}`)
+    .join('\n')
+
+  const strongBulletSummary = context.strongBullets.length > 0
+    ? `Strong highlights already captured:\n${context.strongBullets.map(b => `- ${b.text}`).join('\n')}`
+    : 'No strong bullets identified yet.'
+
+  const weakBulletQuestions = context.weakBullets.length > 0
+    ? `Areas needing more detail (ask about these one at a time):\n${context.weakBullets.map(b => `- "${b.originalText}" → Ask: ${b.suggestedQuestion}`).join('\n')}`
+    : ''
+
+  return `## Pre-loaded Resume Context
+
+The user uploaded a resume. You have already reviewed it and extracted the following:
+
+**Positions found:**
+${positionSummary}
+
+${strongBulletSummary}
+
+${weakBulletQuestions}
+
+**Interview approach with resume context:**
+- Phase 1: Acknowledge you've reviewed their resume. Summarize the strong highlights briefly and ask if they want to add or correct anything.
+- Phase 2: For each weak bullet, ask the suggested question to get more detail. Create bullets once the user provides enough info.
+- Phase 3: After covering all weak bullets, explore any positions or experiences not well covered in the resume.
+- Do NOT re-ask about details already captured as strong bullets unless the user wants to expand on them.`
+}
+
+function buildGapContextSection(context: GapContext): string {
+  const companyText = context.company ? ` at ${context.company}` : ''
+  const mustHaveGaps = context.gaps.filter(g => g.importance === 'must_have')
+  const niceToHaveGaps = context.gaps.filter(g => g.importance === 'nice_to_have')
+
+  let gapList = ''
+  if (mustHaveGaps.length > 0) {
+    gapList += `**Must-have gaps (prioritize these):**\n${mustHaveGaps.map(g => `- ${g.requirement} (${g.category})`).join('\n')}\n\n`
+  }
+  if (niceToHaveGaps.length > 0) {
+    gapList += `**Nice-to-have gaps:**\n${niceToHaveGaps.map(g => `- ${g.requirement} (${g.category})`).join('\n')}`
+  }
+
+  return `## Gap Analysis Context
+
+The user is applying for **${context.jobTitle}**${companyText}. Their existing profile was analyzed against the job requirements, and some areas are missing.
+
+**Existing experience summary:**
+${context.existingBulletSummary}
+
+${gapList}
+
+**Interview approach with gap context:**
+- Focus on the gap areas — ask targeted questions to uncover relevant experience the user may not have mentioned.
+- Start with must-have gaps before nice-to-have gaps.
+- For each gap, ask if they have any relevant experience, projects, or transferable skills.
+- If the user has experience in a gap area, probe for specifics (metrics, scope, impact) to create strong bullets.
+- If the user genuinely lacks experience in an area, acknowledge it and move on — do not force it.`
 }
 
 function buildInterviewStrategySection(config: InterviewConfig): string {
@@ -170,14 +266,7 @@ Before writing your response, consider:
 }
 
 function buildProfessionalLanguageSection(): string {
-  return `## Professional Language (for internal bullet extraction only)
-When extracting achievement bullets internally, ALWAYS use professional, positive framing:
-- NEVER use words like "poorly", "bad", "failed", "terrible", "incompetent", "broken" about previous employers, coworkers, or systems
-- Reframe challenges positively:
-  - "fixed poorly written code" -> "Refactored legacy codebase to improve maintainability"
-  - "inherited a bad system" -> "Modernized inherited system architecture"
-  - "previous team failed to..." -> "Led initiative to establish..."
-- Use action verbs: Led, Developed, Implemented, Optimized, Designed, Delivered, Reduced, Increased`
+  return buildBulletQualityRules()
 }
 
 function buildDataExtractionSection(): string {
@@ -218,6 +307,8 @@ export function buildInterviewPrompt(config: InterviewConfig): string {
   const sections = [
     buildPersonaSection(),
     buildCriticalRulesSection(config),
+    ...(config.context.mode === 'resume' ? [buildResumeContextSection(config.context)] : []),
+    ...(config.context.mode === 'gaps' ? [buildGapContextSection(config.context)] : []),
     buildInterviewStrategySection(config),
     buildInterviewApproachSection(),
     buildFewShotExamplesSection(),

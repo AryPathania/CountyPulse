@@ -85,10 +85,10 @@ export function InterviewChat({
     if (config?.useMock) {
       resetMockState()
     }
-    const initialMessage = getInitialMessage()
+    const initialMessage = getInitialMessage(config?.context)
     setMessages([initialMessage])
     setHasInitialized(true)
-  }, [config?.useMock, hasInitialized])
+  }, [config?.useMock, config?.context, hasInitialized])
 
   // Notify parent when state changes for persistence
   useEffect(() => {
