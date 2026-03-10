@@ -47,6 +47,17 @@
   font-size: 1.125rem;
 }
 
+.resumes-page__section {
+  margin-bottom: 2rem;
+}
+
+.resumes-page__section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #888);
+  margin: 0 0 0.75rem;
+}
+
 .resumes-page__list {
   list-style: none;
   margin: 0;
@@ -70,6 +81,44 @@
 .resume-card:hover {
   border-color: var(--color-accent, #4169e1);
   background: var(--color-surface-elevated, #2a2a2a);
+}
+
+.resume-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.resume-card__badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent, #4169e1);
+  background: rgba(65, 105, 225, 0.15);
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.resume-card__delete {
+  background: none;
+  border: none;
+  color: var(--color-text-muted, #888);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.resume-card:hover .resume-card__delete {
+  opacity: 1;
+}
+
+.resume-card__delete:hover {
+  color: #e55;
 }
 
 .resume-card__title {

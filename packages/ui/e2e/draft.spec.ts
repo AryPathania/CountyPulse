@@ -4,6 +4,7 @@ import {
   setupApiMocks,
   MOCK_JOB_DRAFTS,
   MOCK_BULLETS_WITH_POSITIONS,
+  MOCK_GAP_ANALYSIS,
 } from './fixtures/mock-data'
 
 test.describe('JD to Draft Flow', () => {
@@ -67,17 +68,8 @@ test.describe('JD to Draft Flow', () => {
   })
 
   test('submitting JD navigates to draft page', async ({ page }) => {
-    // Set up mock for JD processing
-    await page.route('**/functions/v1/process-jd*', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          draftId: 'new-draft-123',
-          matchedBullets: MOCK_BULLETS_WITH_POSITIONS.slice(0, 2),
-        }),
-      })
-    })
+    // processJobDescription creates a draft via Supabase REST API (POST /rest/v1/job_drafts)
+    // which is already mocked by setupApiMocks
 
     await page.goto('/')
 
@@ -96,9 +88,10 @@ test.describe('Draft Resume View', () => {
   test.beforeEach(async ({ page }) => {
     await mockAuthState(page)
 
-    // Set up mock for draft with bullets
+    // Set up mock for draft with bullets (include gap_analysis to avoid spinner)
     const draftWithBullets = {
       ...MOCK_JOB_DRAFTS[0],
+      gap_analysis: MOCK_GAP_ANALYSIS,
       bullets: MOCK_BULLETS_WITH_POSITIONS.slice(0, 2),
     }
 
@@ -189,6 +182,7 @@ test.describe('Draft Resume View', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           ...MOCK_JOB_DRAFTS[0],
+          gap_analysis: MOCK_GAP_ANALYSIS,
           bullets: [],
         }),
       })
@@ -198,6 +192,21 @@ test.describe('Draft Resume View', () => {
 
     await expect(page.getByTestId('no-bullets')).toBeVisible()
     await expect(page.getByText('No matching bullets found')).toBeVisible()
+  })
+
+  test('shows gap analysis with coverage data', async ({ page }) => {
+    await page.goto('/resumes/draft-1')
+    await expect(page.getByTestId('gap-analysis')).toBeVisible()
+    await expect(page.getByTestId('gap-summary')).toContainText('1/2 requirements covered')
+    await expect(page.getByTestId('gap-item')).toBeVisible()
+    await expect(page.getByText('GraphQL experience')).toBeVisible()
+    await expect(page.getByTestId('covered-item')).toBeVisible()
+    await expect(page.getByText('React experience')).toBeVisible()
+  })
+
+  test('shows Interview for Gaps button when gaps exist', async ({ page }) => {
+    await page.goto('/resumes/draft-1')
+    await expect(page.getByTestId('interview-for-gaps')).toBeVisible()
   })
 })
 

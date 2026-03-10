@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClient } from '../../lib/queryClient'
+import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { ResumesPage } from '../../pages/ResumesPage'
 
 // Mock useNavigate
@@ -37,18 +36,31 @@ const mockGetJobDrafts = vi.fn().mockResolvedValue([
     retrieved_bullet_ids: ['bullet-1', 'bullet-2'],
     selected_bullet_ids: ['bullet-1'],
     created_at: '2024-01-15T00:00:00Z',
+    gap_analysis: null,
   },
 ])
 const mockGetUploadedResumes = vi.fn().mockResolvedValue([])
+const mockDeleteJobDraft = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@odie/db', () => ({
   getJobDrafts: (...args: unknown[]) => mockGetJobDrafts(...args),
   getUploadedResumes: (...args: unknown[]) => mockGetUploadedResumes(...args),
+  deleteJobDraft: (...args: unknown[]) => mockDeleteJobDraft(...args),
 }))
 
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+}
+
 function renderResumesPage() {
+  const testQueryClient = createTestQueryClient()
   return render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={testQueryClient}>
       <BrowserRouter>
         <ResumesPage />
       </BrowserRouter>
@@ -59,7 +71,20 @@ function renderResumesPage() {
 describe('ResumesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    queryClient.clear()
+    mockGetJobDrafts.mockResolvedValue([
+      {
+        id: 'mock-draft-1',
+        user_id: 'test-user-id',
+        job_title: 'Software Engineer',
+        company: 'Tech Corp',
+        jd_text: 'Looking for a skilled software engineer...',
+        retrieved_bullet_ids: ['bullet-1', 'bullet-2'],
+        selected_bullet_ids: ['bullet-1'],
+        created_at: '2024-01-15T00:00:00Z',
+        gap_analysis: null,
+      },
+    ])
+    mockGetUploadedResumes.mockResolvedValue([])
   })
 
   it('should render resumes page', async () => {
@@ -111,6 +136,144 @@ describe('ResumesPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('resumes-list')).toBeInTheDocument()
     })
+  })
+
+  it('should show Drafts section title', async () => {
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('drafts-section')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('drafts-section')).toHaveTextContent('Drafts')
+  })
+
+  it('should show Draft badge on draft cards', async () => {
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('drafts-section')).toBeInTheDocument()
+    })
+
+    const badges = screen.getAllByTestId('draft-badge')
+    expect(badges.length).toBeGreaterThan(0)
+    expect(badges[0]).toHaveTextContent('Draft')
+  })
+
+  it('should show JD preview for drafts without job_title', async () => {
+    const jdText = 'We are looking for a senior software engineer with extensive experience in distributed systems...'
+    mockGetJobDrafts.mockResolvedValue([
+      {
+        id: 'mock-draft-2',
+        user_id: 'test-user-id',
+        job_title: null,
+        company: null,
+        jd_text: jdText,
+        retrieved_bullet_ids: [],
+        selected_bullet_ids: [],
+        created_at: '2024-01-15T00:00:00Z',
+        gap_analysis: null,
+      },
+    ])
+
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('drafts-section')).toBeInTheDocument()
+    })
+
+    const truncated = jdText.slice(0, 60) + '...'
+    expect(screen.getByText(truncated)).toBeInTheDocument()
+  })
+
+  it('should show Untitled Draft when no job_title or jd_text', async () => {
+    mockGetJobDrafts.mockResolvedValue([
+      {
+        id: 'mock-draft-3',
+        user_id: 'test-user-id',
+        job_title: null,
+        company: null,
+        jd_text: null,
+        retrieved_bullet_ids: [],
+        selected_bullet_ids: [],
+        created_at: '2024-01-15T00:00:00Z',
+        gap_analysis: null,
+      },
+    ])
+
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('drafts-section')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Untitled Draft')).toBeInTheDocument()
+  })
+
+  it('should show gap_analysis jobTitle when job_title is a URL', async () => {
+    mockGetJobDrafts.mockResolvedValue([
+      {
+        id: 'mock-draft-url',
+        user_id: 'test-user-id',
+        job_title: 'https://job-boards.greenhouse.io/company/jobs/123',
+        company: null,
+        jd_text: 'Some JD text',
+        retrieved_bullet_ids: [],
+        selected_bullet_ids: [],
+        created_at: '2024-01-15T00:00:00Z',
+        gap_analysis: { jobTitle: 'Software Engineer', company: 'Tech Corp' },
+      },
+    ])
+
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('drafts-section')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Software Engineer')).toBeInTheDocument()
+    expect(screen.queryByText('https://job-boards.greenhouse.io/company/jobs/123')).not.toBeInTheDocument()
+  })
+
+  it('should show more specific timestamp with time', async () => {
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('drafts-section')).toBeInTheDocument()
+    })
+
+    const expectedDate = new Date('2024-01-15T00:00:00Z').toLocaleString()
+    expect(screen.getByText(expectedDate)).toBeInTheDocument()
+  })
+
+  it('should delete draft when delete button clicked and confirmed', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('delete-draft-mock-draft-1')).toBeInTheDocument()
+    })
+
+    await userEvent.click(screen.getByTestId('delete-draft-mock-draft-1'))
+
+    expect(window.confirm).toHaveBeenCalledWith('Delete this draft?')
+    expect(mockDeleteJobDraft).toHaveBeenCalledWith('mock-draft-1')
+  })
+
+  it('should not delete draft when confirm is cancelled', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('delete-draft-mock-draft-1')).toBeInTheDocument()
+    })
+
+    await userEvent.click(screen.getByTestId('delete-draft-mock-draft-1'))
+
+    expect(window.confirm).toHaveBeenCalledWith('Delete this draft?')
+    expect(mockDeleteJobDraft).not.toHaveBeenCalled()
   })
 
   describe('Uploaded Resumes section', () => {

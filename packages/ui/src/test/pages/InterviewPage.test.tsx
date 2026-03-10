@@ -140,6 +140,26 @@ function renderInterviewPage() {
 }
 
 /**
+ * Helper to render InterviewPage with route state (e.g., interviewContext).
+ * Uses MemoryRouter initialEntries with state to simulate navigation from another page.
+ */
+function renderInterviewPageWithRouteState(state: Record<string, unknown>) {
+  const queryClient = createTestQueryClient()
+  const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries')
+  const tree = (
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[{ pathname: '/interview', state }]}>
+        <Routes>
+          <Route path="/interview" element={<InterviewPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  )
+  const result = render(tree)
+  return { ...result, queryClient, invalidateQueriesSpy, tree }
+}
+
+/**
  * Helper to render InterviewPage with pre-populated localStorage state.
  * This simulates a resumed interview where draft bullets/positions already exist.
  */
@@ -710,6 +730,85 @@ describe('InterviewPage', () => {
           expect.any(Array)
         )
       })
+    })
+  })
+
+  describe('interviewContext routing', () => {
+    it('should clear localStorage when interviewContext is provided with non-blank mode', async () => {
+      // Pre-populate localStorage with a saved interview state
+      const storageKey = `odie_interview_state_test-user-id`
+      const storedState = {
+        messages: [{ role: 'user', content: 'old conversation' }],
+        extractedData: { positions: [] },
+        savedBulletIds: ['old-b1'],
+        savedBulletKeys: ['OldCo|Dev|Old bullet'],
+        savedPositionIds: ['old-pos-1'],
+        lastUpdated: new Date().toISOString(),
+      }
+      mockLocalStorage.getItem.mockImplementation((key: string) => {
+        if (key === storageKey) return JSON.stringify(storedState)
+        return null
+      })
+
+      renderInterviewPageWithRouteState({
+        interviewContext: {
+          mode: 'gaps',
+          gaps: [{ requirement: 'Need Kubernetes', category: 'DevOps', importance: 'must_have' }],
+          existingBulletSummary: 'Some bullets',
+          jobTitle: 'SRE',
+          company: 'Acme',
+        },
+      })
+
+      // Wait for hydration and the context-aware clearState path
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      // clearState should have been called (removeItem on localStorage)
+      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith(storageKey)
+
+      // The stored state should NOT have been loaded as initial state -
+      // InterviewChat should render without restored messages
+      // (we verify indirectly: getItem may be called for load check, but removeItem proves clear happened)
+    })
+
+    it('should not clear localStorage when interviewContext mode is blank', async () => {
+      const storageKey = `odie_interview_state_test-user-id`
+      mockLocalStorage.getItem.mockReturnValue(null)
+
+      renderInterviewPageWithRouteState({
+        interviewContext: { mode: 'blank' },
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      // clearState should NOT have been called for blank mode
+      expect(mockLocalStorage.removeItem).not.toHaveBeenCalledWith(storageKey)
+    })
+
+    it('should invalidate jobDrafts queries on interview completion', async () => {
+      mockCreatePositionWithBullets.mockResolvedValue({
+        position: { id: 'pos-1' },
+        bulletIds: ['b1'],
+      })
+
+      const { invalidateQueriesSpy } = renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await userEvent.click(screen.getByTestId('complete-with-data'))
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/bullets')
+      })
+
+      // Verify jobDrafts queries were invalidated
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['jobDrafts'] })
     })
   })
 })

@@ -83,6 +83,25 @@ export const MOCK_BULLETS_WITH_POSITIONS = MOCK_BULLETS.map((bullet) => ({
   position: MOCK_POSITIONS.find((p) => p.id === bullet.position_id) || null,
 }))
 
+export const MOCK_GAP_ANALYSIS = {
+  jobTitle: 'Frontend Engineer',
+  company: 'New Company',
+  covered: [
+    {
+      requirement: { description: 'React experience', category: 'Frontend', importance: 'must_have' },
+      matchedBullets: [
+        { id: 'bullet-1', text: 'Built interactive dashboards with React and TypeScript', similarity: 0.92 },
+      ],
+    },
+  ],
+  gaps: [
+    { description: 'GraphQL experience', category: 'Backend', importance: 'nice_to_have' },
+  ],
+  totalRequirements: 2,
+  coveredCount: 1,
+  analyzedAt: '2024-01-15T00:00:00Z',
+}
+
 export const MOCK_JOB_DRAFTS = [
   {
     id: 'draft-1',
@@ -91,6 +110,10 @@ export const MOCK_JOB_DRAFTS = [
     company: 'New Company',
     jd_text: 'We are looking for a skilled frontend engineer...',
     jd_embedding: null,
+    parsed_requirements: null,
+    gap_analysis: MOCK_GAP_ANALYSIS,
+    selected_bullet_ids: null,
+    retrieved_bullet_ids: null,
     created_at: '2024-01-15T00:00:00Z',
     updated_at: '2024-01-15T00:00:00Z',
   },
@@ -190,11 +213,27 @@ export async function setupApiMocks(page: Page) {
 
   // Mock job drafts
   await page.route('**/rest/v1/job_drafts*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(MOCK_JOB_DRAFTS),
-    })
+    const method = route.request().method()
+
+    if (method === 'POST') {
+      const body = route.request().postDataJSON()
+      const newDraft = {
+        ...MOCK_JOB_DRAFTS[0],
+        id: 'draft-new-' + Date.now(),
+        ...body,
+      }
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(newDraft),
+      })
+    } else {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(MOCK_JOB_DRAFTS),
+      })
+    }
   })
 
   // Mock resumes

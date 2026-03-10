@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
-import { getJobDraftWithBullets, type JobDraftWithBullets } from '@odie/db'
-import { processJobDescription, analyzeJobDescriptionGaps, type GapAnalysisServiceResult } from '../services/jd-processing'
+import { useJobDraftWithBullets, useRunGapAnalysis } from '../queries/job-drafts'
+import { bulletKeys } from '../queries/bullets'
+import { processJobDescription, buildGapDataFromStored, type GapAnalysisServiceResult } from '../services/jd-processing'
 import { GapAnalysis } from '../components/draft/GapAnalysis'
 import './DraftResumePage.css'
 
@@ -18,82 +20,73 @@ export function DraftResumePage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const queryClient = useQueryClient()
 
-  const [draft, setDraft] = useState<JobDraftWithBullets | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [gapData, setGapData] = useState<GapAnalysisServiceResult | null>(null)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-
-  // Get JD text from navigation state (for new drafts)
   const jdTextFromState = (location.state as { jdText?: string } | null)?.jdText
+  const [isCreating, setIsCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
-  // Load or create draft
+  // Load existing draft via TanStack Query
+  const { data: draft, isLoading, error: loadError } = useJobDraftWithBullets(
+    id && id !== 'draft' ? id : undefined
+  )
+
+  // Gap analysis mutation
+  const gapAnalysis = useRunGapAnalysis()
+
+  // Create new draft from JD text (one-off effect: creation + navigation)
   useEffect(() => {
-    const loadOrCreateDraft = async () => {
-      if (!user?.id) {
-        setError('Not authenticated')
-        setIsLoading(false)
-        return
-      }
+    if (!jdTextFromState || !user?.id || id !== 'draft') return
+    if (isCreating) return
 
-      setIsLoading(true)
-      setError(null)
+    setIsCreating(true)
+    processJobDescription(user.id, jdTextFromState)
+      .then(result => {
+        setIsCreating(false)
+        navigate(`/resumes/${result.draftId}`, { replace: true })
+      })
+      .catch(err => {
+        setCreateError(err instanceof Error ? err.message : 'Failed to create draft')
+        setIsCreating(false)
+      })
+  }, [jdTextFromState, user?.id, id, navigate, isCreating])
 
-      try {
-        if (id && id !== 'draft') {
-          // Load existing draft
-          const existingDraft = await getJobDraftWithBullets(id)
-          if (!existingDraft) {
-            setError('Draft not found')
-          } else {
-            setDraft(existingDraft)
-          }
-        } else if (jdTextFromState) {
-          // Create new draft from JD text
-          const result = await processJobDescription(user.id, jdTextFromState)
-          // Navigate to the created draft
-          navigate(`/resumes/${result.draftId}`, { replace: true })
-        } else {
-          setError('No job description provided')
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load draft')
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  // Derive gap data from stored column (if available)
+  const storedGapData = draft?.gap_analysis
+    ? buildGapDataFromStored(draft.id, draft.gap_analysis as Parameters<typeof buildGapDataFromStored>[1])
+    : null
 
-    loadOrCreateDraft()
-  }, [id, jdTextFromState, user?.id, navigate])
+  // Staleness detection: compare analyzedAt with bullets cache timestamp
+  const bulletsState = queryClient.getQueryState(bulletKeys.lists())
+  const isStale = !!(
+    storedGapData?.analyzedAt &&
+    bulletsState?.dataUpdatedAt &&
+    bulletsState.dataUpdatedAt > new Date(storedGapData.analyzedAt).getTime()
+  )
 
-  // Run gap analysis after draft loads
+  const needsAnalysis = !!draft && (!storedGapData || isStale)
+  const isAnalyzing = gapAnalysis.isPending
+  const gapData: GapAnalysisServiceResult | null =
+    storedGapData && !isStale
+      ? storedGapData
+      : gapAnalysis.data ?? null
+
+  // Auto-trigger gap analysis when needed
   useEffect(() => {
-    if (!draft?.jd_text || !user?.id) return
-
-    const runGapAnalysis = async () => {
-      setIsAnalyzing(true)
-      try {
-        const result = await analyzeJobDescriptionGaps(user.id, draft.jd_text, draft.id)
-        setGapData(result)
-      } catch (err) {
-        console.error('Gap analysis failed:', err)
-      } finally {
-        setIsAnalyzing(false)
-      }
+    if (needsAnalysis && !isAnalyzing && !gapAnalysis.data && draft?.jd_text && user?.id) {
+      gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id })
     }
-
-    runGapAnalysis()
-  }, [draft?.id, draft?.jd_text, user?.id])
+  }, [needsAnalysis, isAnalyzing, gapAnalysis, draft?.id, draft?.jd_text, user?.id])
 
   const handleCreateResume = useCallback(() => {
     if (draft?.id) {
-      // TODO: Navigate to resume builder
       navigate(`/resumes/${draft.id}/edit`)
     }
   }, [draft?.id, navigate])
 
-  if (isLoading) {
+  const error = createError || (loadError instanceof Error ? loadError.message : loadError ? String(loadError) : null)
+
+  if (isLoading || isCreating) {
     return (
       <div className="draft-page" data-testid="draft-page">
         <Navigation />
@@ -131,10 +124,10 @@ export function DraftResumePage() {
         <header className="draft-page__header">
           <div>
             <h1 className="draft-page__title">
-              {draft?.job_title || 'Resume Draft'}
+              {gapData?.jobTitle || (draft?.job_title && !/^https?:\/\//.test(draft.job_title) ? draft.job_title : 'Resume Draft')}
             </h1>
-            {draft?.company && (
-              <p className="draft-page__company">{draft.company}</p>
+            {(gapData?.company || draft?.company) && (
+              <p className="draft-page__company">{gapData?.company || draft?.company}</p>
             )}
           </div>
           <button
@@ -147,68 +140,86 @@ export function DraftResumePage() {
         </header>
 
         <div className="draft-page__content">
-          <section className="draft-page__bullets">
-            <h2 className="draft-page__section-title">
-              Matched Bullets ({draft?.bullets.length ?? 0})
-            </h2>
-            <p className="draft-page__section-desc">
-              These bullets from your library best match the job description
-            </p>
-
-            {draft?.bullets && draft.bullets.length > 0 ? (
-              <ul className="draft-page__bullet-list" data-testid="bullet-list">
-                {draft.bullets.map((bullet) => (
-                  <li
-                    key={bullet.id}
-                    className="draft-page__bullet-item"
-                    data-testid={`bullet-${bullet.id}`}
-                  >
-                    <div className="bullet-content">
-                      <p className="bullet-text">{bullet.current_text}</p>
-                      <div className="bullet-meta">
-                        {bullet.category && (
-                          <span className="bullet-category">{bullet.category}</span>
-                        )}
-                        {bullet.position && (
-                          <span className="bullet-position">
-                            {bullet.position.company} - {bullet.position.title}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="draft-page__empty" data-testid="no-bullets">
-                <p>No matching bullets found.</p>
-                <button
-                  onClick={() => navigate('/interview')}
-                  className="btn-secondary"
-                >
-                  Start Interview to Add Bullets
-                </button>
-              </div>
-            )}
-          </section>
-
-          {isAnalyzing && (
+          {isAnalyzing || needsAnalysis ? (
             <div className="draft-page__analyzing" data-testid="gap-loading">
               <div className="spinner" />
               <p>Analyzing requirements...</p>
             </div>
+          ) : (
+            <>
+              <section className="draft-page__bullets">
+                <h2 className="draft-page__section-title">
+                  Matched Bullets ({draft?.bullets.length ?? 0})
+                </h2>
+                <p className="draft-page__section-desc">
+                  These bullets from your library best match the job description
+                </p>
+
+                {draft?.bullets && draft.bullets.length > 0 ? (
+                  <ul className="draft-page__bullet-list" data-testid="bullet-list">
+                    {draft.bullets.map((bullet) => (
+                      <li
+                        key={bullet.id}
+                        className="draft-page__bullet-item"
+                        data-testid={`bullet-${bullet.id}`}
+                      >
+                        <div className="bullet-content">
+                          <p className="bullet-text">{bullet.current_text}</p>
+                          <div className="bullet-meta">
+                            {bullet.category && (
+                              <span className="bullet-category">{bullet.category}</span>
+                            )}
+                            {bullet.position && (
+                              <span className="bullet-position">
+                                {bullet.position.company} - {bullet.position.title}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="draft-page__empty" data-testid="no-bullets">
+                    <p>No matching bullets found.</p>
+                    <button
+                      onClick={() => navigate('/interview')}
+                      className="btn-secondary"
+                    >
+                      Start Interview to Add Bullets
+                    </button>
+                  </div>
+                )}
+              </section>
+
+              {gapData && (
+                <GapAnalysis
+                  jobTitle={gapData.jobTitle}
+                  company={gapData.company}
+                  covered={gapData.covered}
+                  gaps={gapData.gaps}
+                  totalRequirements={gapData.totalRequirements}
+                  coveredCount={gapData.coveredCount}
+                  interviewContext={gapData.interviewContext}
+                />
+              )}
+            </>
           )}
 
-          {gapData && (
-            <GapAnalysis
-              jobTitle={gapData.jobTitle}
-              company={gapData.company}
-              covered={gapData.covered}
-              gaps={gapData.gaps}
-              totalRequirements={gapData.totalRequirements}
-              coveredCount={gapData.coveredCount}
-              interviewContext={gapData.interviewContext}
-            />
+          {gapAnalysis.isError && (
+            <div className="draft-page__error" data-testid="gap-error">
+              <p>Gap analysis failed: {gapAnalysis.error instanceof Error ? gapAnalysis.error.message : 'Unknown error'}</p>
+              <button
+                onClick={() => {
+                  if (draft?.jd_text && user?.id) {
+                    gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id })
+                  }
+                }}
+                className="btn-secondary"
+              >
+                Retry Analysis
+              </button>
+            </div>
           )}
 
           {draft?.jd_text && (

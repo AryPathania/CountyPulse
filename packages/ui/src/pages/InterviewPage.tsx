@@ -46,6 +46,14 @@ export function InterviewPage() {
   // Load initial state from localStorage on mount
   useEffect(() => {
     if (isHydrated && user?.id && !hasLoadedInitialState) {
+      // If a specific interview context was provided via navigation (gaps/resume),
+      // clear any stale localStorage and start fresh
+      if (interviewContext && interviewContext.mode !== 'blank') {
+        clearState()
+        setHasLoadedInitialState(true)
+        return
+      }
+
       const stored = loadState()
       if (stored) {
         setInitialState(stored)
@@ -68,7 +76,7 @@ export function InterviewPage() {
       }
       setHasLoadedInitialState(true)
     }
-  }, [isHydrated, user?.id, loadState, hasLoadedInitialState])
+  }, [isHydrated, user?.id, loadState, hasLoadedInitialState, interviewContext, clearState])
 
   // Handle state changes from InterviewChat - save to localStorage and create draft bullets
   const handleStateChange = useCallback(
@@ -217,6 +225,7 @@ export function InterviewPage() {
 
         // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['bullets'] })
+        queryClient.invalidateQueries({ queryKey: ['jobDrafts'] })
 
         // Redirect to bullets library
         navigate('/bullets')

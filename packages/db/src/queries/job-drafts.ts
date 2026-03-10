@@ -211,14 +211,20 @@ export async function matchBulletsPerRequirement(
 export async function updateJobDraftRequirements(
   draftId: string,
   parsedRequirements: Json | null,
-  gapAnalysis: Json | null
+  gapAnalysis: Json | null,
+  jobTitle?: string | null,
+  company?: string | null
 ): Promise<JobDraft> {
+  const updates: Record<string, Json | null | string> = {
+    parsed_requirements: parsedRequirements,
+    gap_analysis: gapAnalysis,
+  }
+  if (jobTitle !== undefined) updates.job_title = jobTitle
+  if (company !== undefined) updates.company = company
+
   const { data, error } = await supabase
     .from('job_drafts')
-    .update({
-      parsed_requirements: parsedRequirements,
-      gap_analysis: gapAnalysis,
-    })
+    .update(updates)
     .eq('id', draftId)
     .select()
     .single()

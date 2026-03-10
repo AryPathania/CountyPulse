@@ -1,10 +1,8 @@
-import { supabase, createJobDraft, matchBulletsForJd, createRunLogger, matchBulletsPerRequirement, updateJobDraftRequirements } from '@odie/db'
-import { toPgVector } from '@odie/shared'
+import { supabase, createJobDraft, createRunLogger, matchBulletsPerRequirement, updateJobDraftRequirements, updateJobDraftBullets } from '@odie/db'
 import type { InterviewContext, JdRequirement } from '@odie/shared'
 
 export interface JdProcessingResult {
   draftId: string
-  matchedBulletIds: string[]
 }
 
 export interface JdProcessingConfig {
@@ -12,21 +10,12 @@ export interface JdProcessingConfig {
 }
 
 /**
- * Mock bullet matches for testing
- */
-const MOCK_BULLET_MATCHES = [
-  { id: 'mock-bullet-1', current_text: 'Led team of 5 engineers', category: 'Leadership', similarity: 0.92 },
-  { id: 'mock-bullet-2', current_text: 'Reduced latency by 40%', category: 'Backend', similarity: 0.88 },
-  { id: 'mock-bullet-3', current_text: 'Built React dashboard', category: 'Frontend', similarity: 0.85 },
-]
-
-/**
  * Process a job description:
- * 1. Generate embedding for JD text
- * 2. Match bullets using vector similarity
- * 3. Create job_drafts record
- * 4. Log telemetry
- * 5. Return draft ID for navigation
+ * 1. Create job_drafts record with the JD text
+ * 2. Log telemetry
+ * 3. Return draft ID for navigation
+ *
+ * Embedding + matching is deferred to gap analysis.
  */
 export async function processJobDescription(
   userId: string,
@@ -39,10 +28,8 @@ export async function processJobDescription(
     return getMockResult(userId, jdText)
   }
 
-  // Create run logger for telemetry
   const runLogger = createRunLogger(userId, 'draft')
 
-  // Get auth session for edge function calls
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) {
     await runLogger.failure({
@@ -53,35 +40,11 @@ export async function processJobDescription(
   }
 
   try {
-    // Step 1: Generate embedding for JD
-    const embedResponse = await supabase.functions.invoke('embed', {
-      body: { texts: [jdText], type: 'jd' },
-    })
-
-    if (embedResponse.error) {
-      await runLogger.failure({
-        input: { jdTextLength: jdText.length },
-        error: embedResponse.error.message || 'Failed to generate embedding',
-      })
-      throw new Error(embedResponse.error.message || 'Failed to generate embedding')
-    }
-
-    const embedding = embedResponse.data.embeddings[0]
-
-    // Step 2: Match bullets using vector similarity
-    const matches = await matchBulletsForJd(userId, embedding, 50, 0.3)
-    const matchedBulletIds = matches.map((m) => m.id)
-
-    // Step 3: Create job draft record
     const draft = await createJobDraft({
       user_id: userId,
       jd_text: jdText,
-      jd_embedding: toPgVector(embedding),
-      retrieved_bullet_ids: matchedBulletIds,
-      selected_bullet_ids: matchedBulletIds.slice(0, 10), // Pre-select top 10
     })
 
-    // Step 4: Log successful run
     await runLogger.success({
       input: {
         jdTextLength: jdText.length,
@@ -89,17 +52,11 @@ export async function processJobDescription(
       },
       output: {
         draftId: draft.id,
-        matchedBulletCount: matchedBulletIds.length,
-        selectedBulletIds: matchedBulletIds.slice(0, 10),
       },
     })
 
-    return {
-      draftId: draft.id,
-      matchedBulletIds,
-    }
+    return { draftId: draft.id }
   } catch (error) {
-    // Log failure if not already logged
     await runLogger.failure({
       input: { jdTextLength: jdText.length },
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -111,39 +68,111 @@ export async function processJobDescription(
 }
 
 /**
- * Mock result for testing
+ * Mock result for testing — creates a bare draft with no bullets.
  */
 async function getMockResult(userId: string, jdText: string): Promise<JdProcessingResult> {
-  // Create a mock draft
   const draft = await createJobDraft({
     user_id: userId,
     jd_text: jdText,
-    retrieved_bullet_ids: MOCK_BULLET_MATCHES.map((m) => m.id),
-    selected_bullet_ids: MOCK_BULLET_MATCHES.slice(0, 2).map((m) => m.id),
   })
 
-  return {
-    draftId: draft.id,
-    matchedBulletIds: MOCK_BULLET_MATCHES.map((m) => m.id),
-  }
+  return { draftId: draft.id }
+}
+
+export interface RequirementInfo {
+  description: string
+  category: string
+  importance: 'must_have' | 'nice_to_have'
+}
+
+export interface MatchedBullet {
+  id: string
+  text: string
+  similarity: number
+}
+
+export interface CoveredRequirement {
+  requirement: RequirementInfo
+  matchedBullets: MatchedBullet[]
 }
 
 export interface GapAnalysisServiceResult {
   draftId: string
   jobTitle: string
   company: string | null
-  covered: Array<{
-    requirement: { description: string; category: string; importance: 'must_have' | 'nice_to_have' }
-    matchedBullets: Array<{ id: string; text: string; similarity: number }>
-  }>
-  gaps: Array<{
-    requirement: { description: string; category: string; importance: 'must_have' | 'nice_to_have' }
-  }>
+  covered: CoveredRequirement[]
+  gaps: Array<{ requirement: RequirementInfo }>
   totalRequirements: number
   coveredCount: number
   interviewContext: InterviewContext | null
 }
 
+/**
+ * Build an interview context from gap analysis results.
+ * Pure function — used both after fresh analysis and when loading cached results.
+ */
+export function buildInterviewContextFromGaps(
+  gaps: GapAnalysisServiceResult['gaps'],
+  covered: GapAnalysisServiceResult['covered'],
+  jobTitle: string,
+  company: string | null
+): InterviewContext | null {
+  if (gaps.length === 0) return null
+
+  const existingBulletSummary = covered
+    .flatMap(c => c.matchedBullets.map(b => b.text))
+    .slice(0, 10)
+    .join('; ')
+
+  return {
+    mode: 'gaps',
+    gaps: gaps.map(g => ({
+      requirement: g.requirement.description,
+      category: g.requirement.category,
+      importance: g.requirement.importance,
+    })),
+    existingBulletSummary: existingBulletSummary || 'No existing bullets matched.',
+    jobTitle,
+    company,
+  }
+}
+
+/**
+ * Reconstruct GapAnalysisServiceResult from stored gap_analysis JSON column.
+ * Used by DraftResumePage when loading a cached analysis.
+ */
+export function buildGapDataFromStored(
+  draftId: string,
+  storedGapAnalysis: {
+    jobTitle: string
+    company: string | null
+    covered: CoveredRequirement[]
+    gaps: RequirementInfo[]
+    totalRequirements: number
+    coveredCount: number
+    analyzedAt: string
+  }
+): GapAnalysisServiceResult & { analyzedAt: string } {
+  const gaps = storedGapAnalysis.gaps.map(g => ({ requirement: g }))
+  const interviewContext = buildInterviewContextFromGaps(
+    gaps,
+    storedGapAnalysis.covered,
+    storedGapAnalysis.jobTitle,
+    storedGapAnalysis.company
+  )
+
+  return {
+    draftId,
+    jobTitle: storedGapAnalysis.jobTitle,
+    company: storedGapAnalysis.company,
+    covered: storedGapAnalysis.covered,
+    gaps,
+    totalRequirements: storedGapAnalysis.totalRequirements,
+    coveredCount: storedGapAnalysis.coveredCount,
+    interviewContext,
+    analyzedAt: storedGapAnalysis.analyzedAt,
+  }
+}
 
 /**
  * Process a JD with per-requirement gap analysis:
@@ -151,7 +180,8 @@ export interface GapAnalysisServiceResult {
  * 2. Embed each requirement
  * 3. Match bullets per requirement
  * 4. Classify covered vs gap
- * 5. Build gap interview context
+ * 5. Store results + update draft bullets
+ * 6. Build gap interview context
  */
 export async function analyzeJobDescriptionGaps(
   userId: string,
@@ -222,41 +252,30 @@ export async function analyzeJobDescriptionGaps(
       requirement: r.requirement,
     }))
 
-  // 5. Store results on job_drafts
+  // 5. Store results on job_drafts (with full bullet data, not just IDs)
   const gapAnalysis = {
     jobTitle,
     company,
     covered: covered.map(c => ({
       requirement: c.requirement,
-      matchedBulletIds: c.matchedBullets.map(b => b.id),
+      matchedBullets: c.matchedBullets,
     })),
     gaps: gaps.map(g => g.requirement),
     totalRequirements: requirements.length,
     coveredCount: covered.length,
+    analyzedAt: new Date().toISOString(),
   }
 
-  await updateJobDraftRequirements(draftId, requirements, gapAnalysis)
+  await updateJobDraftRequirements(draftId, requirements, gapAnalysis, jobTitle, company)
 
-  // 6. Build gap interview context (only if there are gaps)
-  let interviewContext: InterviewContext | null = null
-  if (gaps.length > 0) {
-    const existingBulletSummary = covered
-      .flatMap(c => c.matchedBullets.map(b => b.text))
-      .slice(0, 10)
-      .join('; ')
+  // Update draft with all matched bullet IDs
+  const allMatchedBulletIds = [...new Set(
+    covered.flatMap(c => c.matchedBullets.map(b => b.id))
+  )]
+  await updateJobDraftBullets(draftId, allMatchedBulletIds)
 
-    interviewContext = {
-      mode: 'gaps',
-      gaps: gaps.map(g => ({
-        requirement: g.requirement.description,
-        category: g.requirement.category,
-        importance: g.requirement.importance,
-      })),
-      existingBulletSummary: existingBulletSummary || 'No existing bullets matched.',
-      jobTitle,
-      company,
-    }
-  }
+  // 6. Build gap interview context
+  const interviewContext = buildInterviewContextFromGaps(gaps, covered, jobTitle, company)
 
   return {
     draftId,
@@ -269,4 +288,3 @@ export async function analyzeJobDescriptionGaps(
     interviewContext,
   }
 }
-

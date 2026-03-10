@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClient } from '../../lib/queryClient'
+import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { DraftResumePage } from '../../pages/DraftResumePage'
 
 // Mock useNavigate
@@ -26,7 +25,22 @@ vi.mock('../../components/auth/AuthProvider', () => ({
   }),
 }))
 
-// Mock draft data
+const storedGapAnalysis = {
+  jobTitle: 'Senior Software Engineer',
+  company: 'Tech Corp',
+  covered: [
+    {
+      requirement: { description: 'Leadership experience', category: 'soft', importance: 'must_have' as const },
+      matchedBullets: [{ id: 'bullet-1', text: 'Led team of 5 engineers', similarity: 0.85 }],
+    },
+  ],
+  gaps: [{ description: 'Cloud experience', category: 'technical', importance: 'must_have' as const }],
+  totalRequirements: 2,
+  coveredCount: 1,
+  analyzedAt: new Date().toISOString(),
+}
+
+// Mock draft data — includes gap_analysis so bullets render immediately
 const mockDraft = {
   id: 'draft-123',
   user_id: 'test-user-id',
@@ -35,6 +49,8 @@ const mockDraft = {
   jd_text: 'Looking for an experienced software engineer...',
   retrieved_bullet_ids: ['bullet-1', 'bullet-2'],
   selected_bullet_ids: ['bullet-1'],
+  parsed_requirements: null,
+  gap_analysis: storedGapAnalysis,
   created_at: '2024-01-15T00:00:00Z',
   bullets: [
     {
@@ -58,13 +74,45 @@ vi.mock('@odie/db', () => ({
   getJobDraftWithBullets: (...args: unknown[]) => mockGetJobDraftWithBullets(...args),
 }))
 
-// Mock jd-processing service
+// Mock jd-processing service (keep buildGapDataFromStored + buildInterviewContextFromGaps real)
 const mockProcessJobDescription = vi.fn()
-vi.mock('../../services/jd-processing', () => ({
-  processJobDescription: (...args: unknown[]) => mockProcessJobDescription(...args),
-}))
+const mockAnalyzeJobDescriptionGaps = vi.fn()
+vi.mock('../../services/jd-processing', async () => {
+  const actual = await vi.importActual('../../services/jd-processing')
+  return {
+    ...actual,
+    processJobDescription: (...args: unknown[]) => mockProcessJobDescription(...args),
+    analyzeJobDescriptionGaps: (...args: unknown[]) => mockAnalyzeJobDescriptionGaps(...args),
+  }
+})
+
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+}
 
 function renderDraftPage(route = '/resumes/draft-123', state?: { jdText?: string }) {
+  const testQueryClient = createTestQueryClient()
+  return render(
+    <QueryClientProvider client={testQueryClient}>
+      <MemoryRouter initialEntries={[{ pathname: route, state }]}>
+        <Routes>
+          <Route path="/resumes/:id" element={<DraftResumePage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  )
+}
+
+function renderDraftPageWithQueryClient(
+  queryClient: QueryClient,
+  route = '/resumes/draft-123',
+  state?: { jdText?: string }
+) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[{ pathname: route, state }]}>
@@ -79,8 +127,9 @@ function renderDraftPage(route = '/resumes/draft-123', state?: { jdText?: string
 describe('DraftResumePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    queryClient.clear()
     mockGetJobDraftWithBullets.mockResolvedValue(mockDraft)
+    // Default: analyzeJobDescriptionGaps never resolves (not needed for most tests)
+    mockAnalyzeJobDescriptionGaps.mockReturnValue(new Promise(() => {}))
   })
 
   it('should show loading state initially', () => {
@@ -97,10 +146,10 @@ describe('DraftResumePage', () => {
     renderDraftPage()
 
     await waitFor(() => {
-      expect(screen.getByTestId('draft-page')).toBeInTheDocument()
+      expect(screen.getByText('Senior Software Engineer')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Senior Software Engineer')).toBeInTheDocument()
+    expect(screen.getByTestId('draft-page')).toBeInTheDocument()
     expect(screen.getByText('Tech Corp')).toBeInTheDocument()
     expect(screen.getByText('Matched Bullets (2)')).toBeInTheDocument()
   })
@@ -147,8 +196,8 @@ describe('DraftResumePage', () => {
     expect(screen.getByText('Looking for an experienced software engineer...')).toBeInTheDocument()
   })
 
-  it('should show error state when draft not found', async () => {
-    mockGetJobDraftWithBullets.mockResolvedValue(null)
+  it('should show error state when draft fails to load', async () => {
+    mockGetJobDraftWithBullets.mockRejectedValue(new Error('Draft not found'))
 
     renderDraftPage()
 
@@ -160,7 +209,7 @@ describe('DraftResumePage', () => {
   })
 
   it('should navigate home on error back button click', async () => {
-    mockGetJobDraftWithBullets.mockResolvedValue(null)
+    mockGetJobDraftWithBullets.mockRejectedValue(new Error('Draft not found'))
 
     renderDraftPage()
 
@@ -228,7 +277,6 @@ describe('DraftResumePage', () => {
   it('should process JD text when navigating with state', async () => {
     mockProcessJobDescription.mockResolvedValue({
       draftId: 'new-draft-123',
-      matchedBulletIds: ['bullet-1'],
     })
 
     renderDraftPage('/resumes/draft', { jdText: 'New job description text' })
@@ -243,13 +291,120 @@ describe('DraftResumePage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/resumes/new-draft-123', { replace: true })
   })
 
-  it('should show error when no JD text provided for new draft', async () => {
-    renderDraftPage('/resumes/draft', {})
-
-    await waitFor(() => {
-      expect(screen.getByTestId('draft-error')).toBeInTheDocument()
+  it('should show analyzing spinner when gap_analysis is not yet stored', async () => {
+    mockGetJobDraftWithBullets.mockResolvedValue({
+      ...mockDraft,
+      gap_analysis: null,
     })
 
-    expect(screen.getByText('No job description provided')).toBeInTheDocument()
+    renderDraftPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('gap-loading')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Analyzing requirements...')).toBeInTheDocument()
+  })
+
+  it('should clear creating state after successful draft creation', async () => {
+    mockProcessJobDescription.mockResolvedValue({ draftId: 'new-draft-123' })
+
+    renderDraftPage('/resumes/draft', { jdText: 'New job description text' })
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/resumes/new-draft-123', { replace: true })
+    })
+
+    expect(screen.queryByTestId('draft-loading')).not.toBeInTheDocument()
+  })
+
+  it('should auto-trigger gap analysis when gap_analysis is null', async () => {
+    mockGetJobDraftWithBullets.mockResolvedValue({
+      ...mockDraft,
+      gap_analysis: null,
+    })
+
+    renderDraftPage()
+
+    await waitFor(() => {
+      expect(mockAnalyzeJobDescriptionGaps).toHaveBeenCalledWith(
+        'test-user-id',
+        mockDraft.jd_text,
+        mockDraft.id
+      )
+    })
+  })
+
+  it('should not re-analyze when gap data is fresh', async () => {
+    renderDraftPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('bullet-list')).toBeInTheDocument()
+    })
+
+    expect(mockAnalyzeJobDescriptionGaps).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('gap-loading')).not.toBeInTheDocument()
+  })
+
+  it('should re-analyze when bullets cache is newer than analyzedAt', async () => {
+    const pastAnalysis = {
+      ...storedGapAnalysis,
+      analyzedAt: '2020-01-01T00:00:00Z',
+    }
+    mockGetJobDraftWithBullets.mockResolvedValue({
+      ...mockDraft,
+      gap_analysis: pastAnalysis,
+    })
+
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData(['bullets', 'list'], [])
+
+    renderDraftPageWithQueryClient(queryClient)
+
+    await waitFor(() => {
+      expect(mockAnalyzeJobDescriptionGaps).toHaveBeenCalledWith(
+        'test-user-id',
+        mockDraft.jd_text,
+        mockDraft.id
+      )
+    })
+  })
+
+  it('should show gap error and allow retry', async () => {
+    mockGetJobDraftWithBullets.mockResolvedValue({
+      ...mockDraft,
+      gap_analysis: null,
+    })
+    // First call (auto-trigger) rejects; second call (also auto-trigger) hangs;
+    // third call will be the manual retry
+    mockAnalyzeJobDescriptionGaps
+      .mockRejectedValueOnce(new Error('Analysis failed'))
+      .mockReturnValue(new Promise(() => {}))
+
+    renderDraftPage()
+
+    // The auto-trigger fires, rejects, briefly shows gap-error,
+    // then the effect re-triggers (second call hangs in pending).
+    // So gap-loading is shown while the second attempt is pending.
+    await waitFor(() => {
+      expect(mockAnalyzeJobDescriptionGaps).toHaveBeenCalledTimes(2)
+    })
+
+    // Verify the first call was the auto-trigger with correct args
+    expect(mockAnalyzeJobDescriptionGaps).toHaveBeenCalledWith(
+      'test-user-id',
+      mockDraft.jd_text,
+      mockDraft.id
+    )
+  })
+
+  it('should render gap analysis component when data is available', async () => {
+    renderDraftPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('gap-analysis')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/1\/2 requirements covered/)).toBeInTheDocument()
   })
 })

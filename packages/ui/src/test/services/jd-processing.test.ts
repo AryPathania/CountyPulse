@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { processJobDescription, analyzeJobDescriptionGaps } from '../../services/jd-processing'
+import { processJobDescription, analyzeJobDescriptionGaps, buildInterviewContextFromGaps, buildGapDataFromStored } from '../../services/jd-processing'
 
 // Mock @odie/db
 const mockGetSession = vi.fn()
 const mockFunctionsInvoke = vi.fn()
-const mockMatchBulletsForJd = vi.fn()
 const mockCreateJobDraft = vi.fn()
 const mockMatchBulletsPerRequirement = vi.fn()
 const mockUpdateJobDraftRequirements = vi.fn()
+const mockUpdateJobDraftBullets = vi.fn()
 const mockRunLoggerSuccess = vi.fn().mockResolvedValue({})
 const mockRunLoggerFailure = vi.fn().mockResolvedValue({})
 const mockCreateRunLogger = vi.fn(() => ({
@@ -24,11 +24,11 @@ vi.mock('@odie/db', () => ({
       invoke: (...args: unknown[]) => mockFunctionsInvoke(...args),
     },
   },
-  matchBulletsForJd: (...args: unknown[]) => mockMatchBulletsForJd(...args),
   createJobDraft: (...args: unknown[]) => mockCreateJobDraft(...args),
   createRunLogger: (...args: unknown[]) => mockCreateRunLogger(...args),
   matchBulletsPerRequirement: (...args: unknown[]) => mockMatchBulletsPerRequirement(...args),
   updateJobDraftRequirements: (...args: unknown[]) => mockUpdateJobDraftRequirements(...args),
+  updateJobDraftBullets: (...args: unknown[]) => mockUpdateJobDraftBullets(...args),
 }))
 
 describe('jd-processing service', () => {
@@ -37,21 +37,10 @@ describe('jd-processing service', () => {
   })
 
   describe('processJobDescription', () => {
-    it('should process JD and return draft ID with matched bullets', async () => {
-      // Setup mocks for authenticated flow
+    it('should create a draft and return draft ID', async () => {
       mockGetSession.mockResolvedValue({
         data: { session: { access_token: 'test-token' } },
       })
-
-      mockFunctionsInvoke.mockResolvedValue({
-        data: { embeddings: [new Array(1536).fill(0.1)] },
-        error: null,
-      })
-
-      mockMatchBulletsForJd.mockResolvedValue([
-        { id: 'bullet-1', current_text: 'Test bullet 1', category: 'Leadership', similarity: 0.9 },
-        { id: 'bullet-2', current_text: 'Test bullet 2', category: 'Backend', similarity: 0.8 },
-      ])
 
       mockCreateJobDraft.mockResolvedValue({
         id: 'draft-123',
@@ -63,30 +52,16 @@ describe('jd-processing service', () => {
 
       expect(result).toEqual({
         draftId: 'draft-123',
-        matchedBulletIds: ['bullet-1', 'bullet-2'],
       })
 
-      // Verify embed function was called
-      expect(mockFunctionsInvoke).toHaveBeenCalledWith('embed', {
-        body: { texts: ['Test job description'], type: 'jd' },
-      })
-
-      // Verify bullet matching was called
-      expect(mockMatchBulletsForJd).toHaveBeenCalledWith(
-        'user-123',
-        expect.any(Array),
-        50,
-        0.3
-      )
-
-      // Verify draft was created with correct data
+      // Verify draft was created with only user_id and jd_text
       expect(mockCreateJobDraft).toHaveBeenCalledWith({
         user_id: 'user-123',
         jd_text: 'Test job description',
-        jd_embedding: expect.stringMatching(/^\[[\d.,]+\]$/),
-        retrieved_bullet_ids: ['bullet-1', 'bullet-2'],
-        selected_bullet_ids: ['bullet-1', 'bullet-2'],
       })
+
+      // Verify no embed or matching calls
+      expect(mockFunctionsInvoke).not.toHaveBeenCalled()
 
       // Verify success telemetry was logged
       expect(mockCreateRunLogger).toHaveBeenCalledWith('user-123', 'draft')
@@ -97,8 +72,6 @@ describe('jd-processing service', () => {
         },
         output: {
           draftId: 'draft-123',
-          matchedBulletCount: 2,
-          selectedBulletIds: ['bullet-1', 'bullet-2'],
         },
       })
     })
@@ -119,24 +92,20 @@ describe('jd-processing service', () => {
       })
     })
 
-    it('should throw error when embed function fails', async () => {
+    it('should log failure telemetry when createJobDraft throws', async () => {
       mockGetSession.mockResolvedValue({
         data: { session: { access_token: 'test-token' } },
       })
 
-      mockFunctionsInvoke.mockResolvedValue({
-        data: null,
-        error: { message: 'Embedding failed' },
-      })
+      mockCreateJobDraft.mockRejectedValue(new Error('DB insert failed'))
 
       await expect(processJobDescription('user-123', 'Test JD')).rejects.toThrow(
-        'Embedding failed'
+        'DB insert failed'
       )
 
-      // Should log failure telemetry
       expect(mockRunLoggerFailure).toHaveBeenCalledWith({
         input: { jdTextLength: 7 },
-        error: 'Embedding failed',
+        error: 'DB insert failed',
       })
     })
 
@@ -149,51 +118,16 @@ describe('jd-processing service', () => {
 
       const result = await processJobDescription('user-123', 'Test JD', { useMock: true })
 
-      expect(result.draftId).toBe('mock-draft-123')
-      expect(result.matchedBulletIds).toEqual([
-        'mock-bullet-1',
-        'mock-bullet-2',
-        'mock-bullet-3',
-      ])
+      expect(result).toEqual({ draftId: 'mock-draft-123' })
 
       // Should not call embed function in mock mode
       expect(mockFunctionsInvoke).not.toHaveBeenCalled()
-      expect(mockMatchBulletsForJd).not.toHaveBeenCalled()
-    })
 
-    it('should pre-select top 10 bullets', async () => {
-      mockGetSession.mockResolvedValue({
-        data: { session: { access_token: 'test-token' } },
-      })
-
-      mockFunctionsInvoke.mockResolvedValue({
-        data: { embeddings: [new Array(1536).fill(0.1)] },
-        error: null,
-      })
-
-      // Return 15 bullets to test slicing
-      const manyBullets = Array.from({ length: 15 }, (_, i) => ({
-        id: `bullet-${i}`,
-        current_text: `Bullet ${i}`,
-        category: 'Test',
-        similarity: 0.9 - i * 0.01,
-      }))
-
-      mockMatchBulletsForJd.mockResolvedValue(manyBullets)
-
-      mockCreateJobDraft.mockResolvedValue({
-        id: 'draft-123',
+      // Mock draft should be created with bare fields only
+      expect(mockCreateJobDraft).toHaveBeenCalledWith({
         user_id: 'user-123',
+        jd_text: 'Test JD',
       })
-
-      await processJobDescription('user-123', 'Test JD')
-
-      // Verify only top 10 are pre-selected
-      expect(mockCreateJobDraft).toHaveBeenCalledWith(
-        expect.objectContaining({
-          selected_bullet_ids: manyBullets.slice(0, 10).map((b) => b.id),
-        })
-      )
     })
   })
 
@@ -247,6 +181,7 @@ describe('jd-processing service', () => {
         }))
       )
       mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
 
       await analyzeJobDescriptionGaps('user-1', 'Looking for a React dev', 'draft-1')
 
@@ -267,6 +202,7 @@ describe('jd-processing service', () => {
         }))
       )
       mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
 
       await analyzeJobDescriptionGaps('user-1', 'Some JD', 'draft-1')
 
@@ -290,6 +226,7 @@ describe('jd-processing service', () => {
         }))
       )
       mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
 
       await analyzeJobDescriptionGaps('user-1', 'Some JD', 'draft-1')
 
@@ -329,6 +266,7 @@ describe('jd-processing service', () => {
         },
       ])
       mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
 
       const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
 
@@ -345,7 +283,7 @@ describe('jd-processing service', () => {
       expect(result.totalRequirements).toBe(3)
     })
 
-    it('persists to DB via updateJobDraftRequirements before returning', async () => {
+    it('persists to DB via updateJobDraftRequirements with full bullet data', async () => {
       setupAuthenticatedSession()
       setupParseJdResponse()
       setupEmbedResponse()
@@ -368,6 +306,7 @@ describe('jd-processing service', () => {
         },
       ])
       mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
 
       await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
 
@@ -380,7 +319,7 @@ describe('jd-processing service', () => {
           covered: [
             {
               requirement: { description: 'Experience with React', category: 'Frontend', importance: 'must_have' },
-              matchedBulletIds: ['b1'],
+              matchedBullets: [{ id: 'b1', text: 'Built React app', similarity: 0.85 }],
             },
           ],
           gaps: [
@@ -389,8 +328,52 @@ describe('jd-processing service', () => {
           ],
           totalRequirements: 3,
           coveredCount: 1,
-        }
+          analyzedAt: expect.any(String),
+        },
+        'Senior Engineer',
+        'Acme Corp'
       )
+    })
+
+    it('updates draft bullets with all matched bullet IDs', async () => {
+      setupAuthenticatedSession()
+      setupParseJdResponse()
+      setupEmbedResponse()
+
+      mockMatchBulletsPerRequirement.mockResolvedValue([
+        {
+          requirement: { description: 'Experience with React', category: 'Frontend', importance: 'must_have' },
+          matches: [
+            { id: 'b1', current_text: 'Built React app', category: 'Frontend', similarity: 0.85 },
+            { id: 'b2', current_text: 'React hooks expert', category: 'Frontend', similarity: 0.75 },
+          ],
+          isCovered: true,
+        },
+        {
+          requirement: { description: 'Team leadership', category: 'Leadership', importance: 'must_have' },
+          matches: [{ id: 'b1', current_text: 'Built React app', category: 'Frontend', similarity: 0.45 }],
+          isCovered: true,
+        },
+        {
+          requirement: { description: 'AWS experience', category: 'Cloud', importance: 'nice_to_have' },
+          matches: [],
+          isCovered: false,
+        },
+      ])
+      mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
+
+      await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+      // Should deduplicate b1 which appears in two covered requirements
+      expect(mockUpdateJobDraftBullets).toHaveBeenCalledWith(
+        'draft-1',
+        expect.arrayContaining(['b1', 'b2'])
+      )
+      // Verify deduplication (b1 should appear only once)
+      const calledIds = mockUpdateJobDraftBullets.mock.calls[0][1]
+      expect(calledIds).toHaveLength(2)
+      expect(new Set(calledIds).size).toBe(calledIds.length)
     })
 
     it('builds gap interview context with mode gaps and first 10 bullet summaries', async () => {
@@ -424,6 +407,7 @@ describe('jd-processing service', () => {
         },
       ])
       mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
 
       const result = await analyzeJobDescriptionGaps('user-1', 'JD', 'draft-1')
 
@@ -455,6 +439,7 @@ describe('jd-processing service', () => {
         }))
       )
       mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
 
       const result = await analyzeJobDescriptionGaps('user-1', 'JD', 'draft-1')
 
@@ -497,4 +482,122 @@ describe('jd-processing service', () => {
     })
   })
 
+  describe('buildInterviewContextFromGaps', () => {
+    it('returns null when there are no gaps', () => {
+      const result = buildInterviewContextFromGaps([], [], 'Engineer', 'Acme')
+      expect(result).toBeNull()
+    })
+
+    it('builds interview context with gaps and bullet summary', () => {
+      const gaps = [
+        { requirement: { description: 'AWS', category: 'Cloud', importance: 'must_have' as const } },
+      ]
+      const covered = [
+        {
+          requirement: { description: 'React', category: 'Frontend', importance: 'must_have' as const },
+          matchedBullets: [{ id: 'b1', text: 'Built React app', similarity: 0.9 }],
+        },
+      ]
+
+      const result = buildInterviewContextFromGaps(gaps, covered, 'Engineer', 'Acme')
+
+      expect(result).toEqual({
+        mode: 'gaps',
+        gaps: [{ requirement: 'AWS', category: 'Cloud', importance: 'must_have' }],
+        existingBulletSummary: 'Built React app',
+        jobTitle: 'Engineer',
+        company: 'Acme',
+      })
+    })
+
+    it('uses fallback summary when no covered bullets exist', () => {
+      const gaps = [
+        { requirement: { description: 'Go', category: 'Backend', importance: 'must_have' as const } },
+      ]
+
+      const result = buildInterviewContextFromGaps(gaps, [], 'Engineer', null)
+
+      expect(result!.existingBulletSummary).toBe('No existing bullets matched.')
+      expect(result!.company).toBeNull()
+    })
+
+    it('limits bullet summary to first 10 texts', () => {
+      const gaps = [
+        { requirement: { description: 'Go', category: 'Backend', importance: 'must_have' as const } },
+      ]
+      const covered = [
+        {
+          requirement: { description: 'React', category: 'Frontend', importance: 'must_have' as const },
+          matchedBullets: Array.from({ length: 15 }, (_, i) => ({
+            id: `b${i}`,
+            text: `Bullet ${i}`,
+            similarity: 0.9,
+          })),
+        },
+      ]
+
+      const result = buildInterviewContextFromGaps(gaps, covered, 'Engineer', 'Acme')
+
+      const texts = result!.existingBulletSummary.split('; ')
+      expect(texts).toHaveLength(10)
+    })
+  })
+
+  describe('buildGapDataFromStored', () => {
+    it('reconstructs GapAnalysisServiceResult from stored data', () => {
+      const stored = {
+        jobTitle: 'Engineer',
+        company: 'Acme' as string | null,
+        covered: [
+          {
+            requirement: { description: 'React', category: 'Frontend', importance: 'must_have' as const },
+            matchedBullets: [{ id: 'b1', text: 'Built React app', similarity: 0.9 }],
+          },
+        ],
+        gaps: [
+          { description: 'AWS', category: 'Cloud', importance: 'must_have' as const },
+        ],
+        totalRequirements: 2,
+        coveredCount: 1,
+        analyzedAt: '2024-01-15T00:00:00Z',
+      }
+
+      const result = buildGapDataFromStored('draft-1', stored)
+
+      expect(result.draftId).toBe('draft-1')
+      expect(result.jobTitle).toBe('Engineer')
+      expect(result.company).toBe('Acme')
+      expect(result.covered).toEqual(stored.covered)
+      expect(result.gaps).toEqual([
+        { requirement: { description: 'AWS', category: 'Cloud', importance: 'must_have' } },
+      ])
+      expect(result.totalRequirements).toBe(2)
+      expect(result.coveredCount).toBe(1)
+      expect(result.analyzedAt).toBe('2024-01-15T00:00:00Z')
+      expect(result.interviewContext).not.toBeNull()
+      expect(result.interviewContext!.mode).toBe('gaps')
+    })
+
+    it('returns null interviewContext when no gaps', () => {
+      const stored = {
+        jobTitle: 'Engineer',
+        company: null,
+        covered: [
+          {
+            requirement: { description: 'React', category: 'Frontend', importance: 'must_have' as const },
+            matchedBullets: [{ id: 'b1', text: 'Built React app', similarity: 0.9 }],
+          },
+        ],
+        gaps: [] as Array<{ description: string; category: string; importance: 'must_have' | 'nice_to_have' }>,
+        totalRequirements: 1,
+        coveredCount: 1,
+        analyzedAt: '2024-01-15T00:00:00Z',
+      }
+
+      const result = buildGapDataFromStored('draft-1', stored)
+
+      expect(result.interviewContext).toBeNull()
+      expect(result.gaps).toHaveLength(0)
+    })
+  })
 })

@@ -1,10 +1,26 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
-import { getJobDrafts, type JobDraft, getUploadedResumes, type UploadedResume } from '@odie/db'
+import { useJobDrafts, useDeleteJobDraft } from '../queries/job-drafts'
+import { useUploadedResumes } from '../queries/uploaded-resumes'
 import { ResumeContextSchema } from '@odie/shared'
 import './ResumesPage.css'
+
+function isUrl(text: string): boolean {
+  return /^https?:\/\//.test(text)
+}
+
+function getDraftTitle(draft: { job_title: string | null; jd_text: string | null; gap_analysis: unknown }): string {
+  // Prefer extracted job title from gap analysis over raw URL in job_title
+  const gapTitle = (draft.gap_analysis as { jobTitle?: string } | null)?.jobTitle
+  if (gapTitle) return gapTitle
+
+  if (draft.job_title && !isUrl(draft.job_title)) return draft.job_title
+
+  if (draft.jd_text) return draft.jd_text.slice(0, 60) + '...'
+
+  return 'Untitled Draft'
+}
 
 /**
  * Resumes page lists all job drafts/resumes for the user.
@@ -12,34 +28,13 @@ import './ResumesPage.css'
 export function ResumesPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [drafts, setDrafts] = useState<JobDraft[]>([])
-  const [uploadedResumes, setUploadedResumes] = useState<UploadedResume[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const deleteDraft = useDeleteJobDraft()
 
-  useEffect(() => {
-    const loadDrafts = async () => {
-      if (!user?.id) {
-        setIsLoading(false)
-        return
-      }
+  const { data: drafts = [], isLoading: draftsLoading, error: draftsError } = useJobDrafts(user?.id)
+  const { data: uploadedResumes = [], isLoading: uploadsLoading, error: uploadsError } = useUploadedResumes(user?.id)
 
-      try {
-        const [data, uploads] = await Promise.all([
-          getJobDrafts(user.id),
-          getUploadedResumes(user.id),
-        ])
-        setDrafts(data)
-        setUploadedResumes(uploads)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load resumes')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadDrafts()
-  }, [user?.id])
+  const isLoading = draftsLoading || uploadsLoading
+  const error = draftsError || uploadsError
 
   return (
     <div className="resumes-page" data-testid="resumes-page">
@@ -63,7 +58,7 @@ export function ResumesPage() {
           </div>
         ) : error ? (
           <div className="resumes-page__error" data-testid="resumes-error">
-            {error}
+            {error instanceof Error ? error.message : String(error)}
           </div>
         ) : drafts.length === 0 && uploadedResumes.length === 0 ? (
           <div className="resumes-page__empty" data-testid="resumes-empty">
@@ -110,28 +105,47 @@ export function ResumesPage() {
             )}
 
             {drafts.length > 0 && (
-              <ul className="resumes-page__list" data-testid="resumes-list">
-                {drafts.map((draft) => (
-                  <li
-                    key={draft.id}
-                    className="resumes-page__item"
-                    onClick={() => navigate(`/resumes/${draft.id}`)}
-                    data-testid={`resume-${draft.id}`}
-                  >
-                    <div className="resume-card">
-                      <h3 className="resume-card__title">
-                        {draft.job_title || 'Untitled Resume'}
-                      </h3>
-                      {draft.company && (
-                        <p className="resume-card__company">{draft.company}</p>
-                      )}
-                      <p className="resume-card__date">
-                        {new Date(draft.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <section className="resumes-page__section" data-testid="drafts-section">
+                <h2 className="resumes-page__section-title">Drafts</h2>
+                <ul className="resumes-page__list" data-testid="resumes-list">
+                  {drafts.map((draft) => (
+                    <li
+                      key={draft.id}
+                      className="resumes-page__item"
+                      onClick={() => navigate(`/resumes/${draft.id}`)}
+                      data-testid={`resume-${draft.id}`}
+                    >
+                      <div className="resume-card">
+                        <div className="resume-card__header">
+                          <span className="resume-card__badge" data-testid="draft-badge">Draft</span>
+                          <button
+                            className="resume-card__delete"
+                            data-testid={`delete-draft-${draft.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (window.confirm('Delete this draft?')) {
+                                deleteDraft.mutate(draft.id)
+                              }
+                            }}
+                            aria-label="Delete draft"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                        <h3 className="resume-card__title">
+                          {getDraftTitle(draft)}
+                        </h3>
+                        {draft.company && (
+                          <p className="resume-card__company">{draft.company}</p>
+                        )}
+                        <p className="resume-card__date">
+                          {new Date(draft.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
           </>
         )}
