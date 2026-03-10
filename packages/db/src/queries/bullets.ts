@@ -1,5 +1,6 @@
 import { supabase } from '../client'
 import type { Database } from '../types'
+import { toPgVector } from '@odie/shared'
 
 type Bullet = Database['public']['Tables']['bullets']['Row']
 type NewBullet = Database['public']['Tables']['bullets']['Insert']
@@ -171,6 +172,33 @@ export async function finalizeDraftBullets(bulletIds: string[]): Promise<void> {
 
   if (error) {
     throw error
+  }
+}
+
+/**
+ * Generate embeddings for bullets and store them in the DB.
+ * Calls the embed edge function, then updates each bullet with its embedding vector.
+ */
+export async function embedBullets(
+  bulletIds: string[],
+  bulletTexts: string[]
+): Promise<void> {
+  if (bulletIds.length === 0) return
+
+  const { data, error } = await supabase.functions.invoke('embed', {
+    body: { texts: bulletTexts, type: 'bullet' },
+  })
+
+  if (error) throw error
+
+  const embeddings: number[][] = data.embeddings
+  for (let i = 0; i < bulletIds.length; i++) {
+    const { error: updateError } = await supabase
+      .from('bullets')
+      .update({ embedding: toPgVector(embeddings[i]) })
+      .eq('id', bulletIds[i])
+
+    if (updateError) throw updateError
   }
 }
 

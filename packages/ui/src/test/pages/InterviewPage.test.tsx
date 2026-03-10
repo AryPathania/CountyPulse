@@ -43,11 +43,13 @@ const mockCreatePositionWithBullets = vi.fn()
 const mockCreatePosition = vi.fn()
 const mockCreateDraftBullet = vi.fn()
 const mockFinalizeDraftBullets = vi.fn()
+const mockEmbedBullets = vi.fn()
 vi.mock('@odie/db', () => ({
   createPositionWithBullets: (...args: unknown[]) => mockCreatePositionWithBullets(...args),
   createPosition: (...args: unknown[]) => mockCreatePosition(...args),
   createDraftBullet: (...args: unknown[]) => mockCreateDraftBullet(...args),
   finalizeDraftBullets: (...args: unknown[]) => mockFinalizeDraftBullets(...args),
+  embedBullets: (...args: unknown[]) => mockEmbedBullets(...args),
 }))
 
 // Mock InterviewChat component to control its behavior
@@ -132,6 +134,7 @@ describe('InterviewPage', () => {
     mockConfirm.mockReturnValue(false)
     mockLocalStorage.getItem.mockReturnValue(null)
     mockFinalizeDraftBullets.mockResolvedValue(undefined)
+    mockEmbedBullets.mockResolvedValue(undefined)
   })
 
   it('should render interview page', async () => {

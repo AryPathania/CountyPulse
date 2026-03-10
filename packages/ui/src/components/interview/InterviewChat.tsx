@@ -78,6 +78,16 @@ export function InterviewChat({
     }
   }, [isSpeaking, speak, stopSpeaking])
 
+  const appendAssistantMessage = useCallback((content: string) => {
+    const msg: ChatMessage = {
+      id: `assistant-${Date.now()}`,
+      role: 'assistant',
+      content,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages((prev) => [...prev, msg])
+  }, [])
+
   // Initialize chat with greeting (only if no initial messages provided)
   useEffect(() => {
     if (hasInitialized) return
@@ -89,6 +99,48 @@ export function InterviewChat({
     setMessages([initialMessage])
     setHasInitialized(true)
   }, [config?.useMock, config?.context, hasInitialized])
+
+  // Auto-start: for context-aware modes (resume/gaps), automatically send
+  // the first API call so the LLM can immediately react to the context
+  const hasAutoStarted = useRef(false)
+  useEffect(() => {
+    if (hasAutoStarted.current) return
+    if (!hasInitialized || messages.length === 0) return
+    if (!config?.context?.mode || config.context.mode === 'blank') return
+    // Only auto-start when there's just the greeting message (fresh session)
+    if (messages.length !== 1 || messages[0].role !== 'assistant') return
+
+    hasAutoStarted.current = true
+
+    const autoMessage: ChatMessage = {
+      id: `user-auto-${Date.now()}`,
+      role: 'user',
+      content: "Yes, let's get started!",
+      timestamp: new Date().toISOString(),
+    }
+
+    const updatedMessages = [...messages, autoMessage]
+    setMessages(updatedMessages)
+    setIsLoading(true)
+
+    sendInterviewMessage(updatedMessages, config).then((result) => {
+      appendAssistantMessage(result.response)
+
+      if (result.extractedPosition) {
+        setExtractedData((prev) => ({
+          positions: [...prev.positions, { position: result.extractedPosition!, bullets: [] }],
+        }))
+      }
+
+      if (!result.shouldContinue) {
+        setIsComplete(true)
+      }
+      setIsLoading(false)
+    }).catch((err) => {
+      setError(err instanceof Error ? err.message : 'Failed to start interview')
+      setIsLoading(false)
+    })
+  }, [hasInitialized, messages, config, appendAssistantMessage])
 
   // Notify parent when state changes for persistence
   useEffect(() => {
@@ -132,15 +184,7 @@ export function InterviewChat({
     try {
       const result = await sendInterviewMessage(updatedMessages, config)
 
-      // Create assistant message
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: result.response,
-        timestamp: new Date().toISOString(),
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
+      appendAssistantMessage(result.response)
 
       // Auto-play AI response if voice output is enabled
       if (voiceSettings.outputEnabled) {

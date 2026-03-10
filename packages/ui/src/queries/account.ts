@@ -13,7 +13,7 @@ export function useResetAccountData() {
 
   return useMutation({
     mutationFn: (userId: string) => resetAccountData(userId),
-    onSuccess: () => {
+    onSuccess: (_data, userId) => {
       // Invalidate all data caches
       queryClient.invalidateQueries({ queryKey: bulletKeys.all })
       queryClient.invalidateQueries({ queryKey: resumeKeys.all })
@@ -22,6 +22,8 @@ export function useResetAccountData() {
       queryClient.invalidateQueries({ queryKey: ['job-drafts'] })
       queryClient.invalidateQueries({ queryKey: ['positions'] })
       queryClient.invalidateQueries({ queryKey: ['profiles'] })
+      // Clear interview localStorage to prevent stale conversation
+      localStorage.removeItem(`odie_interview_state_${userId}`)
     },
   })
 }

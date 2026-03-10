@@ -9,6 +9,7 @@ import {
   createPosition,
   createDraftBullet,
   finalizeDraftBullets,
+  embedBullets,
 } from '@odie/db'
 import type { ExtractedInterviewData, ChatMessage } from '@odie/shared'
 import { toPostgresDate } from '@odie/shared'
@@ -79,7 +80,7 @@ export function InterviewPage() {
         const positionKey = `${positionData.position.company}|${positionData.position.title}`
 
         // Create position if not already saved
-        let positionId = savedPositionMap.get(positionKey)
+        let positionId = savedPositionMapRef.current.get(positionKey)
         if (!positionId) {
           try {
             const created = await createPosition({
@@ -152,9 +153,25 @@ export function InterviewPage() {
       setError(null)
 
       try {
-        // Finalize all draft bullets
+        // Finalize all draft bullets and generate embeddings
         if (savedBulletIds.length > 0) {
           await finalizeDraftBullets(savedBulletIds)
+
+          // Collect bullet texts for embedding from extracted data
+          const bulletTexts: string[] = []
+          for (const { position, bullets } of data.positions) {
+            const positionKey = `${position.company}|${position.title}`
+            for (const bullet of bullets) {
+              const bulletKey = `${positionKey}|${bullet.text}`
+              if (previouslySavedBulletsRef.current.has(bulletKey)) {
+                bulletTexts.push(bullet.text)
+              }
+            }
+          }
+
+          if (bulletTexts.length === savedBulletIds.length) {
+            await embedBullets(savedBulletIds, bulletTexts)
+          }
         }
 
         // For any positions/bullets not yet saved as drafts, save them now
@@ -170,7 +187,7 @@ export function InterviewPage() {
             })
 
             if (unsavedBullets.length > 0) {
-              await createPositionWithBullets(
+              const { bulletIds } = await createPositionWithBullets(
                 {
                   user_id: user.id,
                   company: position.company,
@@ -187,6 +204,10 @@ export function InterviewPage() {
                   soft_skills: b.softSkills,
                 }))
               )
+
+              // Generate embeddings for newly created bullets
+              const bulletTexts = unsavedBullets.map((b) => b.text)
+              await embedBullets(bulletIds, bulletTexts)
             }
           }
         }

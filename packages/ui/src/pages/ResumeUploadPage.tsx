@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
 import { uploadAndParseResume, type ResumeUploadResult } from '../services/resume-upload'
@@ -10,6 +11,7 @@ type UploadStep = 'select' | 'extracting' | 'analyzing' | 'creating' | 'done'
 export function ResumeUploadPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [step, setStep] = useState<UploadStep>('select')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ResumeUploadResult | null>(null)
@@ -49,13 +51,17 @@ export function ResumeUploadPage() {
 
       setResult(uploadResult)
       setStep('done')
+
+      // Invalidate caches so bullets/positions appear immediately
+      queryClient.invalidateQueries({ queryKey: ['bullets'] })
+      queryClient.invalidateQueries({ queryKey: ['positions'] })
     } catch (err) {
       clearTimeout(stepTimer!)
       clearTimeout(stepTimer2!)
       setError(err instanceof Error ? err.message : 'Upload failed')
       setStep('select')
     }
-  }, [user?.id])
+  }, [user?.id, queryClient])
 
   const handleStartInterview = useCallback(() => {
     if (result) {

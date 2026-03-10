@@ -4,6 +4,7 @@ import {
   getUploadedResumeByHash,
   uploadResumeFile,
   createPositionWithBullets,
+  embedBullets,
 } from '@odie/db'
 import type { Json } from '@odie/db'
 import type { InterviewContext, ResumeParseOutput } from '@odie/shared'
@@ -46,6 +47,7 @@ async function extractPdfText(file: File): Promise<string> {
       return text
     }
   } catch {
+    // Client-side extraction unavailable, fall through to server
   }
 
   // Server-side fallback
@@ -142,7 +144,7 @@ export async function uploadAndParseResume(
       const bulletText = (b: typeof strongAndFixable[number]) =>
         b.classification === 'fixable' && b.fixedText ? b.fixedText : b.originalText
 
-      await createPositionWithBullets(
+      const { bulletIds } = await createPositionWithBullets(
         {
           user_id: userId,
           company: pos.company,
@@ -159,6 +161,10 @@ export async function uploadAndParseResume(
           soft_skills: b.softSkills,
         }))
       )
+
+      // Generate and store embeddings for semantic matching
+      const bulletTexts = strongAndFixable.map(b => bulletText(b))
+      await embedBullets(bulletIds, bulletTexts)
     }
   }
 

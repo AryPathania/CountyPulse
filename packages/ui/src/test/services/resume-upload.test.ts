@@ -7,6 +7,7 @@ const mockCreateUploadedResume = vi.fn()
 const mockGetUploadedResumeByHash = vi.fn()
 const mockUploadResumeFile = vi.fn()
 const mockCreatePositionWithBullets = vi.fn()
+const mockEmbedBullets = vi.fn()
 
 vi.mock('@odie/db', () => ({
   supabase: {
@@ -17,6 +18,7 @@ vi.mock('@odie/db', () => ({
   getUploadedResumeByHash: (...args: unknown[]) => mockGetUploadedResumeByHash(...args),
   uploadResumeFile: (...args: unknown[]) => mockUploadResumeFile(...args),
   createPositionWithBullets: (...args: unknown[]) => mockCreatePositionWithBullets(...args),
+  embedBullets: (...args: unknown[]) => mockEmbedBullets(...args),
 }))
 
 // Mock pdf-extract module
@@ -156,7 +158,8 @@ describe('resume-upload service', () => {
         created_at: '2024-01-15T10:00:00Z',
       })
       // Position creation
-      mockCreatePositionWithBullets.mockResolvedValue({})
+      mockCreatePositionWithBullets.mockResolvedValue({ bulletIds: ['b1', 'b2'] })
+      mockEmbedBullets.mockResolvedValue(undefined)
 
       const file = createMockFile()
       const result = await uploadAndParseResume('user-123', file)
@@ -275,7 +278,8 @@ describe('resume-upload service', () => {
         parsed_data: validParsedData,
         created_at: '2024-01-15T10:00:00Z',
       })
-      mockCreatePositionWithBullets.mockResolvedValue({})
+      mockCreatePositionWithBullets.mockResolvedValue({ bulletIds: ['b1', 'b2'] })
+      mockEmbedBullets.mockResolvedValue(undefined)
 
       const file = createMockFile()
       await uploadAndParseResume('user-123', file)
