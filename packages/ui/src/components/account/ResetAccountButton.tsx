@@ -57,6 +57,7 @@ export function ResetAccountButton() {
         </p>
         <ul className="reset-account-panel__list">
           <li>All resumes</li>
+          <li>All uploaded resumes</li>
           <li>All bullets</li>
           <li>All positions</li>
           <li>All interview history</li>

@@ -62,6 +62,7 @@ describe('ResetAccountButton', () => {
     await user.click(screen.getByTestId('reset-account-button'))
 
     expect(screen.getByText('All resumes')).toBeInTheDocument()
+    expect(screen.getByText('All uploaded resumes')).toBeInTheDocument()
     expect(screen.getByText('All bullets')).toBeInTheDocument()
     expect(screen.getByText('All positions')).toBeInTheDocument()
     expect(screen.getByText('All interview history')).toBeInTheDocument()
