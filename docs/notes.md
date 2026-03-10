@@ -21,8 +21,11 @@ Rules:
 - [x] Telemetry
 - [x] CI quality gates (no skip, coverage, duplication)
 - [x] E2E tests (Playwright)
+- [x] Voice interview (Phase 10)
+- [x] Resume upload + parse (Phase 11)
+- [x] Gap analysis (Phase 12)
 
-**MVP Feature Complete** - 284 unit tests, 52 E2E tests, 92%+ coverage
+**MVP Feature Complete** - 580 unit tests, 81 E2E tests, 91%+ coverage
 
 ---
 

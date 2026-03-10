@@ -74,6 +74,8 @@ pnpm gen-types        # Generate Supabase types
 - `parse-resume` — LLM resume parsing (positions, bullets with quality classification)
 - `parse-jd` — JD requirement extraction (structured requirements with importance)
 - `extract-pdf` — Server-side PDF text extraction (fallback)
+- `speak` — OpenAI TTS for voice interview
+- `transcribe` — OpenAI Whisper STT for voice interview
 
 ## DB Tables (Odie)
 - `user_profiles` — Account metadata
@@ -101,8 +103,8 @@ pnpm gen-types        # Generate Supabase types
 **MVP Feature Complete** - All phases implemented + UI polish + resume upload + gap analysis
 
 ### Test Coverage
-- **569 unit/integration tests** (Vitest + Testing Library)
-- **73 E2E tests** (Playwright)
+- **580 unit/integration tests** (Vitest + Testing Library)
+- **81 E2E tests** (Playwright)
 - **91%+ code coverage**
 
 ### Completed Phases

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
@@ -27,16 +27,20 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-// Mock useAuth
-const mockUser = { id: 'test-user-id', email: 'test@example.com' }
+// Mock useAuth — uses a fn so tests can override the return value per-test
+const mockUseAuth = vi.fn()
 vi.mock('../../components/auth/AuthProvider', () => ({
-  useAuth: () => ({
-    user: mockUser,
+  useAuth: () => mockUseAuth(),
+}))
+
+function defaultAuthReturn() {
+  return {
+    user: { id: 'test-user-id', email: 'test@example.com' },
     loading: false,
     signIn: vi.fn(),
     signOut: vi.fn(),
-  }),
-}))
+  }
+}
 
 // Mock @odie/db
 const mockCreatePositionWithBullets = vi.fn()
@@ -52,6 +56,9 @@ vi.mock('@odie/db', () => ({
   embedBullets: (...args: unknown[]) => mockEmbedBullets(...args),
 }))
 
+// Capture onComplete so tests can invoke it with arbitrary data
+let capturedOnComplete: ((data: ExtractedInterviewData) => void) | null = null
+
 // Mock InterviewChat component to control its behavior
 vi.mock('../../components/interview/InterviewChat', () => ({
   InterviewChat: ({
@@ -61,6 +68,7 @@ vi.mock('../../components/interview/InterviewChat', () => ({
     onComplete: (data: ExtractedInterviewData) => void
     onCancel: () => void
   }) => {
+    capturedOnComplete = onComplete
     return (
       <div data-testid="mock-interview-chat">
         <button onClick={() => onComplete({ positions: [] })} data-testid="complete-empty">
@@ -117,7 +125,8 @@ Object.defineProperty(window, 'localStorage', {
 
 function renderInterviewPage() {
   const queryClient = createTestQueryClient()
-  return render(
+  const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries')
+  const tree = (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/interview']}>
         <Routes>
@@ -126,11 +135,45 @@ function renderInterviewPage() {
       </MemoryRouter>
     </QueryClientProvider>
   )
+  const result = render(tree)
+  return { ...result, queryClient, invalidateQueriesSpy, tree }
+}
+
+/**
+ * Helper to render InterviewPage with pre-populated localStorage state.
+ * This simulates a resumed interview where draft bullets/positions already exist.
+ */
+function renderInterviewPageWithDraftState(opts: {
+  savedBulletIds: string[]
+  savedBulletKeys: string[]
+  savedPositionIds: string[]
+  positions: Array<{
+    position: { company: string; title: string; location?: string | null; startDate?: string | null; endDate?: string | null }
+    bullets: Array<{ text: string; category?: string | null; hardSkills?: string[]; softSkills?: string[] }>
+  }>
+}) {
+  const storageKey = `odie_interview_state_test-user-id`
+  const storedState = {
+    messages: [{ role: 'user', content: 'test' }],
+    extractedData: { positions: opts.positions },
+    savedBulletIds: opts.savedBulletIds,
+    savedBulletKeys: opts.savedBulletKeys,
+    savedPositionIds: opts.savedPositionIds,
+    lastUpdated: new Date().toISOString(),
+  }
+  mockLocalStorage.getItem.mockImplementation((key: string) => {
+    if (key === storageKey) return JSON.stringify(storedState)
+    return null
+  })
+
+  return renderInterviewPage()
 }
 
 describe('InterviewPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseAuth.mockReturnValue(defaultAuthReturn())
+    capturedOnComplete = null
     mockConfirm.mockReturnValue(false)
     mockLocalStorage.getItem.mockReturnValue(null)
     mockFinalizeDraftBullets.mockResolvedValue(undefined)
@@ -287,5 +330,386 @@ describe('InterviewPage', () => {
     await userEvent.click(screen.getByTestId('cancel'))
 
     expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
+  describe('handleComplete', () => {
+    it('should not make DB calls when user is not authenticated', async () => {
+      // Render with a valid user so InterviewChat mounts and hydration completes
+      const { rerender, queryClient } = renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      // Simulate session expiry: switch useAuth to return null user
+      mockUseAuth.mockReturnValue({
+        user: null,
+        loading: false,
+        signIn: vi.fn(),
+        signOut: vi.fn(),
+      })
+
+      // Force re-render with a fresh tree so React picks up the new mock return value
+      await act(async () => {
+        rerender(
+          <QueryClientProvider client={queryClient}>
+            <MemoryRouter initialEntries={['/interview']}>
+              <Routes>
+                <Route path="/interview" element={<InterviewPage />} />
+              </Routes>
+            </MemoryRouter>
+          </QueryClientProvider>
+        )
+      })
+
+      // After re-render, InterviewChat received the new onComplete (user?.id is now undefined).
+      // capturedOnComplete now points to the recreated callback.
+      await act(async () => {
+        capturedOnComplete!({ positions: [] })
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-save-error')).toBeInTheDocument()
+        expect(screen.getByText('Not authenticated')).toBeInTheDocument()
+      })
+
+      expect(mockCreatePositionWithBullets).not.toHaveBeenCalled()
+      expect(mockCreatePosition).not.toHaveBeenCalled()
+      expect(mockFinalizeDraftBullets).not.toHaveBeenCalled()
+      expect(mockEmbedBullets).not.toHaveBeenCalled()
+      expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('should finalize draft bullets then embed them when savedBulletIds exist', async () => {
+      const draftPositions = [
+        {
+          position: { company: 'Acme', title: 'Dev' },
+          bullets: [
+            { text: 'Built APIs', category: 'Backend', hardSkills: ['Node'], softSkills: [] },
+            { text: 'Led team', category: 'Leadership', hardSkills: [], softSkills: ['Leadership'] },
+          ],
+        },
+      ]
+
+      renderInterviewPageWithDraftState({
+        savedBulletIds: ['draft-b1', 'draft-b2'],
+        savedBulletKeys: ['Acme|Dev|Built APIs', 'Acme|Dev|Led team'],
+        savedPositionIds: ['pos-1'],
+        positions: draftPositions,
+      })
+
+      // Wait for hydration and localStorage load
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      // Use captured onComplete to send matching data
+      const completeData: ExtractedInterviewData = {
+        positions: draftPositions,
+      }
+
+      await waitFor(() => {
+        expect(capturedOnComplete).not.toBeNull()
+      })
+      await act(async () => {
+        capturedOnComplete!(completeData)
+      })
+
+      // finalizeDraftBullets must be called with all saved draft IDs
+      await waitFor(() => {
+        expect(mockFinalizeDraftBullets).toHaveBeenCalledWith(['draft-b1', 'draft-b2'])
+      })
+
+      // embedBullets must be called AFTER finalize, with matching IDs and texts
+      await waitFor(() => {
+        expect(mockEmbedBullets).toHaveBeenCalledWith(
+          ['draft-b1', 'draft-b2'],
+          ['Built APIs', 'Led team']
+        )
+      })
+
+      // Verify order: finalize before embed
+      const finalizeOrder = mockFinalizeDraftBullets.mock.invocationCallOrder[0]
+      const embedOrder = mockEmbedBullets.mock.invocationCallOrder[0]
+      expect(finalizeOrder).toBeLessThan(embedOrder)
+    })
+
+    it('should skip embedding when bulletTexts count does not match savedBulletIds count', async () => {
+      // Provide 2 savedBulletIds but only 1 matching bulletKey in the data
+      renderInterviewPageWithDraftState({
+        savedBulletIds: ['draft-b1', 'draft-b2'],
+        savedBulletKeys: ['Acme|Dev|Built APIs'], // only 1 key — mismatch with 2 IDs
+        savedPositionIds: ['pos-1'],
+        positions: [
+          {
+            position: { company: 'Acme', title: 'Dev' },
+            bullets: [{ text: 'Built APIs', category: 'Backend' }],
+          },
+        ],
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnComplete).not.toBeNull()
+      })
+
+      await act(async () => {
+        capturedOnComplete!({
+          positions: [
+            {
+              position: { company: 'Acme', title: 'Dev' },
+              bullets: [{ text: 'Built APIs', category: 'Backend' }],
+            },
+          ],
+        })
+      })
+
+      // finalizeDraftBullets should still be called
+      await waitFor(() => {
+        expect(mockFinalizeDraftBullets).toHaveBeenCalledWith(['draft-b1', 'draft-b2'])
+      })
+
+      // embedBullets should NOT be called because texts (1) !== ids (2)
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/bullets')
+      })
+      expect(mockEmbedBullets).not.toHaveBeenCalled()
+    })
+
+    it('should not create position again when it already exists in savedPositionMap', async () => {
+      // Pre-load state with a saved position for "Acme|Dev"
+      renderInterviewPageWithDraftState({
+        savedBulletIds: ['draft-b1'],
+        savedBulletKeys: ['Acme|Dev|Built APIs'],
+        savedPositionIds: ['pos-existing'],
+        positions: [
+          {
+            position: { company: 'Acme', title: 'Dev' },
+            bullets: [{ text: 'Built APIs', category: 'Backend' }],
+          },
+        ],
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnComplete).not.toBeNull()
+      })
+
+      // Complete with the same position — it should be deduplicated
+      await act(async () => {
+        capturedOnComplete!({
+          positions: [
+            {
+              position: { company: 'Acme', title: 'Dev' },
+              bullets: [{ text: 'Built APIs', category: 'Backend' }],
+            },
+          ],
+        })
+      })
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/bullets')
+      })
+
+      // Position already exists in savedPositionMap, so createPositionWithBullets must NOT be called
+      expect(mockCreatePositionWithBullets).not.toHaveBeenCalled()
+    })
+
+    it('should create new positions with bullets and embed them', async () => {
+      mockCreatePositionWithBullets.mockResolvedValue({
+        position: { id: 'new-pos-1' },
+        bulletIds: ['new-b1', 'new-b2'],
+      })
+
+      renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnComplete).not.toBeNull()
+      })
+
+      const newPositionData: ExtractedInterviewData = {
+        positions: [
+          {
+            position: {
+              company: 'NewCorp',
+              title: 'SRE',
+              location: 'Remote',
+              startDate: '2023-01',
+              endDate: '2024-06',
+            },
+            bullets: [
+              { text: 'Managed infra', category: 'DevOps', hardSkills: ['K8s'], softSkills: [] },
+              { text: 'On-call rotation', category: 'Operations', hardSkills: [], softSkills: ['Communication'] },
+            ],
+          },
+        ],
+      }
+
+      await act(async () => {
+        capturedOnComplete!(newPositionData)
+      })
+
+      // Should call createPositionWithBullets for the new position
+      await waitFor(() => {
+        expect(mockCreatePositionWithBullets).toHaveBeenCalledWith(
+          {
+            user_id: 'test-user-id',
+            company: 'NewCorp',
+            title: 'SRE',
+            location: 'Remote',
+            start_date: '2023-01-01',
+            end_date: '2024-06-01',
+          },
+          [
+            {
+              original_text: 'Managed infra',
+              current_text: 'Managed infra',
+              category: 'DevOps',
+              hard_skills: ['K8s'],
+              soft_skills: [],
+            },
+            {
+              original_text: 'On-call rotation',
+              current_text: 'On-call rotation',
+              category: 'Operations',
+              hard_skills: [],
+              soft_skills: ['Communication'],
+            },
+          ]
+        )
+      })
+
+      // embedBullets should be called with the returned bulletIds and texts
+      await waitFor(() => {
+        expect(mockEmbedBullets).toHaveBeenCalledWith(
+          ['new-b1', 'new-b2'],
+          ['Managed infra', 'On-call rotation']
+        )
+      })
+
+      // createPositionWithBullets must be called before embedBullets for new positions
+      const createOrder = mockCreatePositionWithBullets.mock.invocationCallOrder[0]
+      const embedOrder = mockEmbedBullets.mock.invocationCallOrder[0]
+      expect(createOrder).toBeLessThan(embedOrder)
+    })
+
+    it('should execute side effects in correct order: finalize, embed drafts, create new, embed new, clearState, invalidateQueries, navigate', async () => {
+      // Set up draft state for one position, and we will complete with that + a new position
+      mockCreatePositionWithBullets.mockResolvedValue({
+        position: { id: 'new-pos' },
+        bulletIds: ['new-b1'],
+      })
+
+      renderInterviewPageWithDraftState({
+        savedBulletIds: ['draft-b1'],
+        savedBulletKeys: ['Acme|Dev|Built APIs'],
+        savedPositionIds: ['pos-1'],
+        positions: [
+          {
+            position: { company: 'Acme', title: 'Dev' },
+            bullets: [{ text: 'Built APIs', category: 'Backend' }],
+          },
+        ],
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnComplete).not.toBeNull()
+      })
+
+      // Complete with both the existing (draft) position and a brand new one
+      await act(async () => {
+        capturedOnComplete!({
+          positions: [
+            {
+              position: { company: 'Acme', title: 'Dev' },
+              bullets: [{ text: 'Built APIs', category: 'Backend' }],
+            },
+            {
+              position: { company: 'NewCo', title: 'PM' },
+              bullets: [{ text: 'Shipped features', category: 'Product' }],
+            },
+          ],
+        })
+      })
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/bullets')
+      })
+
+      // Verify the order of operations
+      const finalizeOrder = mockFinalizeDraftBullets.mock.invocationCallOrder[0]
+      const embedDraftOrder = mockEmbedBullets.mock.invocationCallOrder[0]
+      const createNewOrder = mockCreatePositionWithBullets.mock.invocationCallOrder[0]
+      const embedNewOrder = mockEmbedBullets.mock.invocationCallOrder[1]
+
+      // finalize -> embed drafts -> create new position -> embed new bullets
+      expect(finalizeOrder).toBeLessThan(embedDraftOrder)
+      expect(embedDraftOrder).toBeLessThan(createNewOrder)
+      expect(createNewOrder).toBeLessThan(embedNewOrder)
+
+      // clearState (localStorage.removeItem) must be called
+      expect(mockLocalStorage.removeItem).toHaveBeenCalled()
+
+      // navigate must be called last
+      expect(mockNavigate).toHaveBeenCalledWith('/bullets')
+    })
+
+    it('should call toPostgresDate on startDate and endDate for new positions', async () => {
+      mockCreatePositionWithBullets.mockResolvedValue({
+        position: { id: 'pos-dates' },
+        bulletIds: ['b-dates'],
+      })
+
+      renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnComplete).not.toBeNull()
+      })
+
+      await act(async () => {
+        capturedOnComplete!({
+          positions: [
+            {
+              position: {
+                company: 'DateCorp',
+                title: 'Analyst',
+                startDate: '2022-03',
+                endDate: '2023-11',
+              },
+              bullets: [{ text: 'Analyzed data', category: 'Analytics' }],
+            },
+          ],
+        })
+      })
+
+      // toPostgresDate('2022-03') => '2022-03-01', toPostgresDate('2023-11') => '2023-11-01'
+      await waitFor(() => {
+        expect(mockCreatePositionWithBullets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            start_date: '2022-03-01',
+            end_date: '2023-11-01',
+          }),
+          expect.any(Array)
+        )
+      })
+    })
   })
 })

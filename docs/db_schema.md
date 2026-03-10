@@ -4,7 +4,7 @@ This file is the human-readable source of truth for table/column names, relation
 
 **Updated by:** DB Agent only
 **Updated when:** any migration changes schema
-**Last updated:** 2026-03-09 (migrations 022, 023)
+**Last updated:** 2026-03-10 (migrations 022-025)
 
 ---
 
@@ -307,6 +307,16 @@ match_bullets(
 - Uses cosine similarity (1 - cosine distance)
 - Returns bullets ordered by similarity (highest first)
 - Threshold default 0.5 filters low-quality matches
+
+### reset_account_data
+
+**Purpose:** Wipe all user data for account reset (testing/dev)
+
+Deletes from: `uploaded_resumes`, `resumes`, `bullets`, `positions`, `job_drafts`, `runs`, `candidate_profiles`, `user_profiles` (in order, respecting FK constraints).
+
+**Security:** Only callable by the owning user (`auth.uid() = target_user_id`)
+
+**Updated:** Migration 024 added `uploaded_resumes` deletion. Migration 025 added storage bucket RLS policies for `resumes` bucket.
 
 ---
 

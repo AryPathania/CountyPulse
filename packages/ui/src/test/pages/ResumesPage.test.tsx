@@ -27,20 +27,23 @@ vi.mock('../../components/auth/AuthProvider', () => ({
 }))
 
 // Mock @odie/db - data must be inside factory due to hoisting
+const mockGetJobDrafts = vi.fn().mockResolvedValue([
+  {
+    id: 'mock-draft-1',
+    user_id: 'test-user-id',
+    job_title: 'Software Engineer',
+    company: 'Tech Corp',
+    jd_text: 'Looking for a skilled software engineer...',
+    retrieved_bullet_ids: ['bullet-1', 'bullet-2'],
+    selected_bullet_ids: ['bullet-1'],
+    created_at: '2024-01-15T00:00:00Z',
+  },
+])
+const mockGetUploadedResumes = vi.fn().mockResolvedValue([])
+
 vi.mock('@odie/db', () => ({
-  getJobDrafts: vi.fn().mockResolvedValue([
-    {
-      id: 'mock-draft-1',
-      user_id: 'test-user-id',
-      job_title: 'Software Engineer',
-      company: 'Tech Corp',
-      jd_text: 'Looking for a skilled software engineer...',
-      retrieved_bullet_ids: ['bullet-1', 'bullet-2'],
-      selected_bullet_ids: ['bullet-1'],
-      created_at: '2024-01-15T00:00:00Z',
-    },
-  ]),
-  getUploadedResumes: vi.fn().mockResolvedValue([]),
+  getJobDrafts: (...args: unknown[]) => mockGetJobDrafts(...args),
+  getUploadedResumes: (...args: unknown[]) => mockGetUploadedResumes(...args),
 }))
 
 function renderResumesPage() {
@@ -107,6 +110,156 @@ describe('ResumesPage', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('resumes-list')).toBeInTheDocument()
+    })
+  })
+
+  describe('Uploaded Resumes section', () => {
+    // Valid parsed_data that passes ResumeContextSchema when spread with mode:'resume'
+    const validParsedData = {
+      strongBullets: [
+        {
+          text: 'Led a team of 5 engineers to deliver project 2 weeks ahead of schedule',
+          category: 'Leadership',
+          hardSkills: ['project management'],
+          softSkills: ['leadership'],
+          metrics: { value: '2 weeks', type: 'time savings' },
+        },
+      ],
+      weakBullets: [
+        {
+          originalText: 'Worked on backend stuff',
+          suggestedQuestion: 'What specific backend technologies did you use and what was the impact?',
+        },
+      ],
+      positions: [
+        {
+          company: 'Acme Corp',
+          title: 'Senior Engineer',
+          location: 'Remote',
+          startDate: '2022-01',
+          endDate: '2024-06',
+        },
+      ],
+      skills: {
+        hard: ['TypeScript', 'React'],
+        soft: ['Communication'],
+      },
+      education: [
+        {
+          institution: 'MIT',
+          degree: 'BS',
+          field: 'Computer Science',
+          graduationDate: '2020-05',
+        },
+      ],
+    }
+
+    const mockUploadedResume = {
+      id: 'upload-1',
+      user_id: 'test-user-id',
+      file_name: 'my-resume.pdf',
+      file_hash: 'abc123',
+      storage_path: 'resumes/my-resume.pdf',
+      parsed_data: validParsedData,
+      created_at: '2024-03-20T10:00:00Z',
+    }
+
+    it('should NOT render Uploaded Resumes section when getUploadedResumes returns empty array', async () => {
+      mockGetUploadedResumes.mockResolvedValueOnce([])
+
+      renderResumesPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('resumes-list')).toBeInTheDocument()
+      })
+
+      expect(screen.queryByText('Uploaded Resumes')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('uploaded-resumes-section')).not.toBeInTheDocument()
+    })
+
+    it('should render Uploaded Resumes section with file name and formatted date when data exists', async () => {
+      mockGetUploadedResumes.mockResolvedValueOnce([mockUploadedResume])
+
+      renderResumesPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('uploaded-resumes-section')).toBeInTheDocument()
+      })
+
+      expect(screen.getByText('Uploaded Resumes')).toBeInTheDocument()
+      expect(screen.getByText('my-resume.pdf')).toBeInTheDocument()
+      // Verify date is formatted (toLocaleDateString output)
+      const expectedDate = new Date('2024-03-20T10:00:00Z').toLocaleDateString()
+      expect(screen.getByText(expectedDate)).toBeInTheDocument()
+    })
+
+    it('should render Start Interview button when parsed_data passes ResumeContextSchema', async () => {
+      mockGetUploadedResumes.mockResolvedValueOnce([mockUploadedResume])
+
+      renderResumesPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('uploaded-resumes-section')).toBeInTheDocument()
+      })
+
+      expect(screen.getByText('Start Interview')).toBeInTheDocument()
+    })
+
+    it('should NOT render Start Interview button when parsed_data is null', async () => {
+      mockGetUploadedResumes.mockResolvedValueOnce([
+        { ...mockUploadedResume, parsed_data: null },
+      ])
+
+      renderResumesPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('uploaded-resumes-section')).toBeInTheDocument()
+      })
+
+      expect(screen.queryByText('Start Interview')).not.toBeInTheDocument()
+    })
+
+    it('should NOT render Start Interview button when parsed_data fails schema validation', async () => {
+      // Invalid data: missing required fields like positions, skills
+      const invalidParsedData = {
+        strongBullets: [],
+        weakBullets: [],
+        // positions missing
+        // skills missing
+      }
+
+      mockGetUploadedResumes.mockResolvedValueOnce([
+        { ...mockUploadedResume, parsed_data: invalidParsedData },
+      ])
+
+      renderResumesPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('uploaded-resumes-section')).toBeInTheDocument()
+      })
+
+      expect(screen.queryByText('Start Interview')).not.toBeInTheDocument()
+    })
+
+    it('should navigate to /interview with interviewContext when Start Interview is clicked', async () => {
+      mockGetUploadedResumes.mockResolvedValueOnce([mockUploadedResume])
+
+      renderResumesPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('Start Interview')).toBeInTheDocument()
+      })
+
+      await userEvent.click(screen.getByText('Start Interview'))
+
+      expect(mockNavigate).toHaveBeenCalledWith('/interview', {
+        state: {
+          interviewContext: {
+            mode: 'resume',
+            ...validParsedData,
+          },
+        },
+      })
     })
   })
 })
