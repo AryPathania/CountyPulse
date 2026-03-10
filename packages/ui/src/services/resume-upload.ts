@@ -7,7 +7,7 @@ import {
 } from '@odie/db'
 import type { Json } from '@odie/db'
 import type { InterviewContext, ResumeParseOutput } from '@odie/shared'
-import { ResumeParseOutputSchema } from '@odie/shared'
+import { ResumeParseOutputSchema, toPostgresDate } from '@odie/shared'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MiB
 
@@ -148,8 +148,8 @@ export async function uploadAndParseResume(
           company: pos.company,
           title: pos.title,
           location: pos.location ?? null,
-          start_date: pos.startDate ?? null,
-          end_date: pos.endDate ?? null,
+          start_date: toPostgresDate(pos.startDate),
+          end_date: toPostgresDate(pos.endDate),
         },
         strongAndFixable.map(b => ({
           original_text: b.originalText,

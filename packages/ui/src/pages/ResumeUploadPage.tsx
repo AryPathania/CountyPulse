@@ -34,10 +34,13 @@ export function ResumeUploadPage() {
     setError(null)
     setStep('extracting')
 
+    let stepTimer: ReturnType<typeof setTimeout>
+    let stepTimer2: ReturnType<typeof setTimeout>
+
     try {
       // Simulate step progression (actual steps happen inside uploadAndParseResume)
-      const stepTimer = setTimeout(() => setStep('analyzing'), 2000)
-      const stepTimer2 = setTimeout(() => setStep('creating'), 5000)
+      stepTimer = setTimeout(() => setStep('analyzing'), 2000)
+      stepTimer2 = setTimeout(() => setStep('creating'), 5000)
 
       const uploadResult = await uploadAndParseResume(user.id, file)
 
@@ -47,6 +50,8 @@ export function ResumeUploadPage() {
       setResult(uploadResult)
       setStep('done')
     } catch (err) {
+      clearTimeout(stepTimer!)
+      clearTimeout(stepTimer2!)
       setError(err instanceof Error ? err.message : 'Upload failed')
       setStep('select')
     }

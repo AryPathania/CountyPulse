@@ -97,6 +97,8 @@ This file is the human-readable source of truth for table/column names, relation
 **RLS:**
 - SELECT/INSERT/UPDATE/DELETE: `user_id = auth.uid()`
 
+**Note:** LLM contracts (`ResumeParseOutputSchema`) return dates as `YYYY-MM`. These must be normalized to `YYYY-MM-DD` (append `-01`) before inserting into `start_date`/`end_date` DATE columns. Use `toPostgresDate()` from `@odie/shared`.
+
 ---
 
 ### bullets
