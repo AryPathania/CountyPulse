@@ -126,19 +126,30 @@ export const MOCK_RESUMES = [
     job_draft_id: 'draft-1',
     name: 'Frontend Engineer Resume',
     template_id: 'classic_v1',
-    content: JSON.stringify({
+    content: {
       sections: [
         {
           id: 'section-experience',
           title: 'Experience',
-          type: 'experience',
+          subsections: [
+            {
+              id: 'sub-pos-1',
+              title: 'Senior Software Engineer',
+              subtitle: 'Tech Corp',
+              startDate: '2022-01-01',
+              endDate: null,
+              location: 'San Francisco, CA',
+              positionId: 'pos-1',
+            },
+          ],
           items: [
-            { bulletId: 'bullet-1', positionId: 'pos-1' },
-            { bulletId: 'bullet-2', positionId: 'pos-1' },
+            { type: 'subsection', subsectionId: 'sub-pos-1' },
+            { type: 'bullet', bulletId: 'bullet-1' },
+            { type: 'bullet', bulletId: 'bullet-2' },
           ],
         },
       ],
-    }),
+    },
     pdf_url: null,
     created_at: '2024-01-15T00:00:00Z',
     updated_at: '2024-01-15T00:00:00Z',
@@ -277,6 +288,15 @@ export async function setupApiMocks(page: Page) {
           updated_at: '2024-01-01T00:00:00Z',
         },
       ]),
+    })
+  })
+
+  // Mock uploaded resumes
+  await page.route('**/rest/v1/uploaded_resumes*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
     })
   })
 

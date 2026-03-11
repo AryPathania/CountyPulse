@@ -1,10 +1,57 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '../../lib/queryClient'
 import { ResumeBuilderPage } from '../../pages/ResumeBuilderPage'
+import type { ReactNode } from 'react'
+
+// Capture onDragEnd handler from DndContext for programmatic invocation
+let capturedOnDragEnd: ((event: unknown) => void) | null = null
+
+vi.mock('@dnd-kit/core', () => ({
+  DndContext: ({ children, onDragEnd }: { children: ReactNode; onDragEnd?: (event: unknown) => void }) => {
+    capturedOnDragEnd = onDragEnd ?? null
+    return children
+  },
+  DragOverlay: ({ children }: { children: ReactNode }) => children,
+  closestCenter: vi.fn(),
+  KeyboardSensor: vi.fn(),
+  PointerSensor: vi.fn(),
+  useSensor: vi.fn(),
+  useSensors: vi.fn(() => []),
+  useDraggable: (opts: { id: string }) => ({
+    attributes: { 'data-draggable-id': opts.id },
+    listeners: {},
+    setNodeRef: vi.fn(),
+    isDragging: false,
+  }),
+}))
+
+vi.mock('@dnd-kit/sortable', () => ({
+  SortableContext: ({ children }: { children: ReactNode }) => children,
+  sortableKeyboardCoordinates: vi.fn(),
+  verticalListSortingStrategy: 'vertical',
+  useSortable: (opts: { id: string }) => ({
+    attributes: { 'data-sortable-id': opts.id },
+    listeners: {},
+    setNodeRef: vi.fn(),
+    transform: null,
+    transition: null,
+    isDragging: false,
+  }),
+  arrayMove: (arr: unknown[], from: number, to: number) => {
+    const result = [...arr]
+    const [item] = result.splice(from, 1)
+    result.splice(to, 0, item)
+    return result
+  },
+}))
+
+vi.mock('@dnd-kit/utilities', () => ({
+  CSS: { Transform: { toString: () => undefined } },
+}))
 
 // Mock useNavigate
 const mockNavigate = vi.fn()
@@ -26,7 +73,7 @@ vi.mock('../../components/auth/AuthProvider', () => ({
   }),
 }))
 
-// Mock resume data
+// Mock resume data with subsection grouping
 const mockResume = {
   id: 'resume-123',
   user_id: 'test-user-id',
@@ -38,8 +85,21 @@ const mockResume = {
         id: 'experience',
         title: 'Experience',
         items: [
+          { type: 'subsection' as const, subsectionId: 'sub-pos-1' },
           { type: 'bullet' as const, bulletId: 'bullet-1' },
           { type: 'bullet' as const, bulletId: 'bullet-2' },
+          { type: 'bullet' as const, bulletId: 'bullet-4' },
+        ],
+        subsections: [
+          {
+            id: 'sub-pos-1',
+            title: 'Lead Engineer',
+            subtitle: 'Tech Corp',
+            startDate: '2022-06-01',
+            endDate: '2024-01-15',
+            location: 'San Francisco, CA',
+            positionId: 'pos-1',
+          },
         ],
       },
       {
@@ -57,8 +117,21 @@ const mockResume = {
         id: 'experience',
         title: 'Experience',
         items: [
+          { type: 'subsection' as const, subsectionId: 'sub-pos-1' },
           { type: 'bullet' as const, bulletId: 'bullet-1' },
           { type: 'bullet' as const, bulletId: 'bullet-2' },
+          { type: 'bullet' as const, bulletId: 'bullet-4' },
+        ],
+        subsections: [
+          {
+            id: 'sub-pos-1',
+            title: 'Lead Engineer',
+            subtitle: 'Tech Corp',
+            startDate: '2022-06-01',
+            endDate: '2024-01-15',
+            location: 'San Francisco, CA',
+            positionId: 'pos-1',
+          },
         ],
       },
       {
@@ -81,19 +154,36 @@ const mockResume = {
       category: 'Backend',
       position: { id: 'pos-1', company: 'Tech Corp', title: 'Lead Engineer' },
     },
+    {
+      id: 'bullet-4',
+      current_text: 'Designed scalable API architecture',
+      category: 'Architecture',
+      position: { id: 'pos-1', company: 'Tech Corp', title: 'Lead Engineer' },
+    },
   ],
-  positions: [],
+  positions: [
+    {
+      id: 'pos-1',
+      company: 'Tech Corp',
+      title: 'Lead Engineer',
+      start_date: '2022-06-01',
+      end_date: '2024-01-15',
+      location: 'San Francisco, CA',
+    },
+  ],
 }
 
 // Mock @odie/db
 const mockGetResumeWithBullets = vi.fn()
 const mockUpdateResumeContent = vi.fn()
 const mockLogRun = vi.fn()
+const mockGetBullets = vi.fn()
 
 vi.mock('@odie/db', () => ({
   getResumeWithBullets: (...args: unknown[]) => mockGetResumeWithBullets(...args),
   updateResumeContent: (...args: unknown[]) => mockUpdateResumeContent(...args),
   logRun: (...args: unknown[]) => mockLogRun(...args),
+  getBullets: (...args: unknown[]) => mockGetBullets(...args),
 }))
 
 function renderResumeBuilder(resumeId = 'resume-123') {
@@ -115,6 +205,56 @@ describe('ResumeBuilderPage', () => {
     mockGetResumeWithBullets.mockResolvedValue(mockResume)
     mockUpdateResumeContent.mockResolvedValue(mockResume)
     mockLogRun.mockResolvedValue({})
+    mockGetBullets.mockResolvedValue([
+      {
+        id: 'bullet-1',
+        current_text: 'Led team of 5 engineers',
+        category: 'Leadership',
+        position: { company: 'Tech Corp', title: 'Lead Engineer' },
+        user_id: 'test-user-id',
+        position_id: 'pos-1',
+        original_text: 'Led team of 5 engineers',
+        hard_skills: null,
+        soft_skills: null,
+        created_at: '',
+        updated_at: '',
+        embedding: null,
+        was_edited: null,
+        is_draft: false,
+      },
+      {
+        id: 'bullet-2',
+        current_text: 'Reduced latency by 40%',
+        category: 'Backend',
+        position: { company: 'Tech Corp', title: 'Lead Engineer' },
+        user_id: 'test-user-id',
+        position_id: 'pos-1',
+        original_text: 'Reduced latency by 40%',
+        hard_skills: null,
+        soft_skills: null,
+        created_at: '',
+        updated_at: '',
+        embedding: null,
+        was_edited: null,
+        is_draft: false,
+      },
+      {
+        id: 'bullet-3',
+        current_text: 'Built CI/CD pipeline reducing deploy time by 60%',
+        category: 'DevOps',
+        position: { company: 'StartupXYZ', title: 'Junior Dev' },
+        user_id: 'test-user-id',
+        position_id: 'pos-2',
+        original_text: 'Built CI/CD pipeline reducing deploy time by 60%',
+        hard_skills: null,
+        soft_skills: null,
+        created_at: '',
+        updated_at: '',
+        embedding: null,
+        was_edited: null,
+        is_draft: false,
+      },
+    ])
   })
 
   it('should show loading state initially', () => {
@@ -364,7 +504,7 @@ describe('ResumeBuilderPage', () => {
         resumeId: 'resume-123',
         resumeName: 'Software Engineer Resume',
         templateId: 'default',
-        bulletCount: 2,
+        bulletCount: 3,
         sectionCount: 2,
       },
       output: { action: 'print_dialog_opened' },
@@ -409,5 +549,522 @@ describe('ResumeBuilderPage', () => {
     })
 
     vi.restoreAllMocks()
+  })
+
+  describe('subsection grouping in editor', () => {
+    it('should render subsection header in the experience section', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('subsection-sub-pos-1')).toBeInTheDocument()
+      })
+
+      const header = screen.getByTestId('subsection-sub-pos-1')
+      expect(header).toHaveTextContent('Lead Engineer')
+      expect(header).toHaveTextContent('Tech Corp')
+    })
+
+    it('should render subsection headers alongside bullets', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('subsection-sub-pos-1')).toBeInTheDocument()
+      })
+
+      // Bullets should still render next to subsection headers
+      const leadBullets = screen.getAllByText('Led team of 5 engineers')
+      expect(leadBullets.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('should render multiple subsections when resume has multiple grouped subsections', async () => {
+      const multiSubSectionResume = {
+        ...mockResume,
+        parsedContent: {
+          sections: [
+            {
+              id: 'experience',
+              title: 'Experience',
+              items: [
+                { type: 'subsection' as const, subsectionId: 'sub-pos-1' },
+                { type: 'bullet' as const, bulletId: 'bullet-1' },
+                { type: 'subsection' as const, subsectionId: 'sub-pos-2' },
+                { type: 'bullet' as const, bulletId: 'bullet-2' },
+              ],
+              subsections: [
+                {
+                  id: 'sub-pos-1',
+                  title: 'Lead Engineer',
+                  subtitle: 'Tech Corp',
+                  startDate: '2022-06-01',
+                  endDate: '2024-01-15',
+                  location: 'San Francisco, CA',
+                  positionId: 'pos-1',
+                },
+                {
+                  id: 'sub-pos-2',
+                  title: 'Junior Dev',
+                  subtitle: 'StartupXYZ',
+                  startDate: '2020-01-01',
+                  endDate: '2022-05-01',
+                  positionId: 'pos-2',
+                },
+              ],
+            },
+            {
+              id: 'skills',
+              title: 'Skills',
+              items: [],
+            },
+          ],
+        },
+      }
+      mockGetResumeWithBullets.mockResolvedValue(multiSubSectionResume)
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('subsection-sub-pos-1')).toBeInTheDocument()
+        expect(screen.getByTestId('subsection-sub-pos-2')).toBeInTheDocument()
+      })
+
+      const sub1Header = screen.getByTestId('subsection-sub-pos-1')
+      expect(sub1Header).toHaveTextContent('Tech Corp')
+      const sub2Header = screen.getByTestId('subsection-sub-pos-2')
+      expect(sub2Header).toHaveTextContent('StartupXYZ')
+    })
+  })
+
+  describe('bullet reorder preview sync', () => {
+    it('should update preview bullet order after drag-and-drop reorder', async () => {
+      renderResumeBuilder()
+
+      // Wait for resume to load
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Verify initial order in preview: bullet-1 before bullet-2
+      const preview = screen.getByTestId('builder-preview')
+      const initialBullets = within(preview).getAllByTestId(/^template-bullet-/)
+      expect(initialBullets).toHaveLength(3)
+      expect(initialBullets[0]).toHaveAttribute('data-testid', 'template-bullet-bullet-1')
+      expect(initialBullets[1]).toHaveAttribute('data-testid', 'template-bullet-bullet-2')
+      expect(initialBullets[2]).toHaveAttribute('data-testid', 'template-bullet-bullet-4')
+
+      // Simulate drag-and-drop: move bullet-2 to before bullet-1
+      expect(capturedOnDragEnd).not.toBeNull()
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'bullet-2' },
+          over: { id: 'bullet-1' },
+        })
+      })
+
+      // After reorder, preview should reflect new order: bullet-2 first, bullet-1 second
+      await waitFor(() => {
+        const reorderedBullets = within(preview).getAllByTestId(/^template-bullet-/)
+        expect(reorderedBullets[0]).toHaveAttribute('data-testid', 'template-bullet-bullet-2')
+        expect(reorderedBullets[1]).toHaveAttribute('data-testid', 'template-bullet-bullet-1')
+      })
+    })
+
+    it('should persist reordered content to the backend after drag-and-drop', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Simulate drag-and-drop: move bullet-2 before bullet-1
+      expect(capturedOnDragEnd).not.toBeNull()
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'bullet-2' },
+          over: { id: 'bullet-1' },
+        })
+      })
+
+      // updateResumeContent should be called with reordered sections
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith('resume-123', {
+          sections: [
+            {
+              id: 'experience',
+              title: 'Experience',
+              items: [
+                { type: 'subsection', subsectionId: 'sub-pos-1' },
+                { type: 'bullet', bulletId: 'bullet-2' },
+                { type: 'bullet', bulletId: 'bullet-1' },
+                { type: 'bullet', bulletId: 'bullet-4' },
+              ],
+              subsections: [
+                {
+                  id: 'sub-pos-1',
+                  title: 'Lead Engineer',
+                  subtitle: 'Tech Corp',
+                  startDate: '2022-06-01',
+                  endDate: '2024-01-15',
+                  location: 'San Francisco, CA',
+                  positionId: 'pos-1',
+                },
+              ],
+            },
+            {
+              id: 'skills',
+              title: 'Skills',
+              items: [],
+            },
+          ],
+        })
+      })
+    })
+
+    it('should update both editor and preview bullet text after reorder', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Verify initial state: bullet text appears in preview
+      const preview = screen.getByTestId('builder-preview')
+      const firstBulletBefore = within(preview).getAllByTestId(/^template-bullet-/)[0]
+      expect(firstBulletBefore).toHaveTextContent('Led team of 5 engineers')
+
+      // Reorder: move bullet-2 before bullet-1
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'bullet-2' },
+          over: { id: 'bullet-1' },
+        })
+      })
+
+      // After reorder, first bullet in preview should show bullet-2's text
+      await waitFor(() => {
+        const firstBulletAfter = within(preview).getAllByTestId(/^template-bullet-/)[0]
+        expect(firstBulletAfter).toHaveTextContent('Reduced latency by 40%')
+      })
+    })
+
+    it('should add bullet from palette to section via drag-and-drop', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Wait for palette to appear with available bullet
+      await waitFor(() => {
+        expect(screen.getByTestId('bullet-palette')).toBeInTheDocument()
+      })
+
+      // Simulate drag from palette onto a section
+      expect(capturedOnDragEnd).not.toBeNull()
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'palette-bullet-3' },
+          over: { id: 'experience' },
+        })
+      })
+
+      // Verify content was saved with the new bullet
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                items: expect.arrayContaining([
+                  expect.objectContaining({ type: 'bullet', bulletId: 'bullet-3' }),
+                ]),
+              }),
+            ]),
+          })
+        )
+      })
+    })
+
+    it('should correctly move bullet DOWN by multiple positions', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Initial order: pos-1, bullet-1, bullet-2, bullet-4
+      // Drag bullet-1 down to bullet-4's position
+      expect(capturedOnDragEnd).not.toBeNull()
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'bullet-1' },
+          over: { id: 'bullet-4' },
+        })
+      })
+
+      // After reorder: sub-pos-1, bullet-2, bullet-4, bullet-1
+      // bullet-1 should now be AFTER bullet-4 (moved down by 2)
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith('resume-123', {
+          sections: [
+            {
+              id: 'experience',
+              title: 'Experience',
+              items: [
+                { type: 'subsection', subsectionId: 'sub-pos-1' },
+                { type: 'bullet', bulletId: 'bullet-2' },
+                { type: 'bullet', bulletId: 'bullet-4' },
+                { type: 'bullet', bulletId: 'bullet-1' },
+              ],
+              subsections: [
+                {
+                  id: 'sub-pos-1',
+                  title: 'Lead Engineer',
+                  subtitle: 'Tech Corp',
+                  startDate: '2022-06-01',
+                  endDate: '2024-01-15',
+                  location: 'San Francisco, CA',
+                  positionId: 'pos-1',
+                },
+              ],
+            },
+            {
+              id: 'skills',
+              title: 'Skills',
+              items: [],
+            },
+          ],
+        })
+      })
+    })
+
+    it('should not update state when dragging bullet onto itself', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Simulate drag-and-drop onto same position (no-op)
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'bullet-1' },
+          over: { id: 'bullet-1' },
+        })
+      })
+
+      // Order should remain unchanged
+      const preview = screen.getByTestId('builder-preview')
+      const bullets = within(preview).getAllByTestId(/^template-bullet-/)
+      expect(bullets[0]).toHaveAttribute('data-testid', 'template-bullet-bullet-1')
+      expect(bullets[1]).toHaveAttribute('data-testid', 'template-bullet-bullet-2')
+
+      // No save call for no-op
+      expect(mockUpdateResumeContent).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('bullet palette', () => {
+    it('should render bullet palette with available bullets count', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('bullet-palette')).toBeInTheDocument()
+      })
+
+      // bullet-1 and bullet-2 are used, bullet-3 is available
+      expect(screen.getByTestId('bullet-palette-count')).toHaveTextContent('1')
+    })
+
+    it('should show palette bullet that is not used in resume', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('bullet-palette')).toBeInTheDocument()
+      })
+
+      // bullet-3 is not used in the resume
+      await waitFor(() => {
+        expect(screen.getByTestId('palette-bullet-bullet-3')).toBeInTheDocument()
+      })
+    })
+
+    it('should not show bullets already used in resume', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('bullet-palette')).toBeInTheDocument()
+      })
+
+      // bullet-1 and bullet-2 are used in the resume
+      expect(screen.queryByTestId('palette-bullet-bullet-1')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('palette-bullet-bullet-2')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('sub-section CRUD', () => {
+    it('should add a sub-section when add button is clicked', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Software Engineer Resume').length).toBeGreaterThan(0)
+      })
+
+      // Click "Add Sub-Section" on the experience section
+      const addBtn = screen.getByTestId('add-subsection-experience')
+      await userEvent.click(addBtn)
+
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                subsections: expect.arrayContaining([
+                  expect.objectContaining({ title: 'New Sub-Section' }),
+                ]),
+                items: expect.arrayContaining([
+                  expect.objectContaining({ type: 'subsection' }),
+                ]),
+              }),
+            ]),
+          })
+        )
+      })
+    })
+
+    it('should edit a sub-section when edit is submitted', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Lead Engineer').length).toBeGreaterThan(0)
+      })
+
+      // Click edit button on the subsection
+      const editBtn = screen.getByTestId('subsection-edit-sub-pos-1')
+      await userEvent.click(editBtn)
+
+      // Change the title in the edit form
+      const titleInput = screen.getByDisplayValue('Lead Engineer')
+      await userEvent.clear(titleInput)
+      await userEvent.type(titleInput, 'Staff Engineer')
+
+      // Submit the form
+      const saveBtn = screen.getByTestId('subsection-save-sub-pos-1')
+      await userEvent.click(saveBtn)
+
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                subsections: expect.arrayContaining([
+                  expect.objectContaining({ id: 'sub-pos-1', title: 'Staff Engineer' }),
+                ]),
+              }),
+            ]),
+          })
+        )
+      })
+    })
+
+    it('should delete a sub-section when delete button is clicked', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Lead Engineer').length).toBeGreaterThan(0)
+      })
+
+      const deleteBtn = screen.getByTestId('subsection-delete-sub-pos-1')
+      await userEvent.click(deleteBtn)
+
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                items: expect.not.arrayContaining([
+                  expect.objectContaining({ subsectionId: 'sub-pos-1' }),
+                ]),
+                subsections: [],
+              }),
+            ]),
+          })
+        )
+      })
+    })
+
+    it('should add a sub-section to an empty section', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Software Engineer Resume').length).toBeGreaterThan(0)
+      })
+
+      // Click "Add Sub-Section" on the skills section (which is empty)
+      const addBtn = screen.getByTestId('add-subsection-skills')
+      await userEvent.click(addBtn)
+
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'skills',
+                subsections: expect.arrayContaining([
+                  expect.objectContaining({ title: 'New Sub-Section' }),
+                ]),
+                items: expect.arrayContaining([
+                  expect.objectContaining({ type: 'subsection' }),
+                ]),
+              }),
+            ]),
+          })
+        )
+      })
+    })
+  })
+
+  describe('bullet remove', () => {
+    it('should show remove button on bullets', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('remove-bullet-bullet-1')).toBeInTheDocument()
+      })
+    })
+
+    it('should remove bullet from section when remove is clicked', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('remove-bullet-bullet-1')).toBeInTheDocument()
+      })
+
+      await userEvent.click(screen.getByTestId('remove-bullet-bullet-1'))
+
+      // Verify content was saved without bullet-1 in experience section
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                items: expect.not.arrayContaining([
+                  expect.objectContaining({ bulletId: 'bullet-1' }),
+                ]),
+              }),
+            ]),
+          })
+        )
+      })
+    })
   })
 })

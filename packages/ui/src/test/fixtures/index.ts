@@ -5,6 +5,9 @@
 import type { BulletWithPosition, ResumeWithBullets, Position } from '@odie/db'
 import type { ResumeContent } from '@odie/db'
 
+/** Shape of candidateInfo on ResumeWithBullets */
+type CandidateInfo = NonNullable<ResumeWithBullets['candidateInfo']>
+
 // Standard test user ID - use this across all tests
 export const TEST_USER_ID = 'test-user-123'
 
@@ -118,7 +121,7 @@ export function createMockResume(
     ],
     positions: [],
     ...overrides,
-  }
+  } as ResumeWithBullets
 }
 
 /**
@@ -175,6 +178,26 @@ export function createMockMessage(
     role,
     content,
     timestamp: TEST_CREATED_AT,
+    ...overrides,
+  }
+}
+
+/**
+ * Create mock candidate info for resume header tests.
+ */
+export function createMockCandidateInfo(
+  overrides: Partial<CandidateInfo> = {}
+): CandidateInfo {
+  return {
+    displayName: 'Jane Doe',
+    email: 'jane@example.com',
+    headline: 'Senior Software Engineer',
+    summary: 'Experienced engineer with 10 years in full-stack development.',
+    phone: '(555) 123-4567',
+    location: 'San Francisco, CA',
+    linkedinUrl: 'https://linkedin.com/in/janedoe',
+    githubUrl: 'https://github.com/janedoe',
+    websiteUrl: 'https://janedoe.dev',
     ...overrides,
   }
 }

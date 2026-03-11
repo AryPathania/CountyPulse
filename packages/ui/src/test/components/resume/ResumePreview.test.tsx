@@ -79,26 +79,26 @@ describe('ResumePreview', () => {
     expect(screen.getByTestId('template-section-skills')).toBeInTheDocument()
   })
 
-  it('should display position info', () => {
+  it('should display subsection info', () => {
     const resume = createMockResume({
       parsedContent: {
         sections: [
           {
             id: 'experience',
             title: 'Experience',
-            items: [{ type: 'position', positionId: 'pos-1' }],
+            items: [{ type: 'subsection', subsectionId: 'sub-pos-1' }],
+            subsections: [
+              {
+                id: 'sub-pos-1',
+                title: 'Software Engineer',
+                subtitle: 'Tech Corp',
+                startDate: '2020-01',
+                positionId: 'pos-1',
+              },
+            ],
           },
         ],
       },
-      positions: [
-        {
-          id: 'pos-1',
-          company: 'Tech Corp',
-          title: 'Software Engineer',
-          start_date: '2020-01',
-          end_date: null,
-        },
-      ],
     })
 
     render(<ResumePreview resume={resume} />)

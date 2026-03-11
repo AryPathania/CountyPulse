@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/auth'
 import { mockAuthState } from './fixtures/auth'
-import { setupApiMocks, MOCK_RESUMES, MOCK_BULLETS_WITH_POSITIONS } from './fixtures/mock-data'
+import { setupApiMocks, MOCK_RESUMES, MOCK_BULLETS_WITH_POSITIONS, MOCK_POSITIONS } from './fixtures/mock-data'
 
 declare global {
   interface Window {
@@ -63,6 +63,18 @@ test.describe('Resume Builder Editor', () => {
   test.beforeEach(async ({ page }) => {
     await mockAuthState(page)
 
+    const candidateInfo = {
+      displayName: 'Test User',
+      email: 'test@example.com',
+      headline: null,
+      summary: null,
+      phone: '555-123-4567',
+      location: 'San Francisco, CA',
+      linkedinUrl: 'https://linkedin.com/in/testuser',
+      githubUrl: 'https://github.com/testuser',
+      websiteUrl: null,
+    }
+
     // Set up comprehensive mocks for the builder
     await page.route('**/rest/v1/resumes*', async (route) => {
       const url = route.request().url()
@@ -72,13 +84,22 @@ test.describe('Resume Builder Editor', () => {
       if (url.includes('id=eq.resume-1') || url.includes('resume-1')) {
         const resumeWithBullets = {
           ...MOCK_RESUMES[0],
-          parsedContent: JSON.parse(MOCK_RESUMES[0].content),
+          parsedContent: MOCK_RESUMES[0].content,
           bullets: MOCK_BULLETS_WITH_POSITIONS.slice(0, 2).map((b) => ({
             id: b.id,
             current_text: b.current_text,
             category: b.category,
             position: b.position,
           })),
+          positions: MOCK_POSITIONS.map((p) => ({
+            id: p.id,
+            company: p.company,
+            title: p.title,
+            start_date: p.start_date,
+            end_date: p.end_date,
+            location: p.location,
+          })),
+          candidateInfo,
         }
         await route.fulfill({
           status: 200,
@@ -99,6 +120,40 @@ test.describe('Resume Builder Editor', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(MOCK_BULLETS_WITH_POSITIONS),
+      })
+    })
+
+    await page.route('**/rest/v1/user_profiles*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          display_name: 'Test User',
+        }),
+      })
+    })
+
+    await page.route('**/rest/v1/candidate_profiles*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          headline: null,
+          summary: null,
+          phone: '555-123-4567',
+          location: 'San Francisco, CA',
+          linkedin_url: 'https://linkedin.com/in/testuser',
+          github_url: 'https://github.com/testuser',
+          website_url: null,
+        }),
+      })
+    })
+
+    await page.route('**/rest/v1/positions*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(MOCK_POSITIONS),
       })
     })
 
@@ -219,5 +274,90 @@ test.describe('Resume Builder Editor', () => {
 
     // Should navigate to resume view (not edit)
     await expect(page).toHaveURL(/\/resumes\/resume-1(?!\/edit)/)
+  })
+
+  test('shows sub-section headers in editor', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    const subsection = page.getByTestId('subsection-sub-pos-1')
+    await expect(subsection).toBeVisible()
+    await expect(subsection).toContainText('Senior Software Engineer')
+    await expect(subsection).toContainText('Tech Corp')
+  })
+
+  test('shows user display name in preview, not resume name', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    const preview = page.getByTestId('builder-preview')
+    await expect(preview).toBeVisible()
+
+    // The preview should show the candidate display name, not the resume name as the main header
+    await expect(preview.locator('.classic-template__name')).toContainText('Test User')
+  })
+
+  test('shows contact info in preview header', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    const contact = page.getByTestId('template-contact')
+    await expect(contact).toBeVisible()
+
+    // Email should be present
+    await expect(contact).toContainText('test@example.com')
+
+    // LinkedIn should render as a link
+    const linkedinLink = contact.locator('a[href="https://linkedin.com/in/testuser"]')
+    await expect(linkedinLink).toBeVisible()
+    await expect(linkedinLink).toContainText('LinkedIn')
+  })
+
+  test('shows bullet palette with available bullets', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    const palette = page.getByTestId('bullet-palette')
+    await expect(palette).toBeVisible()
+
+    // bullet-1 and bullet-2 are used in the resume; only bullet-3 is available
+    const count = page.getByTestId('bullet-palette-count')
+    await expect(count).toHaveText('1')
+  })
+
+  test('hides used bullets from palette', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    // bullet-3 is unused, should be in the palette
+    await expect(page.getByTestId('palette-bullet-bullet-3')).toBeVisible()
+
+    // bullet-1 is used in the resume, should NOT appear in palette
+    await expect(page.getByTestId('palette-bullet-bullet-1')).not.toBeVisible()
+  })
+
+  test('remove button removes bullet from section', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    // Initially the palette count should be 1 (only bullet-3 is unused)
+    const count = page.getByTestId('bullet-palette-count')
+    await expect(count).toHaveText('1')
+
+    // Click remove on bullet-1
+    const removeBtn = page.getByTestId('remove-bullet-bullet-1')
+    await removeBtn.click()
+
+    // After removing, palette count should increase to 2
+    await expect(count).toHaveText('2')
+  })
+
+  test('can add a sub-section', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    // Wait for the section to load with content
+    const sectionEl = page.getByTestId('section-section-experience')
+    await expect(sectionEl).toBeVisible()
+
+    // Click "Add Sub-Section" button
+    const addBtn = page.getByTestId('add-subsection-section-experience')
+    await addBtn.click()
+
+    // "New Sub-Section" text should appear after clicking add
+    await expect(sectionEl.getByText('New Sub-Section')).toBeVisible()
   })
 })

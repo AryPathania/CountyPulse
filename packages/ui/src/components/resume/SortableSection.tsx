@@ -2,7 +2,8 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { SortableBullet } from './SortableBullet'
-import type { ResumeSection } from '@odie/db'
+import { SortableSubSection } from './SortableSubSection'
+import type { ResumeSection, SubSectionData } from '@odie/db'
 
 interface SortableSectionProps {
   section: ResumeSection
@@ -17,9 +18,21 @@ interface SortableSectionProps {
     } | null
   }>
   onEditBullet: (bulletId: string) => void
+  onRemoveBullet?: (bulletId: string) => void
+  onEditSubSection?: (subsectionId: string, data: Partial<SubSectionData>) => void
+  onDeleteSubSection?: (subsectionId: string) => void
+  onAddSubSection?: () => void
 }
 
-export function SortableSection({ section, bullets, onEditBullet }: SortableSectionProps) {
+export function SortableSection({
+  section,
+  bullets,
+  onEditBullet,
+  onRemoveBullet,
+  onEditSubSection,
+  onDeleteSubSection,
+  onAddSubSection,
+}: SortableSectionProps) {
   const {
     attributes,
     listeners,
@@ -40,10 +53,16 @@ export function SortableSection({ section, bullets, onEditBullet }: SortableSect
     return bullets.find((b) => b.id === bulletId)
   }
 
-  // Create sortable IDs for items
+  // Get sub-section data for each item
+  const getSubSectionForItem = (subsectionId: string | undefined) => {
+    if (!subsectionId) return null
+    return (section.subsections ?? []).find((s) => s.id === subsectionId)
+  }
+
+  // Create sortable IDs for draggable items (bullets + sub-sections)
   const itemIds = section.items
-    .filter((item) => item.bulletId)
-    .map((item) => item.bulletId as string)
+    .filter((item) => item.bulletId || item.subsectionId)
+    .map((item) => (item.bulletId ?? item.subsectionId) as string)
 
   return (
     <div
@@ -57,7 +76,7 @@ export function SortableSection({ section, bullets, onEditBullet }: SortableSect
         {...attributes}
         {...listeners}
       >
-        <span className="sortable-section__handle">⋮⋮</span>
+        <span className="sortable-section__handle">&#8942;&#8942;</span>
         <h3 className="sortable-section__title">{section.title}</h3>
       </div>
 
@@ -69,6 +88,20 @@ export function SortableSection({ section, bullets, onEditBullet }: SortableSect
         ) : (
           <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
             {section.items.map((item) => {
+              if (item.type === 'subsection' && item.subsectionId) {
+                const subsection = getSubSectionForItem(item.subsectionId)
+                if (!subsection) return null
+
+                return (
+                  <SortableSubSection
+                    key={item.subsectionId}
+                    subsection={subsection}
+                    onEdit={(data) => onEditSubSection?.(item.subsectionId!, data)}
+                    onDelete={() => onDeleteSubSection?.(item.subsectionId!)}
+                  />
+                )
+              }
+
               if (item.type === 'bullet' && item.bulletId) {
                 const bullet = getBulletForItem(item.bulletId)
                 if (!bullet) return null
@@ -78,6 +111,7 @@ export function SortableSection({ section, bullets, onEditBullet }: SortableSect
                     key={item.bulletId}
                     bullet={bullet}
                     onEdit={() => onEditBullet(item.bulletId!)}
+                    onRemove={onRemoveBullet ? () => onRemoveBullet(item.bulletId!) : undefined}
                   />
                 )
               }
@@ -86,6 +120,18 @@ export function SortableSection({ section, bullets, onEditBullet }: SortableSect
           </SortableContext>
         )}
       </div>
+
+      {onAddSubSection && (
+        <button
+          type="button"
+          className="sortable-section__add-subsection"
+          onClick={onAddSubSection}
+          data-testid={`add-subsection-${section.id}`}
+          title="Add sub-section"
+        >
+          + Add Sub-Section
+        </button>
+      )}
     </div>
   )
 }

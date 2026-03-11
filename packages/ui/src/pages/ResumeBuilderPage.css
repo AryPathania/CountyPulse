@@ -180,6 +180,179 @@
   font-style: italic;
 }
 
+/* Sortable sub-section styles (draggable headers) */
+.sortable-subsection {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.25rem;
+  margin-top: 0.75rem;
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-surface);
+  border-radius: 0 6px 6px 0;
+  transition: border-color 0.15s;
+}
+
+.sortable-subsection:first-child {
+  margin-top: 0;
+}
+
+.sortable-subsection:hover {
+  border-left-color: var(--color-primary);
+}
+
+.sortable-subsection--dragging {
+  opacity: 0.5;
+}
+
+.sortable-subsection--editing {
+  border-left-color: var(--color-primary);
+  padding: 1rem;
+}
+
+.sortable-subsection__handle {
+  flex-shrink: 0;
+  padding: 0.25rem;
+  cursor: grab;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.sortable-subsection__handle:active {
+  cursor: grabbing;
+}
+
+.sortable-subsection__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.sortable-subsection__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.sortable-subsection__title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.sortable-subsection__dates {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.sortable-subsection__bottom {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.125rem;
+}
+
+.sortable-subsection__subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.sortable-subsection__location {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.sortable-subsection__actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.sortable-subsection__edit-btn,
+.sortable-subsection__delete-btn {
+  padding: 0.25rem 0.375rem;
+  font-size: 0.75rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.sortable-subsection__edit-btn:hover {
+  background: var(--color-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.sortable-subsection__delete-btn:hover {
+  background: var(--color-error, #ef4444);
+  border-color: var(--color-error, #ef4444);
+  color: white;
+}
+
+/* Sub-section edit form */
+.sortable-subsection__edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.sortable-subsection__input {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.sortable-subsection__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.sortable-subsection__input--date {
+  max-width: 140px;
+}
+
+.sortable-subsection__date-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.sortable-subsection__date-row span {
+  color: var(--color-text-muted);
+}
+
+.sortable-subsection__edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* Add sub-section button */
+.sortable-section__add-subsection {
+  display: block;
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: 0 0 8px 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.sortable-section__add-subsection:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
 /* Sortable bullet styles */
 .sortable-bullet {
   display: flex;
@@ -255,4 +428,22 @@
   background: var(--color-bg);
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+
+.sortable-bullet__remove {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  margin-left: 0.25rem;
+  line-height: 1;
+}
+
+.sortable-bullet__remove:hover {
+  background: var(--color-error, #ef4444);
+  border-color: var(--color-error, #ef4444);
+  color: white;
 }

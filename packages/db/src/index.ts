@@ -11,6 +11,7 @@ export * from './queries/job-drafts'
 export * from './queries/uploaded-resumes'
 export * from './queries/resumes'
 export * from './queries/account'
+export * from './queries/candidate-profiles'
 
 // Types
 export type { Database, Json } from './types'

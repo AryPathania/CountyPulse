@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -20,6 +20,7 @@ import {
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
 import { SortableSection } from '../components/resume/SortableSection'
+import { BulletPalette } from '../components/resume/BulletPalette'
 import { ResumePreview } from '../components/resume/ResumePreview'
 import { TemplateSelector } from '../components/resume/TemplateSelector'
 import { BulletEditor } from '../components/bullets'
@@ -28,10 +29,13 @@ import {
   getResumeWithBullets,
   updateResumeContent,
   updateResume,
+  getBullets,
   logRun,
   type ResumeWithBullets,
   type ResumeContent,
   type ResumeSection,
+  type SubSectionData,
+  type BulletWithPosition,
 } from '@odie/db'
 import './ResumeBuilderPage.css'
 
@@ -45,6 +49,7 @@ export function ResumeBuilderPage() {
   const { user } = useAuth()
 
   const [resume, setResume] = useState<ResumeWithBullets | null>(null)
+  const [allBullets, setAllBullets] = useState<BulletWithPosition[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -60,7 +65,7 @@ export function ResumeBuilderPage() {
     })
   )
 
-  // Load resume
+  // Load resume and all bullets
   useEffect(() => {
     const loadResume = async () => {
       if (!id) {
@@ -76,6 +81,11 @@ export function ResumeBuilderPage() {
         } else {
           setResume(data)
         }
+        // Fetch all user bullets for the palette
+        if (user?.id) {
+          const bullets = await getBullets(user.id)
+          setAllBullets(bullets)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load resume')
       } finally {
@@ -84,7 +94,19 @@ export function ResumeBuilderPage() {
     }
 
     loadResume()
-  }, [id])
+  }, [id, user?.id])
+
+  // Compute which bullets are already used in the resume
+  const usedBulletIds = useMemo(() => {
+    if (!resume) return new Set<string>()
+    const ids = new Set<string>()
+    for (const section of resume.parsedContent.sections) {
+      for (const item of section.items) {
+        if (item.bulletId) ids.add(item.bulletId)
+      }
+    }
+    return ids
+  }, [resume])
 
   // Save content changes
   const saveContent = useCallback(
@@ -101,6 +123,33 @@ export function ResumeBuilderPage() {
       }
     },
     [id]
+  )
+
+  // Helper: update resume content and persist
+  const applyContent = useCallback(
+    (newContent: ResumeContent, overrides?: { bullets?: ResumeWithBullets['bullets'] }) => {
+      if (!resume) return
+      setResume({
+        ...resume,
+        parsedContent: newContent,
+        bullets: overrides?.bullets ?? [...resume.bullets],
+        positions: [...resume.positions],
+      })
+      saveContent(newContent)
+    },
+    [resume, saveContent]
+  )
+
+  // Helper: transform a single section by ID, then apply
+  const updateSection = useCallback(
+    (sectionId: string, transform: (section: ResumeSection) => ResumeSection, overrides?: { bullets?: ResumeWithBullets['bullets'] }) => {
+      if (!resume) return
+      const newSections = resume.parsedContent.sections.map((s) =>
+        s.id === sectionId ? transform(s) : s
+      )
+      applyContent({ sections: newSections }, overrides)
+    },
+    [resume, applyContent]
   )
 
   // Handle template change
@@ -157,43 +206,6 @@ export function ResumeBuilderPage() {
     setActiveId(event.active.id as string)
   }, [])
 
-  // Handle drag end for sections
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event
-
-      setActiveId(null)
-
-      if (!over || !resume) return
-
-      const activeIdStr = active.id as string
-      const overIdStr = over.id as string
-
-      if (activeIdStr === overIdStr) return
-
-      // Check if we're moving sections or bullets
-      const activeSection = resume.parsedContent.sections.find((s) => s.id === activeIdStr)
-      const overSection = resume.parsedContent.sections.find((s) => s.id === overIdStr)
-
-      if (activeSection && overSection) {
-        // Moving sections
-        const oldIndex = resume.parsedContent.sections.findIndex((s) => s.id === activeIdStr)
-        const newIndex = resume.parsedContent.sections.findIndex((s) => s.id === overIdStr)
-
-        const newSections = arrayMove(resume.parsedContent.sections, oldIndex, newIndex)
-        const newContent: ResumeContent = { sections: newSections }
-
-        setResume({ ...resume, parsedContent: newContent })
-        saveContent(newContent)
-      } else {
-        // Moving bullets within or between sections
-        handleBulletMove(activeIdStr, overIdStr)
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [resume, saveContent]
-  )
-
   // Handle bullet movement
   const handleBulletMove = useCallback(
     (activeIdStr: string, overIdStr: string) => {
@@ -208,7 +220,7 @@ export function ResumeBuilderPage() {
 
       for (let i = 0; i < sections.length; i++) {
         const itemIndex = sections[i].items.findIndex(
-          (item) => item.bulletId === activeIdStr || item.positionId === activeIdStr
+          (item) => item.bulletId === activeIdStr || item.subsectionId === activeIdStr
         )
         if (itemIndex !== -1) {
           sourceSection = sections[i]
@@ -234,7 +246,7 @@ export function ResumeBuilderPage() {
 
         // Check if dropping on an item
         const itemIndex = sections[i].items.findIndex(
-          (item) => item.bulletId === overIdStr || item.positionId === overIdStr
+          (item) => item.bulletId === overIdStr || item.subsectionId === overIdStr
         )
         if (itemIndex !== -1) {
           targetSectionIndex = i
@@ -251,21 +263,165 @@ export function ResumeBuilderPage() {
         items: [...section.items],
       }))
 
-      const [movedItem] = newSections[sourceSectionIndex].items.splice(sourceItemIndex, 1)
-
-      // Adjust target index if same section and source was before target
-      let adjustedTargetIndex = targetItemIndex
-      if (sourceSectionIndex === targetSectionIndex && sourceItemIndex < targetItemIndex) {
-        adjustedTargetIndex -= 1
+      if (sourceSectionIndex === targetSectionIndex) {
+        // Same section: use arrayMove for correct index handling
+        newSections[sourceSectionIndex].items = arrayMove(
+          newSections[sourceSectionIndex].items,
+          sourceItemIndex,
+          targetItemIndex
+        )
+      } else {
+        // Cross-section: remove from source, insert into target
+        const [movedItem] = newSections[sourceSectionIndex].items.splice(sourceItemIndex, 1)
+        newSections[targetSectionIndex].items.splice(targetItemIndex, 0, movedItem)
       }
 
-      newSections[targetSectionIndex].items.splice(adjustedTargetIndex, 0, movedItem)
-
       const newContent: ResumeContent = { sections: newSections }
-      setResume({ ...resume, parsedContent: newContent })
-      saveContent(newContent)
+      applyContent(newContent)
+      console.debug('[ResumeBuilder] bullet reordered, preview state updated')
     },
-    [resume, saveContent]
+    [resume, applyContent]
+  )
+
+  // Handle adding a bullet from the palette to a section
+  const handleAddBulletToSection = useCallback(
+    (bulletId: string, sectionId: string) => {
+      if (!resume) return
+      // Build bullet data for the resume if not already present
+      const bulletData = allBullets.find((b) => b.id === bulletId)
+      const newBullets =
+        bulletData && !resume.bullets.find((b) => b.id === bulletId)
+          ? [
+              ...resume.bullets,
+              {
+                id: bulletData.id,
+                current_text: bulletData.current_text,
+                category: bulletData.category,
+                position: bulletData.position
+                  ? { id: '', company: bulletData.position.company, title: bulletData.position.title }
+                  : null,
+              },
+            ]
+          : [...resume.bullets]
+      updateSection(sectionId, (section) => ({
+        ...section,
+        items: [...section.items, { type: 'bullet' as const, bulletId }],
+      }), { bullets: newBullets })
+      console.debug('[ResumeBuilder] bullet added from palette to section %s', sectionId)
+    },
+    [resume, allBullets, updateSection]
+  )
+
+  // Handle removing a bullet from a section
+  const handleRemoveBullet = useCallback(
+    (bulletId: string, sectionId: string) => {
+      updateSection(sectionId, (section) => ({
+        ...section,
+        items: section.items.filter((item) => item.bulletId !== bulletId),
+      }))
+      console.debug('[ResumeBuilder] bullet removed from section %s', sectionId)
+    },
+    [updateSection]
+  )
+
+  // Handle adding a sub-section to a section
+  const handleAddSubSection = useCallback(
+    (sectionId: string) => {
+      const newSubSection: SubSectionData = {
+        id: `sub-${crypto.randomUUID()}`,
+        title: 'New Sub-Section',
+      }
+      updateSection(sectionId, (section) => ({
+        ...section,
+        subsections: [...(section.subsections ?? []), newSubSection],
+        items: [...section.items, { type: 'subsection' as const, subsectionId: newSubSection.id }],
+      }))
+      console.debug('[ResumeBuilder] sub-section added to section %s', sectionId)
+    },
+    [updateSection]
+  )
+
+  // Handle editing a sub-section
+  const handleEditSubSection = useCallback(
+    (sectionId: string, subsectionId: string, data: Partial<SubSectionData>) => {
+      updateSection(sectionId, (section) => ({
+        ...section,
+        subsections: (section.subsections ?? []).map((sub) =>
+          sub.id === subsectionId ? { ...sub, ...data } : sub
+        ),
+      }))
+      console.debug('[ResumeBuilder] sub-section %s edited in section %s', subsectionId, sectionId)
+    },
+    [updateSection]
+  )
+
+  // Handle deleting a sub-section (keeps bullets, removes header)
+  const handleDeleteSubSection = useCallback(
+    (sectionId: string, subsectionId: string) => {
+      updateSection(sectionId, (section) => ({
+        ...section,
+        items: section.items.filter((item) => item.subsectionId !== subsectionId),
+        subsections: (section.subsections ?? []).filter((sub) => sub.id !== subsectionId),
+      }))
+      console.debug('[ResumeBuilder] sub-section %s deleted from section %s', subsectionId, sectionId)
+    },
+    [updateSection]
+  )
+
+  // Handle drag end for sections
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+
+      setActiveId(null)
+
+      if (!over || !resume) return
+
+      const activeIdStr = active.id as string
+      const overIdStr = over.id as string
+
+      if (activeIdStr === overIdStr) return
+
+      // If dragging from palette
+      if (activeIdStr.startsWith('palette-')) {
+        const bulletId = activeIdStr.replace('palette-', '')
+        let targetSectionId: string | undefined
+        // Check if dropped on a section
+        const targetSection = resume.parsedContent.sections.find((s) => s.id === overIdStr)
+        if (targetSection) {
+          targetSectionId = targetSection.id
+        } else {
+          // Dropped on a bullet - find which section contains it
+          for (const section of resume.parsedContent.sections) {
+            if (section.items.some((item) => item.bulletId === overIdStr || item.subsectionId === overIdStr)) {
+              targetSectionId = section.id
+              break
+            }
+          }
+        }
+        if (targetSectionId) {
+          handleAddBulletToSection(bulletId, targetSectionId)
+        }
+        return
+      }
+
+      // Check if we're moving sections or bullets
+      const activeSection = resume.parsedContent.sections.find((s) => s.id === activeIdStr)
+      const overSection = resume.parsedContent.sections.find((s) => s.id === overIdStr)
+
+      if (activeSection && overSection) {
+        // Moving sections
+        const oldIndex = resume.parsedContent.sections.findIndex((s) => s.id === activeIdStr)
+        const newIndex = resume.parsedContent.sections.findIndex((s) => s.id === overIdStr)
+
+        const newSections = arrayMove(resume.parsedContent.sections, oldIndex, newIndex)
+        applyContent({ sections: newSections })
+      } else {
+        // Moving bullets within or between sections
+        handleBulletMove(activeIdStr, overIdStr)
+      }
+    },
+    [resume, applyContent, handleBulletMove, handleAddBulletToSection]
   )
 
   // Get bullet data by ID
@@ -296,6 +452,26 @@ export function ResumeBuilderPage() {
   const getActiveItem = useCallback(() => {
     if (!activeId || !resume) return null
 
+    // Check if dragging from palette
+    if (activeId.startsWith('palette-')) {
+      const bulletId = activeId.replace('palette-', '')
+      const paletteBullet = allBullets.find((b) => b.id === bulletId)
+      if (paletteBullet) {
+        return {
+          type: 'bullet' as const,
+          bullet: {
+            id: paletteBullet.id,
+            current_text: paletteBullet.current_text,
+            category: paletteBullet.category,
+            position: paletteBullet.position
+              ? { id: '', company: paletteBullet.position.company, title: paletteBullet.position.title }
+              : null,
+          },
+        }
+      }
+      return null
+    }
+
     const section = resume.parsedContent.sections.find((s) => s.id === activeId)
     if (section) {
       return { type: 'section' as const, section }
@@ -303,7 +479,7 @@ export function ResumeBuilderPage() {
 
     for (const section of resume.parsedContent.sections) {
       const item = section.items.find(
-        (i) => i.bulletId === activeId || i.positionId === activeId
+        (i) => i.bulletId === activeId || i.subsectionId === activeId
       )
       if (item) {
         const bullet = item.bulletId ? getBulletById(item.bulletId) : null
@@ -312,7 +488,7 @@ export function ResumeBuilderPage() {
     }
 
     return null
-  }, [activeId, resume, getBulletById])
+  }, [activeId, resume, getBulletById, allBullets])
 
   if (isLoading) {
     return (
@@ -409,6 +585,10 @@ export function ResumeBuilderPage() {
                     section={section}
                     bullets={resume.bullets}
                     onEditBullet={handleBulletEdit}
+                    onRemoveBullet={(bulletId) => handleRemoveBullet(bulletId, section.id)}
+                    onEditSubSection={(subsectionId, data) => handleEditSubSection(section.id, subsectionId, data)}
+                    onDeleteSubSection={(subsectionId) => handleDeleteSubSection(section.id, subsectionId)}
+                    onAddSubSection={() => handleAddSubSection(section.id)}
                   />
                 ))}
               </SortableContext>
@@ -425,6 +605,8 @@ export function ResumeBuilderPage() {
                   </div>
                 )}
               </DragOverlay>
+
+              <BulletPalette allBullets={allBullets} usedBulletIds={usedBulletIds} />
             </DndContext>
 
             {/* Inline bullet editor */}

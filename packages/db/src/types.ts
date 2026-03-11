@@ -72,22 +72,37 @@ export type Database = {
       }
       candidate_profiles: {
         Row: {
+          github_url: string | null
           headline: string | null
+          linkedin_url: string | null
+          location: string | null
+          phone: string | null
           summary: string | null
           updated_at: string
           user_id: string
+          website_url: string | null
         }
         Insert: {
+          github_url?: string | null
           headline?: string | null
+          linkedin_url?: string | null
+          location?: string | null
+          phone?: string | null
           summary?: string | null
           updated_at?: string
           user_id: string
+          website_url?: string | null
         }
         Update: {
+          github_url?: string | null
           headline?: string | null
+          linkedin_url?: string | null
+          location?: string | null
+          phone?: string | null
           summary?: string | null
           updated_at?: string
           user_id?: string
+          website_url?: string | null
         }
         Relationships: []
       }

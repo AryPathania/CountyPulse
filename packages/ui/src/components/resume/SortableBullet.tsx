@@ -13,9 +13,10 @@ interface SortableBulletProps {
     } | null
   }
   onEdit: () => void
+  onRemove?: () => void
 }
 
-export function SortableBullet({ bullet, onEdit }: SortableBulletProps) {
+export function SortableBullet({ bullet, onEdit, onRemove }: SortableBulletProps) {
   const {
     attributes,
     listeners,
@@ -68,6 +69,20 @@ export function SortableBullet({ bullet, onEdit }: SortableBulletProps) {
         >
           Edit
         </button>
+        {onRemove && (
+          <button
+            type="button"
+            className="sortable-bullet__remove"
+            onClick={() => {
+              console.debug('[SortableBullet] bullet removed from section')
+              onRemove()
+            }}
+            data-testid={`remove-bullet-${bullet.id}`}
+            title="Remove from section"
+          >
+            &times;
+          </button>
+        )}
       </div>
     </div>
   )

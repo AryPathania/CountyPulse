@@ -4,7 +4,7 @@ This file is the human-readable source of truth for table/column names, relation
 
 **Updated by:** DB Agent only
 **Updated when:** any migration changes schema
-**Last updated:** 2026-03-10 (migrations 022-025)
+**Last updated:** 2026-03-10 (migrations 022-026)
 
 ---
 
@@ -57,6 +57,11 @@ This file is the human-readable source of truth for table/column names, relation
 | user_id | uuid | no | - |
 | headline | text | yes | - |
 | summary | text | yes | - |
+| phone | text | yes | - |
+| location | text | yes | - |
+| linkedin_url | text | yes | - |
+| github_url | text | yes | - |
+| website_url | text | yes | - |
 | updated_at | timestamptz | no | now() |
 
 **Constraints:**
@@ -67,6 +72,9 @@ This file is the human-readable source of truth for table/column names, relation
 
 **RLS:**
 - SELECT/INSERT/UPDATE/DELETE: `user_id = auth.uid()`
+
+**Notes:**
+- Contact fields (phone, location, linkedin_url, github_url, website_url) added in migration 026 for resume header display
 
 ---
 

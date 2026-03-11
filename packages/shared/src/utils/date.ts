@@ -34,3 +34,15 @@ export function toPostgresDate(dateString: string | null | undefined): string | 
   // Return as-is for any other format (let PostgreSQL handle validation)
   return dateString
 }
+
+/**
+ * Format a date string for display on resumes and UI.
+ * Converts "YYYY-MM-DD" or "YYYY-MM" to "Mon YYYY" (e.g., "Mar 2024").
+ * Returns "Present" for null/undefined.
+ */
+export function formatDisplayDate(dateString: string | null | undefined): string {
+  if (!dateString) return 'Present'
+  const d = new Date(dateString + 'T00:00:00')
+  if (isNaN(d.getTime())) return dateString
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+}

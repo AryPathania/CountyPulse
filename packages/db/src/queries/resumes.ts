@@ -6,11 +6,25 @@ type NewResume = Database['public']['Tables']['resumes']['Insert']
 type UpdateResume = Database['public']['Tables']['resumes']['Update']
 
 /**
+ * Sub-section data stored inline in resume content JSON.
+ * Represents a grouping header (e.g., position, degree, project).
+ */
+export interface SubSectionData {
+  id: string
+  title: string
+  subtitle?: string
+  startDate?: string
+  endDate?: string
+  location?: string
+  positionId?: string
+}
+
+/**
  * Resume content JSON schema
  */
 export interface ResumeContentItem {
-  type: 'position' | 'bullet'
-  positionId?: string
+  type: 'subsection' | 'bullet'
+  subsectionId?: string
   bulletId?: string
 }
 
@@ -18,6 +32,7 @@ export interface ResumeSection {
   id: string
   title: string
   items: ResumeContentItem[]
+  subsections?: SubSectionData[]
 }
 
 export interface ResumeContent {
@@ -34,16 +49,19 @@ export function createDefaultResumeContent(): ResumeContent {
         id: 'experience',
         title: 'Experience',
         items: [],
+        subsections: [],
       },
       {
         id: 'skills',
         title: 'Skills',
         items: [],
+        subsections: [],
       },
       {
         id: 'education',
         title: 'Education',
         items: [],
+        subsections: [],
       },
     ],
   }
@@ -116,7 +134,65 @@ export interface ResumeWithBullets extends Resume {
     title: string
     start_date: string | null
     end_date: string | null
+    location: string | null
   }>
+  candidateInfo?: {
+    displayName: string
+    email: string | null
+    headline: string | null
+    summary: string | null
+    phone: string | null
+    location: string | null
+    linkedinUrl: string | null
+    githubUrl: string | null
+    websiteUrl: string | null
+  }
+}
+
+/**
+ * Normalize old resume content format (type: 'position') to new format (type: 'subsection').
+ * Converts position items to subsection items and populates the subsections array.
+ */
+export function normalizeResumeContent(content: ResumeContent): ResumeContent {
+  let needsNormalization = false
+  for (const section of content.sections) {
+    for (const item of section.items) {
+      if ((item as { type: string }).type === 'position') {
+        needsNormalization = true
+        break
+      }
+    }
+    if (needsNormalization) break
+  }
+
+  if (!needsNormalization) return content
+
+  console.debug('[normalizeResumeContent] converting old position format to subsection')
+  return {
+    sections: content.sections.map((section) => {
+      const subsections: SubSectionData[] = [...(section.subsections ?? [])]
+      const newItems: ResumeContentItem[] = []
+
+      for (const item of section.items) {
+        const rawItem = item as { type: string; positionId?: string; bulletId?: string; subsectionId?: string }
+        if (rawItem.type === 'position' && rawItem.positionId) {
+          const subsectionId = `sub-${rawItem.positionId}`
+          if (!subsections.find((s) => s.id === subsectionId)) {
+            subsections.push({
+              id: subsectionId,
+              title: '',
+              positionId: rawItem.positionId,
+            })
+          }
+          newItems.push({ type: 'subsection', subsectionId })
+        } else {
+          newItems.push(item)
+        }
+      }
+
+      return { ...section, items: newItems, subsections }
+    }),
+  }
 }
 
 /**
@@ -126,7 +202,7 @@ export async function getResumeWithBullets(resumeId: string): Promise<ResumeWith
   const resume = await getResume(resumeId)
   if (!resume) return null
 
-  const parsedContent = parseResumeContent(resume.content)
+  const parsedContent = normalizeResumeContent(parseResumeContent(resume.content))
 
   // Collect all bullet IDs and position IDs from content
   const bulletIds: string[] = []
@@ -137,8 +213,11 @@ export async function getResumeWithBullets(resumeId: string): Promise<ResumeWith
       if (item.type === 'bullet' && item.bulletId) {
         bulletIds.push(item.bulletId)
       }
-      if (item.type === 'position' && item.positionId) {
-        positionIds.push(item.positionId)
+    }
+    // Collect position IDs from sub-sections
+    for (const sub of section.subsections ?? []) {
+      if (sub.positionId) {
+        positionIds.push(sub.positionId)
       }
     }
   }
@@ -174,18 +253,50 @@ export async function getResumeWithBullets(resumeId: string): Promise<ResumeWith
   if (positionIds.length > 0) {
     const { data, error } = await supabase
       .from('positions')
-      .select('id, company, title, start_date, end_date')
+      .select('id, company, title, start_date, end_date, location')
       .in('id', positionIds)
 
     if (error) throw error
     positions = data ?? []
   }
 
+  // Fetch candidate info
+  const [userProfileResult, candidateProfileResult] = await Promise.all([
+    supabase
+      .from('user_profiles')
+      .select('display_name')
+      .eq('user_id', resume.user_id)
+      .single(),
+    supabase
+      .from('candidate_profiles')
+      .select('headline, summary, phone, location, linkedin_url, github_url, website_url')
+      .eq('user_id', resume.user_id)
+      .single(),
+  ])
+
+  // Get email from auth user session
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+
+  const candidateInfo = userProfileResult.data ? {
+    displayName: userProfileResult.data.display_name,
+    email: authUser?.email ?? null,
+    headline: candidateProfileResult.data?.headline ?? null,
+    summary: candidateProfileResult.data?.summary ?? null,
+    phone: candidateProfileResult.data?.phone ?? null,
+    location: candidateProfileResult.data?.location ?? null,
+    linkedinUrl: candidateProfileResult.data?.linkedin_url ?? null,
+    githubUrl: candidateProfileResult.data?.github_url ?? null,
+    websiteUrl: candidateProfileResult.data?.website_url ?? null,
+  } : undefined
+
+  console.debug('[getResumeWithBullets] loaded candidate info for %s', candidateInfo?.displayName)
+
   return {
     ...resume,
     parsedContent,
     bullets,
     positions,
+    candidateInfo,
   }
 }
 
@@ -257,6 +368,80 @@ export async function deleteResume(resumeId: string): Promise<void> {
 }
 
 /**
+ * Result of grouping bullets by position into sub-sections.
+ */
+export interface GroupedBulletsResult {
+  items: ResumeContentItem[]
+  subsections: SubSectionData[]
+}
+
+/**
+ * Group bullets by position, creating sub-section headers.
+ * Pure function (no DB calls) for testability.
+ *
+ * @param bulletIds - ordered list of bullet IDs to group
+ * @param bulletRows - bullet ID to position_id mapping from DB
+ * @param orderedPositionIds - position IDs sorted by start_date desc
+ * @param positionDetails - position data for building sub-section headers
+ * @returns items array and subsections array
+ */
+export function groupBulletsByPosition(
+  bulletIds: string[],
+  bulletRows: Array<{ id: string; position_id: string | null }>,
+  orderedPositionIds: string[],
+  positionDetails?: Array<{ id: string; company: string; title: string; start_date: string | null; end_date: string | null; location: string | null }>
+): GroupedBulletsResult {
+  const positionBullets = new Map<string, string[]>()
+  const orphanBullets: string[] = []
+  const bulletMap = new Map(bulletRows.map((b) => [b.id, b.position_id]))
+  const positionMap = new Map((positionDetails ?? []).map((p) => [p.id, p]))
+
+  for (const bulletId of bulletIds) {
+    const posId = bulletMap.get(bulletId)
+    if (posId) {
+      if (!positionBullets.has(posId)) positionBullets.set(posId, [])
+      positionBullets.get(posId)!.push(bulletId)
+    } else {
+      orphanBullets.push(bulletId)
+    }
+  }
+
+  const items: ResumeContentItem[] = []
+  const subsections: SubSectionData[] = []
+
+  // Sub-section header + its bullets, ordered by start_date desc
+  for (const posId of orderedPositionIds) {
+    const bullets = positionBullets.get(posId)
+    if (!bullets || bullets.length === 0) continue
+
+    const subsectionId = `sub-${posId}`
+    const pos = positionMap.get(posId)
+
+    subsections.push({
+      id: subsectionId,
+      title: pos?.title ?? '',
+      subtitle: pos?.company ?? '',
+      startDate: pos?.start_date ?? undefined,
+      endDate: pos?.end_date ?? undefined,
+      location: pos?.location ?? undefined,
+      positionId: posId,
+    })
+
+    items.push({ type: 'subsection', subsectionId })
+    for (const bId of bullets) {
+      items.push({ type: 'bullet', bulletId: bId })
+    }
+  }
+
+  // Append orphan bullets at the end
+  for (const bId of orphanBullets) {
+    items.push({ type: 'bullet', bulletId: bId })
+  }
+
+  return { items, subsections }
+}
+
+/**
  * Create a resume from a job draft
  */
 export async function createResumeFromDraft(
@@ -264,25 +449,66 @@ export async function createResumeFromDraft(
   name: string,
   bulletIds: string[]
 ): Promise<Resume> {
+  let experienceResult: GroupedBulletsResult = { items: [], subsections: [] }
+
+  if (bulletIds.length > 0) {
+    const { data: bulletRows, error: bulletError } = await supabase
+      .from('bullets')
+      .select('id, position_id')
+      .in('id', bulletIds)
+
+    if (bulletError) throw bulletError
+
+    // Gather unique position IDs
+    const positionIdSet = new Set<string>()
+    for (const row of bulletRows ?? []) {
+      if (row.position_id) positionIdSet.add(row.position_id)
+    }
+    const uniquePositionIds = Array.from(positionIdSet)
+
+    // Fetch positions ordered by start_date desc (with details for sub-sections)
+    let orderedPositionIds: string[] = []
+    let positionDetails: Array<{ id: string; company: string; title: string; start_date: string | null; end_date: string | null; location: string | null }> = []
+    if (uniquePositionIds.length > 0) {
+      const { data: positionRows, error: posError } = await supabase
+        .from('positions')
+        .select('id, company, title, start_date, end_date, location')
+        .in('id', uniquePositionIds)
+        .order('start_date', { ascending: false })
+
+      if (posError) throw posError
+      orderedPositionIds = (positionRows ?? []).map((p) => p.id)
+      positionDetails = positionRows ?? []
+    }
+
+    experienceResult = groupBulletsByPosition(bulletIds, bulletRows ?? [], orderedPositionIds, positionDetails)
+
+    console.debug(
+      '[createResumeFromDraft] grouped %d bullets into %d sub-sections',
+      bulletIds.length,
+      experienceResult.subsections.length
+    )
+  }
+
   const content: ResumeContent = {
     sections: [
       {
         id: 'experience',
         title: 'Experience',
-        items: bulletIds.map((bulletId) => ({
-          type: 'bullet' as const,
-          bulletId,
-        })),
+        items: experienceResult.items,
+        subsections: experienceResult.subsections,
       },
       {
         id: 'skills',
         title: 'Skills',
         items: [],
+        subsections: [],
       },
       {
         id: 'education',
         title: 'Education',
         items: [],
+        subsections: [],
       },
     ],
   }

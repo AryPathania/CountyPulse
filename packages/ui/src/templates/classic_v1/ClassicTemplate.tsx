@@ -1,5 +1,53 @@
+import { formatDisplayDate } from '@odie/shared'
 import type { TemplateProps } from '../types'
 import './ClassicTemplate.css'
+
+/**
+ * Render the resume header with candidate contact info.
+ */
+function ResumeHeader({ resume }: TemplateProps) {
+  const contactParts: Array<{ label: string; href?: string }> = []
+  if (resume.candidateInfo) {
+    const info = resume.candidateInfo
+    if (info.email) contactParts.push({ label: info.email })
+    if (info.linkedinUrl) contactParts.push({ label: 'LinkedIn', href: info.linkedinUrl })
+    if (info.githubUrl) contactParts.push({ label: 'GitHub', href: info.githubUrl })
+    if (info.websiteUrl) contactParts.push({ label: info.websiteUrl, href: info.websiteUrl })
+    if (info.phone) contactParts.push({ label: info.phone })
+  }
+
+  return (
+    <header className="classic-template__header">
+      <h1 className="classic-template__name">
+        {resume.candidateInfo?.displayName || resume.name}
+      </h1>
+      {resume.candidateInfo && (
+        <>
+          {contactParts.length > 0 && (
+            <div className="classic-template__contact" data-testid="template-contact">
+              {contactParts.map((part, i) => (
+                <span key={i}>
+                  {i > 0 && <span className="classic-template__separator"> · </span>}
+                  {part.href ? (
+                    <a href={part.href} className="classic-template__link">{part.label}</a>
+                  ) : (
+                    <span>{part.label}</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+          {resume.candidateInfo.location && (
+            <div className="classic-template__location">{resume.candidateInfo.location}</div>
+          )}
+          {resume.candidateInfo.summary && (
+            <div className="classic-template__summary">{resume.candidateInfo.summary}</div>
+          )}
+        </>
+      )}
+    </header>
+  )
+}
 
 /**
  * Classic resume template with traditional styling.
@@ -11,9 +59,9 @@ export function ClassicTemplate({ resume }: TemplateProps) {
     return resume.bullets.find((b) => b.id === bulletId)
   }
 
-  // Get position data by ID
-  const getPositionById = (positionId: string) => {
-    return resume.positions.find((p) => p.id === positionId)
+  // Get sub-section data by ID
+  const getSubSectionById = (subsectionId: string, sectionSubsections: typeof resume.parsedContent.sections[0]['subsections']) => {
+    return (sectionSubsections ?? []).find((s) => s.id === subsectionId)
   }
 
   const hasContent = resume.parsedContent.sections.some((s) => s.items.length > 0)
@@ -21,9 +69,7 @@ export function ClassicTemplate({ resume }: TemplateProps) {
   if (!hasContent) {
     return (
       <div className="classic-template" data-testid="template-classic">
-        <header className="classic-template__header">
-          <h1 className="classic-template__name">{resume.name}</h1>
-        </header>
+        <ResumeHeader resume={resume} />
         <div className="classic-template__empty" data-testid="template-empty">
           <p>Your resume is empty.</p>
           <p>Drag bullets into sections to build your resume.</p>
@@ -35,9 +81,7 @@ export function ClassicTemplate({ resume }: TemplateProps) {
   return (
     <div className="classic-template" data-testid="template-classic">
       {/* Header */}
-      <header className="classic-template__header">
-        <h1 className="classic-template__name">{resume.name}</h1>
-      </header>
+      <ResumeHeader resume={resume} />
 
       {/* Sections */}
       {resume.parsedContent.sections.map((section) => {
@@ -54,22 +98,25 @@ export function ClassicTemplate({ resume }: TemplateProps) {
 
             <div className="classic-template__items">
               {section.items.map((item, index) => {
-                if (item.type === 'position' && item.positionId) {
-                  const position = getPositionById(item.positionId)
-                  if (!position) return null
+                if (item.type === 'subsection' && item.subsectionId) {
+                  const subsection = getSubSectionById(item.subsectionId, section.subsections)
+                  if (!subsection) return null
 
                   return (
                     <div
-                      key={`pos-${item.positionId}-${index}`}
+                      key={`sub-${item.subsectionId}-${index}`}
                       className="classic-template__position"
+                      data-testid={`template-subsection-${item.subsectionId}`}
                     >
                       <div className="classic-template__position-header">
-                        <span className="classic-template__company">{position.company}</span>
-                        <span className="classic-template__dates">
-                          {position.start_date} - {position.end_date ?? 'Present'}
-                        </span>
+                        <span className="classic-template__company">{subsection.subtitle}</span>
+                        {(subsection.startDate || subsection.endDate) && (
+                          <span className="classic-template__dates">
+                            {formatDisplayDate(subsection.startDate)} - {formatDisplayDate(subsection.endDate)}
+                          </span>
+                        )}
                       </div>
-                      <div className="classic-template__title">{position.title}</div>
+                      <div className="classic-template__title">{subsection.title}</div>
                     </div>
                   )
                 }

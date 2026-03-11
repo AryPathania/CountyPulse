@@ -36,9 +36,11 @@ vi.mock('@odie/db', () => ({
     },
   },
   getUserProfile: vi.fn().mockResolvedValue(null),
+  getCandidateProfile: vi.fn().mockResolvedValue(null),
   createUserProfile: vi.fn(),
   updateUserProfile: vi.fn(),
   markProfileComplete: vi.fn(),
+  upsertCandidateProfile: vi.fn(),
 }))
 
 const renderWithRouter = (component: React.ReactElement) => {

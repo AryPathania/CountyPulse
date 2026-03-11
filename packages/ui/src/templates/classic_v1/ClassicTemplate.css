@@ -21,6 +21,38 @@
   letter-spacing: 0.1em;
 }
 
+.classic-template__contact {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #555;
+  margin-top: 0.25rem;
+}
+
+.classic-template__separator {
+  color: #999;
+}
+
+.classic-template__link {
+  color: #333;
+  text-decoration: underline;
+}
+
+.classic-template__location {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #555;
+  margin-top: 0.15rem;
+}
+
+.classic-template__summary {
+  text-align: center;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: #444;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
 .classic-template__section {
   margin-bottom: 1.5rem;
 }

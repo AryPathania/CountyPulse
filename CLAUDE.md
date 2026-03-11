@@ -48,6 +48,7 @@ pnpm gen-types        # Generate Supabase types
 - **Interview Context**: Discriminated union (`blank` | `resume` | `gaps`) parameterizes interview prompt
 - **Bullet Quality Rules**: Shared prompt section in `supabase/functions/_shared/prompts/bullet-quality.ts`
 - **Resume Dedup**: SHA-256 file hash with unique index on `(user_id, file_hash)`
+- **Resume Sub-Sections**: Generic editable grouping headers stored in resume content JSON (`SubSectionData`). Draggable, editable, deletable. Used for positions, education, projects. Auto-generated from positions via `groupBulletsByPosition()`, editable by users. Old `type: 'position'` items normalized to `type: 'subsection'` on read.
 
 ## Conventions
 - UI components: `packages/ui/src/components/`
@@ -64,7 +65,7 @@ pnpm gen-types        # Generate Supabase types
 - `/bullets` — Bullets library
 - `/resumes` — Resumes list (drafts + uploaded)
 - `/resumes/:id` — Draft resume page (gap analysis, matched bullets)
-- `/resumes/:id/edit` — Resume builder (drag-and-drop sections, live preview)
+- `/resumes/:id/edit` — Resume builder (drag-and-drop sections, bullet palette, live preview)
 - `/upload-resume` — PDF resume upload
 - `/telemetry` — Runs dashboard
 - `/settings` — User settings
@@ -80,10 +81,10 @@ pnpm gen-types        # Generate Supabase types
 
 ## DB Tables (Odie)
 - `user_profiles` — Account metadata
-- `candidate_profiles` — Resume header (headline, summary)
+- `candidate_profiles` — Resume header (headline, summary, phone, location, linkedin_url, github_url, website_url)
 - `positions` — Work experience entries
 - `bullets` — STAR bullets with embeddings
-- `resumes` — Curated bullet selections
+- `resumes` — Curated bullet selections (content JSON has sections with `SubSectionData[]` and items of type `subsection` | `bullet`)
 - `job_drafts` — JD + retrieval + gap analysis (`parsed_requirements`, `gap_analysis`)
 - `uploaded_resumes` — PDF uploads with cached parse results
 - `runs` — LLM telemetry
@@ -104,9 +105,9 @@ pnpm gen-types        # Generate Supabase types
 **MVP Feature Complete** - All phases implemented + UI polish + resume upload + gap analysis
 
 ### Test Coverage
-- **620 unit/integration tests** (Vitest + Testing Library)
-- **81 E2E tests** (Playwright)
-- **91%+ code coverage**
+- **700 unit/integration tests** (Vitest + Testing Library)
+- **95 E2E tests** (Playwright)
+- **94%+ code coverage**
 
 ### Completed Phases
 - Phase 0.5: Schema Inventory + Repo Alignment
