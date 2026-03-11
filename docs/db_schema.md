@@ -203,10 +203,11 @@ This file is the human-readable source of truth for table/column names, relation
 - SELECT/INSERT/UPDATE/DELETE: `user_id = auth.uid()`
 
 **Notes:**
-- `retrieved_bullet_ids` stores top 50 matches for debugging/audit
+- `job_title` and `company` are initially null; populated from LLM extraction during gap analysis
+- `retrieved_bullet_ids` stores all matched bullet IDs from gap analysis
 - `selected_bullet_ids` stores final chosen set for the draft
 - `parsed_requirements` stores LLM-extracted requirements from JD text (added migration 023)
-- `gap_analysis` stores per-requirement match/gap results for "What's Missing" feature (added migration 023)
+- `gap_analysis` stores per-requirement match/gap results including `jobTitle`, `company`, `covered`, `gaps`, `totalRequirements`, `coveredCount`, `analyzedAt` (added migration 023)
 
 ---
 

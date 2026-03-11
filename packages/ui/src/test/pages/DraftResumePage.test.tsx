@@ -70,8 +70,10 @@ const mockDraft = {
 
 // Mock @odie/db
 const mockGetJobDraftWithBullets = vi.fn()
+const mockCreateResumeFromDraft = vi.fn()
 vi.mock('@odie/db', () => ({
   getJobDraftWithBullets: (...args: unknown[]) => mockGetJobDraftWithBullets(...args),
+  createResumeFromDraft: (...args: unknown[]) => mockCreateResumeFromDraft(...args),
 }))
 
 // Mock jd-processing service (keep buildGapDataFromStored + buildInterviewContextFromGaps real)
@@ -128,6 +130,7 @@ describe('DraftResumePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetJobDraftWithBullets.mockResolvedValue(mockDraft)
+    mockCreateResumeFromDraft.mockResolvedValue({ id: 'resume-456', name: 'Test Resume' })
     // Default: analyzeJobDescriptionGaps never resolves (not needed for most tests)
     mockAnalyzeJobDescriptionGaps.mockReturnValue(new Promise(() => {}))
   })
@@ -230,7 +233,7 @@ describe('DraftResumePage', () => {
     })
   })
 
-  it('should navigate to edit page when create resume clicked', async () => {
+  it('should create resume and navigate to edit page when create resume clicked', async () => {
     renderDraftPage()
 
     await waitFor(() => {
@@ -239,7 +242,17 @@ describe('DraftResumePage', () => {
 
     await userEvent.click(screen.getByTestId('create-resume-btn'))
 
-    expect(mockNavigate).toHaveBeenCalledWith('/resumes/draft-123/edit')
+    await waitFor(() => {
+      expect(mockCreateResumeFromDraft).toHaveBeenCalledWith(
+        'test-user-id',
+        'Senior Software Engineer',
+        ['bullet-1', 'bullet-2']
+      )
+    })
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/resumes/resume-456/edit')
+    })
   })
 
   it('should show empty state when no bullets matched', async () => {

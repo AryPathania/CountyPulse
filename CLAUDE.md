@@ -62,11 +62,12 @@ pnpm gen-types        # Generate Supabase types
 - `/` — Home (JD paste + quick actions)
 - `/interview` — Interview chat (accepts `interviewContext` in route state)
 - `/bullets` — Bullets library
-- `/resumes` — Resumes list (created + uploaded)
-- `/resumes/:id` — Resume builder
-- `/draft/:id` — Draft resume from JD (with gap analysis)
+- `/resumes` — Resumes list (drafts + uploaded)
+- `/resumes/:id` — Draft resume page (gap analysis, matched bullets)
+- `/resumes/:id/edit` — Resume builder (drag-and-drop sections, live preview)
 - `/upload-resume` — PDF resume upload
 - `/telemetry` — Runs dashboard
+- `/settings` — User settings
 
 ## Edge Functions
 - `interview` — Conversational interview (context-aware: blank/resume/gaps)
@@ -103,7 +104,7 @@ pnpm gen-types        # Generate Supabase types
 **MVP Feature Complete** - All phases implemented + UI polish + resume upload + gap analysis
 
 ### Test Coverage
-- **580 unit/integration tests** (Vitest + Testing Library)
+- **620 unit/integration tests** (Vitest + Testing Library)
 - **81 E2E tests** (Playwright)
 - **91%+ code coverage**
 

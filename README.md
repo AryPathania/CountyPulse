@@ -15,11 +15,12 @@ pnpm dev                              # Start dev server at http://localhost:517
 ```
 odie-ai/
 ├── packages/
-│   ├── web/                          # React 19 + Vite frontend (@odie/web)
+│   ├── ui/                           # React 19 + Vite frontend (@odie/ui)
 │   │   ├── src/
-│   │   │   ├── components/auth/      # Auth components (AuthProvider, LoginForm, etc.)
+│   │   │   ├── components/           # UI components (auth, layout, draft, resume)
 │   │   │   ├── pages/                # Page components
-│   │   │   ├── lib/                  # Utilities (supabaseClient)
+│   │   │   ├── queries/              # TanStack Query hooks
+│   │   │   ├── services/             # Business logic (JD processing, resume upload)
 │   │   │   ├── test/                 # Test suite
 │   │   │   └── App.tsx               # Main app with routing
 │   │   ├── vite.config.ts
@@ -61,7 +62,7 @@ odie-ai/
 ```bash
 # Development
 pnpm dev                              # Start UI dev server
-pnpm --filter @odie/web dev           # Explicit UI dev
+pnpm --filter @odie/ui dev           # Explicit UI dev
 
 # Building
 pnpm build                            # Build all packages
@@ -73,7 +74,7 @@ pnpm gen-types                        # Generate TS types from schema
 # Testing
 pnpm test                             # Run all tests
 pnpm test:coverage                    # Coverage report
-pnpm --filter @odie/web test:ui       # Tests with UI dashboard
+pnpm --filter @odie/ui test:ui       # Tests with UI dashboard
 
 # Quality
 pnpm lint                             # Lint all packages
@@ -115,7 +116,7 @@ OPENAI_API_KEY=your-openai-key
 pnpm test
 
 # Watch mode
-pnpm --filter @odie/web test --watch
+pnpm --filter @odie/ui test --watch
 
 # Coverage
 pnpm test:coverage

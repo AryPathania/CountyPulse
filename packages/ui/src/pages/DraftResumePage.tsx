@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
 import { useJobDraftWithBullets, useRunGapAnalysis } from '../queries/job-drafts'
+import { useCreateResumeFromDraft } from '../queries/resumes'
 import { bulletKeys } from '../queries/bullets'
 import { processJobDescription, buildGapDataFromStored, type GapAnalysisServiceResult } from '../services/jd-processing'
 import { GapAnalysis } from '../components/draft/GapAnalysis'
@@ -33,6 +34,7 @@ export function DraftResumePage() {
 
   // Gap analysis mutation
   const gapAnalysis = useRunGapAnalysis()
+  const createResume = useCreateResumeFromDraft()
 
   // Create new draft from JD text (one-off effect: creation + navigation)
   useEffect(() => {
@@ -79,10 +81,14 @@ export function DraftResumePage() {
   }, [needsAnalysis, isAnalyzing, gapAnalysis, draft?.id, draft?.jd_text, user?.id])
 
   const handleCreateResume = useCallback(() => {
-    if (draft?.id) {
-      navigate(`/resumes/${draft.id}/edit`)
-    }
-  }, [draft?.id, navigate])
+    if (!draft || !user?.id) return
+    const bulletIds = draft.bullets.map(b => b.id)
+    const name = gapData?.jobTitle || draft.job_title || 'Untitled Resume'
+    createResume.mutate(
+      { userId: user.id, name, bulletIds },
+      { onSuccess: (resume) => navigate(`/resumes/${resume.id}/edit`) }
+    )
+  }, [draft, user?.id, gapData?.jobTitle, createResume, navigate])
 
   const error = createError || (loadError instanceof Error ? loadError.message : loadError ? String(loadError) : null)
 
@@ -134,8 +140,9 @@ export function DraftResumePage() {
             onClick={handleCreateResume}
             className="btn-primary"
             data-testid="create-resume-btn"
+            disabled={createResume.isPending}
           >
-            Create Resume
+            {createResume.isPending ? 'Creating...' : 'Create Resume'}
           </button>
         </header>
 
