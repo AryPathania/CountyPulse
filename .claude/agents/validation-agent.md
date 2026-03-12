@@ -20,7 +20,7 @@ Mission: block merges that increase complexity.
 ## Testing rules
 
 - 100% of tests must pass.
-- Coverage target: >90% (unit + integration).
+- Coverage target: >95% (unit + integration).
 - Skipping tests is forbidden. CI must fail on `.skip`.
 
 ## MCP
@@ -55,8 +55,17 @@ Mission: block merges that increase complexity.
   - RLS policies work correctly
 - Review db-agent's validation report
 
+7) E2E coverage check
+- Verify each new user-facing flow has a corresponding Playwright test
+- Confirm screenshots or traces are captured on failure
+- Coverage must include both individual component and full wiring (page load → interaction → DB save → UI update)
+
 ## Output
 - a short report for the Orchestrator:
   - violations found
   - exact files/lines
   - recommended refactor
+
+## DB Query Rules
+
+- Flag any `.single()` chained after `.update()`, `.patch()`, or `.delete()` operations — if 0 rows match, `.single()` throws PGRST116 (406). Use `.upsert()` + `.single()` for create-or-update, or `.maybeSingle()` if the row may not exist.

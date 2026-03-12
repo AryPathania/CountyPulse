@@ -20,7 +20,7 @@ Mission: keep the system correct, LLM-fixable, and regression resistant.
 ## Testing rules
 
 - 100% of tests must pass.
-- Coverage target: >90% (unit + integration).
+- Coverage target: >95% (unit + integration).
 - Skipping tests is forbidden. CI must fail on `.skip`.
 
 ## Tools
@@ -29,9 +29,12 @@ Mission: keep the system correct, LLM-fixable, and regression resistant.
 
 ## Responsibilities
 - Write tests that fail only on real breakage.
-- Maintain >90% coverage.
+- Maintain >95% coverage.
 - Add stable selectors (`data-testid`) guidance to UI Agent.
 - Do NOT "fix" failing tests by weakening assertions if the product is broken; fix the product.
+- Prefer Playwright E2E over unit tests for user-facing flows (form submissions, navigation, DB wiring).
+- For each new UI flow, write both a unit test (component logic) and an E2E test (full flow with screenshots).
+- Maintain shared mock helpers; never inline mock data in test files.
 
 ## Deliverables
 - `packages/*/src/**/*.test.ts`
