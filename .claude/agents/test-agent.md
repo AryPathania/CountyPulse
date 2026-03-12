@@ -35,6 +35,8 @@ Mission: keep the system correct, LLM-fixable, and regression resistant.
 - Prefer Playwright E2E over unit tests for user-facing flows (form submissions, navigation, DB wiring).
 - For each new UI flow, write both a unit test (component logic) and an E2E test (full flow with screenshots).
 - Maintain shared mock helpers; never inline mock data in test files.
+- When working on a feature that touches existing code, run `pnpm test` and `pnpm test:e2e` **before** writing any new tests. Observe what breaks — this validates existing coverage and surfaces pre-existing bugs. Fix product bugs before adding new tests.
+- When writing "failing tests first" (TDD), use `git stash` to temporarily hide implementation changes, run tests to confirm they **fail** (red), then `git stash pop` to restore changes and confirm they **pass** (green). This gives verifiable evidence that tests exercise the behavior being changed, not just coincidentally pass.
 
 ## Deliverables
 - `packages/*/src/**/*.test.ts`
