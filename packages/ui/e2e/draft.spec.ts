@@ -140,15 +140,15 @@ test.describe('Draft Resume View', () => {
   test('shows job title from draft', async ({ page }) => {
     await page.goto('/resumes/draft-1')
 
-    // Should show job title in heading
-    await expect(page.getByRole('heading', { name: MOCK_JOB_DRAFTS[0].job_title })).toBeVisible()
+    // Should show job title in the page h1 (not the gap analysis heading)
+    await expect(page.locator('h1.draft-page__title')).toContainText(MOCK_JOB_DRAFTS[0].job_title)
   })
 
   test('shows company from draft', async ({ page }) => {
     await page.goto('/resumes/draft-1')
 
-    // Should show company
-    await expect(page.getByText(MOCK_JOB_DRAFTS[0].company)).toBeVisible()
+    // Should show company in the page header
+    await expect(page.locator('.draft-page__company')).toContainText(MOCK_JOB_DRAFTS[0].company)
   })
 
   test('shows create resume button', async ({ page }) => {

@@ -51,6 +51,15 @@ pnpm gen-types        # Generate Supabase types
 - **Resume Sub-Sections**: Generic editable grouping headers stored in resume content JSON (`SubSectionData`). Draggable, editable, deletable. Used for positions, education, projects. Auto-generated from positions via `groupBulletsByPosition()`, editable by users. Old `type: 'position'` items normalized to `type: 'subsection'` on read.
 - **Profile Links**: Flexible `links JSONB NOT NULL DEFAULT '[]'` on `candidate_profiles`. Each entry is `{label, url}`. Max 8 enforced at app layer. Common types (LinkedIn, GitHub, Twitter, Website) offered as quick-add presets; fully custom labels supported. No fixed URL columns.
 
+## Security
+
+See `docs/adr/006_security_model.md` for the full security model. Summary:
+- **SSRF**: `fetch-jd` edge function blocks private IPs, loopback, and AWS metadata endpoints
+- **SQL injection**: Not possible — PostgREST parameterized queries throughout
+- **XSS**: Not possible — React JSX escapes all dynamic content; no `dangerouslySetInnerHTML`
+- **LLM prompt injection**: Limited to single-user impact; system prompts reduce susceptibility
+- **Auth**: All tables have RLS; all edge functions require valid JWT
+
 ## Conventions
 - UI components: `packages/ui/src/components/`
 - UI hooks: `packages/ui/src/hooks/`

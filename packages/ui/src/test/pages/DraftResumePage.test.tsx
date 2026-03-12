@@ -287,22 +287,6 @@ describe('DraftResumePage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/interview')
   })
 
-  it('should process JD text when navigating with state', async () => {
-    mockProcessJobDescription.mockResolvedValue({
-      draftId: 'new-draft-123',
-    })
-
-    renderDraftPage('/resumes/draft', { jdText: 'New job description text' })
-
-    await waitFor(() => {
-      expect(mockProcessJobDescription).toHaveBeenCalledWith(
-        'test-user-id',
-        'New job description text'
-      )
-    })
-
-    expect(mockNavigate).toHaveBeenCalledWith('/resumes/new-draft-123', { replace: true })
-  })
 
   it('should show analyzing spinner when gap_analysis is not yet stored', async () => {
     mockGetJobDraftWithBullets.mockResolvedValue({
@@ -319,17 +303,6 @@ describe('DraftResumePage', () => {
     expect(screen.getByText('Analyzing requirements...')).toBeInTheDocument()
   })
 
-  it('should clear creating state after successful draft creation', async () => {
-    mockProcessJobDescription.mockResolvedValue({ draftId: 'new-draft-123' })
-
-    renderDraftPage('/resumes/draft', { jdText: 'New job description text' })
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/resumes/new-draft-123', { replace: true })
-    })
-
-    expect(screen.queryByTestId('draft-loading')).not.toBeInTheDocument()
-  })
 
   it('should auto-trigger gap analysis when gap_analysis is null', async () => {
     mockGetJobDraftWithBullets.mockResolvedValue({

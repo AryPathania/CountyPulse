@@ -147,14 +147,15 @@ test.describe('Interview Persistence', () => {
 
     await page.goto('/interview')
 
-    // Wait for load
+    // Wait for chat to load and End Interview button to be available
     await expect(page.getByTestId('interview-chat')).toBeVisible()
+    await expect(page.getByTestId('interview-end')).toBeVisible()
 
     // Click End Interview to complete
     await page.getByTestId('interview-end').click()
 
     // Wait for complete state
-    await expect(page.getByTestId('interview-complete')).toBeVisible()
+    await expect(page.getByTestId('interview-complete')).toBeVisible({ timeout: 10000 })
 
     // Accept dialog if any (for finishing)
     page.on('dialog', async (dialog) => {

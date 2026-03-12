@@ -22,6 +22,20 @@ vi.mock('../../components/auth/AuthProvider', () => ({
   useAuth: () => mockUseAuth(),
 }))
 
+// Mock jd-processing service
+const mockProcessJobDescription = vi.fn()
+vi.mock('../../services/jd-processing', () => ({
+  processJobDescription: (...args: unknown[]) => mockProcessJobDescription(...args),
+}))
+
+// Mock fetchJd service
+const mockFetchJdText = vi.fn()
+const mockIsUrl = vi.fn()
+vi.mock('../../services/fetchJd', () => ({
+  fetchJdText: (...args: unknown[]) => mockFetchJdText(...args),
+  isUrl: (...args: unknown[]) => mockIsUrl(...args),
+}))
+
 function renderHomePage() {
   return render(
     <QueryClientProvider client={queryClient}>
@@ -42,6 +56,9 @@ describe('HomePage', () => {
       signIn: vi.fn(),
       signOut: vi.fn(),
     })
+    // Default: plain text input (not a URL), processJobDescription succeeds
+    mockIsUrl.mockReturnValue(false)
+    mockProcessJobDescription.mockResolvedValue({ draftId: 'draft-abc' })
   })
 
   it('should render home page with JD input', () => {
@@ -74,7 +91,7 @@ describe('HomePage', () => {
     expect(screen.getByTestId('jd-submit')).not.toBeDisabled()
   })
 
-  it('should navigate to draft page on submit', async () => {
+  it('should call processJobDescription and navigate to draft on submit', async () => {
     renderHomePage()
 
     const input = screen.getByTestId('jd-input')
@@ -82,10 +99,14 @@ describe('HomePage', () => {
     await userEvent.click(screen.getByTestId('jd-submit'))
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith(
-        '/resumes/draft',
-        expect.objectContaining({ state: { jdText: 'Looking for a software engineer...' } })
+      expect(mockProcessJobDescription).toHaveBeenCalledWith(
+        'test-user-id',
+        'Looking for a software engineer...'
       )
+    })
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/resumes/draft-abc')
     })
   })
 
@@ -118,6 +139,60 @@ describe('HomePage', () => {
     await userEvent.click(screen.getByTestId('upload-resume'))
 
     expect(mockNavigate).toHaveBeenCalledWith('/upload-resume')
+  })
+
+  it('shows "Fetching job description..." when a URL is pasted and submitted', async () => {
+    mockIsUrl.mockReturnValue(true)
+    // fetchJdText hangs so we can observe the loading label
+    mockFetchJdText.mockReturnValue(new Promise(() => {}))
+
+    renderHomePage()
+
+    const input = screen.getByTestId('jd-input')
+    await userEvent.type(input, 'https://greenhouse.io/jobs/123')
+    await userEvent.click(screen.getByTestId('jd-submit'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('jd-submit')).toHaveTextContent('Fetching job description...')
+    })
+  })
+
+  it('shows error when URL fetch fails', async () => {
+    mockIsUrl.mockReturnValue(true)
+    mockFetchJdText.mockRejectedValue(new Error('Network error'))
+
+    renderHomePage()
+
+    const input = screen.getByTestId('jd-input')
+    await userEvent.type(input, 'https://greenhouse.io/jobs/123')
+    await userEvent.click(screen.getByTestId('jd-submit'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('jd-error')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('jd-error')).toHaveTextContent('Network error')
+    expect(mockProcessJobDescription).not.toHaveBeenCalled()
+  })
+
+  it('calls processJobDescription with fetched text, not the raw URL', async () => {
+    mockIsUrl.mockReturnValue(true)
+    mockFetchJdText.mockResolvedValue('Fetched JD text')
+    mockProcessJobDescription.mockResolvedValue({ draftId: 'draft-url-1' })
+
+    renderHomePage()
+
+    const input = screen.getByTestId('jd-input')
+    await userEvent.type(input, 'https://greenhouse.io/jobs/123')
+    await userEvent.click(screen.getByTestId('jd-submit'))
+
+    await waitFor(() => {
+      expect(mockProcessJobDescription).toHaveBeenCalledWith('test-user-id', 'Fetched JD text')
+    })
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/resumes/draft-url-1')
+    })
   })
 
   it('should not navigate when user is not authenticated', async () => {

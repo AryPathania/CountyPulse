@@ -249,7 +249,6 @@ export function InterviewChat({
 
   const handleEndInterview = () => {
     setIsComplete(true)
-    onComplete(extractedData)
   }
 
   const handleFinish = () => {

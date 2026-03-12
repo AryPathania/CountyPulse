@@ -1,31 +1,25 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, useLocation, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
 import { useJobDraftWithBullets, useRunGapAnalysis } from '../queries/job-drafts'
 import { useCreateResumeFromDraft } from '../queries/resumes'
 import { bulletKeys } from '../queries/bullets'
-import { processJobDescription, buildGapDataFromStored, type GapAnalysisServiceResult } from '../services/jd-processing'
+import { buildGapDataFromStored, type GapAnalysisServiceResult } from '../services/jd-processing'
 import { GapAnalysis } from '../components/draft/GapAnalysis'
 import './DraftResumePage.css'
 
 /**
- * Draft Resume page displays matched bullets for a job description.
- * Handles two modes:
- * 1. Creating new draft from JD text (via navigation state)
- * 2. Viewing existing draft (via URL param)
+ * Draft Resume page displays matched bullets for an existing job draft.
+ * The draft is always created before navigation (in HomePage).
+ * This page only fetches and displays an existing draft by URL param ID.
  */
 export function DraftResumePage() {
   const { id } = useParams<{ id: string }>()
-  const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
   const queryClient = useQueryClient()
-
-  const jdTextFromState = (location.state as { jdText?: string } | null)?.jdText
-  const [isCreating, setIsCreating] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
 
   // Load existing draft via TanStack Query
   const { data: draft, isLoading, error: loadError } = useJobDraftWithBullets(
@@ -35,23 +29,6 @@ export function DraftResumePage() {
   // Gap analysis mutation
   const gapAnalysis = useRunGapAnalysis()
   const createResume = useCreateResumeFromDraft()
-
-  // Create new draft from JD text (one-off effect: creation + navigation)
-  useEffect(() => {
-    if (!jdTextFromState || !user?.id || id !== 'draft') return
-    if (isCreating) return
-
-    setIsCreating(true)
-    processJobDescription(user.id, jdTextFromState)
-      .then(result => {
-        setIsCreating(false)
-        navigate(`/resumes/${result.draftId}`, { replace: true })
-      })
-      .catch(err => {
-        setCreateError(err instanceof Error ? err.message : 'Failed to create draft')
-        setIsCreating(false)
-      })
-  }, [jdTextFromState, user?.id, id, navigate, isCreating])
 
   // Derive gap data from stored column (if available)
   const storedGapData = draft?.gap_analysis
@@ -90,9 +67,9 @@ export function DraftResumePage() {
     )
   }, [draft, user?.id, gapData?.jobTitle, createResume, navigate])
 
-  const error = createError || (loadError instanceof Error ? loadError.message : loadError ? String(loadError) : null)
+  const error = loadError instanceof Error ? loadError.message : loadError ? String(loadError) : null
 
-  if (isLoading || isCreating) {
+  if (isLoading) {
     return (
       <div className="draft-page" data-testid="draft-page">
         <Navigation />

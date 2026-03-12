@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
+import { isUrl, fetchJdText } from '../services/fetchJd'
+import { processJobDescription } from '../services/jd-processing'
 import './HomePage.css'
 
 /**
@@ -23,15 +25,38 @@ export function HomePage() {
       setIsSubmitting(true)
       setError(null)
 
+      let finalText = jdText.trim()
+
+      if (isUrl(finalText)) {
+        try {
+          finalText = await fetchJdText(finalText)
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Couldn't fetch this URL. Please paste the job description text directly."
+          )
+          setIsSubmitting(false)
+          return
+        }
+      }
+
       try {
-        navigate('/resumes/draft', { state: { jdText: jdText.trim() } })
+        const { draftId } = await processJobDescription(user.id, finalText)
+        navigate(`/resumes/${draftId}`)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to process job description')
+        setError(err instanceof Error ? err.message : 'Failed to create draft')
         setIsSubmitting(false)
       }
     },
     [jdText, user?.id, navigate]
   )
+
+  const submitLabel = (() => {
+    if (!isSubmitting) return 'Create Resume Draft'
+    if (isUrl(jdText)) return 'Fetching job description...'
+    return 'Creating Draft...'
+  })()
 
   return (
     <div className="home-page" data-testid="home-page">
@@ -49,7 +74,7 @@ export function HomePage() {
           <textarea
             value={jdText}
             onChange={(e) => setJdText(e.target.value)}
-            placeholder="Paste your job posting here..."
+            placeholder="Paste your job posting here or enter a job URL..."
             className="home-page__input"
             rows={8}
             disabled={isSubmitting}
@@ -68,7 +93,7 @@ export function HomePage() {
             className="home-page__submit"
             data-testid="jd-submit"
           >
-            {isSubmitting ? 'Creating Draft...' : 'Create Resume Draft'}
+            {submitLabel}
           </button>
         </form>
 
