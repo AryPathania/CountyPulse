@@ -72,37 +72,43 @@ export type Database = {
       }
       candidate_profiles: {
         Row: {
-          github_url: string | null
+          created_at: string | null
+          display_name: string
           headline: string | null
-          linkedin_url: string | null
+          links: Json
           location: string | null
           phone: string | null
+          profile_completed_at: string | null
+          profile_version: number | null
           summary: string | null
           updated_at: string
           user_id: string
-          website_url: string | null
         }
         Insert: {
-          github_url?: string | null
+          created_at?: string | null
+          display_name?: string
           headline?: string | null
-          linkedin_url?: string | null
+          links?: Json
           location?: string | null
           phone?: string | null
+          profile_completed_at?: string | null
+          profile_version?: number | null
           summary?: string | null
           updated_at?: string
           user_id: string
-          website_url?: string | null
         }
         Update: {
-          github_url?: string | null
+          created_at?: string | null
+          display_name?: string
           headline?: string | null
-          linkedin_url?: string | null
+          links?: Json
           location?: string | null
           phone?: string | null
+          profile_completed_at?: string | null
+          profile_version?: number | null
           summary?: string | null
           updated_at?: string
           user_id?: string
-          website_url?: string | null
         }
         Relationships: []
       }
@@ -302,36 +308,6 @@ export type Database = {
           id?: string
           parsed_data?: Json | null
           storage_path?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_profiles: {
-        Row: {
-          created_at: string | null
-          display_name: string
-          id: string
-          profile_completed_at: string | null
-          profile_version: number | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          display_name: string
-          id?: string
-          profile_completed_at?: string | null
-          profile_version?: number | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          display_name?: string
-          id?: string
-          profile_completed_at?: string | null
-          profile_version?: number | null
-          updated_at?: string | null
           user_id?: string
         }
         Relationships: []

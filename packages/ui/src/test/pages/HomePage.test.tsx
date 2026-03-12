@@ -16,14 +16,10 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-// Mock useAuth
+// Mock useAuth - uses a fn so tests can override return value
+const mockUseAuth = vi.fn()
 vi.mock('../../components/auth/AuthProvider', () => ({
-  useAuth: () => ({
-    user: { id: 'test-user-id', email: 'test@example.com' },
-    loading: false,
-    signIn: vi.fn(),
-    signOut: vi.fn(),
-  }),
+  useAuth: () => mockUseAuth(),
 }))
 
 function renderHomePage() {
@@ -40,6 +36,12 @@ describe('HomePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queryClient.clear()
+    mockUseAuth.mockReturnValue({
+      user: { id: 'test-user-id', email: 'test@example.com' },
+      loading: false,
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+    })
   })
 
   it('should render home page with JD input', () => {
@@ -108,5 +110,33 @@ describe('HomePage', () => {
     await userEvent.click(screen.getByTestId('view-bullets'))
 
     expect(mockNavigate).toHaveBeenCalledWith('/bullets')
+  })
+
+  it('should navigate to upload resume on quick action click', async () => {
+    renderHomePage()
+
+    await userEvent.click(screen.getByTestId('upload-resume'))
+
+    expect(mockNavigate).toHaveBeenCalledWith('/upload-resume')
+  })
+
+  it('should not navigate when user is not authenticated', async () => {
+    mockUseAuth.mockReturnValue({
+      user: null,
+      loading: false,
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+    })
+
+    renderHomePage()
+
+    const input = screen.getByTestId('jd-input')
+    await userEvent.type(input, 'Looking for a software engineer...')
+
+    // Submit button only checks text, not auth — but handleSubmit guards on user?.id
+    await userEvent.click(screen.getByTestId('jd-submit'))
+
+    // navigate should NOT be called when user is null
+    expect(mockNavigate).not.toHaveBeenCalled()
   })
 })

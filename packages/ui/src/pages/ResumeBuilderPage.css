@@ -104,6 +104,39 @@
   font-weight: 600;
 }
 
+/* Personal info panel */
+.resume-builder__personal-info-panel {
+  margin-bottom: 1.25rem;
+  background: var(--color-bg);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.resume-builder__personal-info-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  background: var(--color-surface);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.resume-builder__personal-info-toggle:hover {
+  color: var(--color-primary);
+}
+
+.resume-builder__personal-info-panel .profile-form {
+  padding: 1rem;
+}
+
 /* Drag overlay styles */
 .drag-overlay {
   padding: 0.75rem 1rem;

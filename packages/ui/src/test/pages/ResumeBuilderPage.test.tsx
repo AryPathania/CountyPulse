@@ -7,12 +7,14 @@ import { queryClient } from '../../lib/queryClient'
 import { ResumeBuilderPage } from '../../pages/ResumeBuilderPage'
 import type { ReactNode } from 'react'
 
-// Capture onDragEnd handler from DndContext for programmatic invocation
+// Capture drag handlers from DndContext for programmatic invocation
 let capturedOnDragEnd: ((event: unknown) => void) | null = null
+let capturedOnDragStart: ((event: unknown) => void) | null = null
 
 vi.mock('@dnd-kit/core', () => ({
-  DndContext: ({ children, onDragEnd }: { children: ReactNode; onDragEnd?: (event: unknown) => void }) => {
+  DndContext: ({ children, onDragEnd, onDragStart }: { children: ReactNode; onDragEnd?: (event: unknown) => void; onDragStart?: (event: unknown) => void }) => {
     capturedOnDragEnd = onDragEnd ?? null
+    capturedOnDragStart = onDragStart ?? null
     return children
   },
   DragOverlay: ({ children }: { children: ReactNode }) => children,
@@ -171,6 +173,15 @@ const mockResume = {
       location: 'San Francisco, CA',
     },
   ],
+  candidateInfo: {
+    displayName: 'Jane Doe',
+    email: 'jane@example.com',
+    headline: 'Senior Engineer',
+    summary: null,
+    phone: '555-000-1111',
+    location: 'Austin, TX',
+    links: [],
+  },
 }
 
 // Mock @odie/db
@@ -178,12 +189,14 @@ const mockGetResumeWithBullets = vi.fn()
 const mockUpdateResumeContent = vi.fn()
 const mockLogRun = vi.fn()
 const mockGetBullets = vi.fn()
+const mockUpsertProfile = vi.fn()
 
 vi.mock('@odie/db', () => ({
   getResumeWithBullets: (...args: unknown[]) => mockGetResumeWithBullets(...args),
   updateResumeContent: (...args: unknown[]) => mockUpdateResumeContent(...args),
   logRun: (...args: unknown[]) => mockLogRun(...args),
   getBullets: (...args: unknown[]) => mockGetBullets(...args),
+  upsertProfile: (...args: unknown[]) => mockUpsertProfile(...args),
 }))
 
 function renderResumeBuilder(resumeId = 'resume-123') {
@@ -205,6 +218,7 @@ describe('ResumeBuilderPage', () => {
     mockGetResumeWithBullets.mockResolvedValue(mockResume)
     mockUpdateResumeContent.mockResolvedValue(mockResume)
     mockLogRun.mockResolvedValue({})
+    mockUpsertProfile.mockResolvedValue({})
     mockGetBullets.mockResolvedValue([
       {
         id: 'bullet-1',
@@ -1031,6 +1045,55 @@ describe('ResumeBuilderPage', () => {
     })
   })
 
+  describe('drag overlay', () => {
+    it('should set activeId on drag start (section drag)', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Trigger drag start with a section id
+      expect(capturedOnDragStart).not.toBeNull()
+      act(() => {
+        capturedOnDragStart!({ active: { id: 'experience' } })
+      })
+
+      // After drag start, activeId is set — overlay would show if DragOverlay rendered children
+      // The DragOverlay mock renders children directly, so we verify no error was thrown
+      // and the drag end clears the activeId
+      act(() => {
+        capturedOnDragEnd!({ active: { id: 'experience' }, over: { id: 'skills' } })
+      })
+
+      // Sections should be reordered (experience -> skills swap)
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalled()
+      })
+    })
+
+    it('should set activeId on drag start (bullet drag)', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Trigger drag start with a bullet id
+      expect(capturedOnDragStart).not.toBeNull()
+      act(() => {
+        capturedOnDragStart!({ active: { id: 'bullet-1' } })
+      })
+
+      // Drag end clears activeId without reorder (same id)
+      act(() => {
+        capturedOnDragEnd!({ active: { id: 'bullet-1' }, over: { id: 'bullet-1' } })
+      })
+
+      expect(mockUpdateResumeContent).not.toHaveBeenCalled()
+    })
+  })
+
   describe('bullet remove', () => {
     it('should show remove button on bullets', async () => {
       renderResumeBuilder()
@@ -1064,6 +1127,159 @@ describe('ResumeBuilderPage', () => {
             ]),
           })
         )
+      })
+    })
+  })
+
+  describe('inline editor with null position bullet', () => {
+    it('should open inline editor for a bullet with no position', async () => {
+      // Override mock to include a bullet with position: null
+      const resumeWithNullPositionBullet = {
+        ...mockResume,
+        parsedContent: {
+          sections: [
+            {
+              id: 'experience',
+              title: 'Experience',
+              items: [
+                { type: 'bullet' as const, bulletId: 'bullet-no-pos' },
+              ],
+              subsections: [],
+            },
+          ],
+        },
+        bullets: [
+          {
+            id: 'bullet-no-pos',
+            current_text: 'Bullet without position',
+            category: 'General',
+            position: null,
+          },
+        ],
+      }
+      mockGetResumeWithBullets.mockResolvedValue(resumeWithNullPositionBullet)
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-bullet-bullet-no-pos')).toBeInTheDocument()
+      })
+
+      await userEvent.click(screen.getByTestId('edit-bullet-bullet-no-pos'))
+
+      // Inline editor should open without crashing (null position handled gracefully)
+      await waitFor(() => {
+        expect(screen.getByTestId('inline-editor')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('PersonalInfoPanel', () => {
+    it('should render personal-info-panel when resume has candidateInfo', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('personal-info-panel')).toBeInTheDocument()
+      })
+    })
+
+    it('should not render personal-info-panel when resume has no candidateInfo', async () => {
+      const resumeWithoutCandidate = { ...mockResume, candidateInfo: undefined }
+      mockGetResumeWithBullets.mockResolvedValue(resumeWithoutCandidate)
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-editor')).toBeInTheDocument()
+      })
+
+      expect(screen.queryByTestId('personal-info-panel')).not.toBeInTheDocument()
+    })
+
+    it('should toggle open and close when toggle button is clicked', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('btn-toggle-personal-info')).toBeInTheDocument()
+      })
+
+      // Collapsed by default — ProfileForm should not be visible
+      expect(screen.queryByTestId('profile-form')).not.toBeInTheDocument()
+
+      // Open the panel
+      await userEvent.click(screen.getByTestId('btn-toggle-personal-info'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('profile-form')).toBeInTheDocument()
+      })
+
+      // Close again
+      await userEvent.click(screen.getByTestId('btn-toggle-personal-info'))
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('profile-form')).not.toBeInTheDocument()
+      })
+    })
+
+    it('should call upsertProfile on save', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('btn-toggle-personal-info')).toBeInTheDocument()
+      })
+
+      // Open panel
+      await userEvent.click(screen.getByTestId('btn-toggle-personal-info'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('profile-form')).toBeInTheDocument()
+      })
+
+      // Submit form (display name is pre-filled as 'Jane Doe')
+      await userEvent.click(screen.getByTestId('btn-save-profile'))
+
+      await waitFor(() => {
+        expect(mockUpsertProfile).toHaveBeenCalledWith(
+          'test-user-id',
+          expect.objectContaining({ display_name: 'Jane Doe', headline: 'Senior Engineer', location: 'Austin, TX' })
+        )
+      })
+    })
+
+    it('should optimistically update candidateInfo displayName in local state after save', async () => {
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('btn-toggle-personal-info')).toBeInTheDocument()
+      })
+
+      // Open panel
+      await userEvent.click(screen.getByTestId('btn-toggle-personal-info'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('input-display-name')).toBeInTheDocument()
+      })
+
+      // Change display name
+      const nameInput = screen.getByTestId('input-display-name')
+      await userEvent.clear(nameInput)
+      await userEvent.type(nameInput, 'John Updated')
+
+      await userEvent.click(screen.getByTestId('btn-save-profile'))
+
+      await waitFor(() => {
+        expect(mockUpsertProfile).toHaveBeenCalledWith(
+          'test-user-id',
+          expect.objectContaining({ display_name: 'John Updated' })
+        )
+      })
+
+      // Close and reopen — the panel should show updated value
+      await userEvent.click(screen.getByTestId('btn-toggle-personal-info'))
+      await userEvent.click(screen.getByTestId('btn-toggle-personal-info'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('input-display-name')).toHaveValue('John Updated')
       })
     })
   })

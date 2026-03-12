@@ -1,0 +1,35 @@
+-- Manual rollback for migration 028
+-- Run this ONLY if you need to undo the merge of user_profiles into candidate_profiles
+-- This file is NOT applied automatically. It is a manual rollback script only.
+
+-- Re-create user_profiles
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL,
+  profile_completed_at TIMESTAMPTZ,
+  profile_version INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id)
+);
+
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own profile" ON user_profiles FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own profile" ON user_profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own profile" ON user_profiles FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own profile" ON user_profiles FOR DELETE USING (auth.uid() = user_id);
+
+-- Re-populate from candidate_profiles
+INSERT INTO user_profiles (user_id, display_name, profile_completed_at, profile_version, created_at)
+SELECT user_id, display_name, profile_completed_at, profile_version, created_at
+FROM candidate_profiles
+ON CONFLICT (user_id) DO NOTHING;
+
+-- Drop the columns added by migration 028
+ALTER TABLE candidate_profiles
+  DROP COLUMN IF EXISTS display_name,
+  DROP COLUMN IF EXISTS profile_completed_at,
+  DROP COLUMN IF EXISTS profile_version,
+  DROP COLUMN IF EXISTS created_at;

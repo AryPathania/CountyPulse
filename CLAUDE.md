@@ -32,7 +32,7 @@ pnpm gen-types        # Generate Supabase types
 
 ## Quality Gates (Non-Negotiable)
 1. **100% tests passing** - No failures allowed
-2. **>90% coverage** - Unit and integration tests
+2. **>95% coverage** - Unit and integration tests
 3. **No `.skip`** - Never use `it.skip`, `describe.skip`, `test.skip`
 4. **Duplication scan** - jscpd must pass
 5. **No name inflation** - Keep names concise
@@ -49,15 +49,24 @@ pnpm gen-types        # Generate Supabase types
 - **Bullet Quality Rules**: Shared prompt section in `supabase/functions/_shared/prompts/bullet-quality.ts`
 - **Resume Dedup**: SHA-256 file hash with unique index on `(user_id, file_hash)`
 - **Resume Sub-Sections**: Generic editable grouping headers stored in resume content JSON (`SubSectionData`). Draggable, editable, deletable. Used for positions, education, projects. Auto-generated from positions via `groupBulletsByPosition()`, editable by users. Old `type: 'position'` items normalized to `type: 'subsection'` on read.
+- **Profile Links**: Flexible `links JSONB NOT NULL DEFAULT '[]'` on `candidate_profiles`. Each entry is `{label, url}`. Max 8 enforced at app layer. Common types (LinkedIn, GitHub, Twitter, Website) offered as quick-add presets; fully custom labels supported. No fixed URL columns.
 
 ## Conventions
 - UI components: `packages/ui/src/components/`
+- UI hooks: `packages/ui/src/hooks/`
 - Query functions: `packages/db/src/queries/`
 - Contracts/schemas: `packages/shared/src/contracts/`
 - Tests co-located or in `test/` directories
 - Edge functions: `supabase/functions/`
 - Shared prompts: `supabase/functions/_shared/prompts/`
 - UI services: `packages/ui/src/services/`
+- DnD block registry: `packages/ui/src/components/dnd/README.md`
+
+## Key Shared Components
+- `ProfileForm` (`packages/ui/src/components/ProfileForm.tsx`) — shared form for editing name, contact, links; used by CompleteProfile, SettingsPage, PersonalInfoPanel
+- `useProfileSave` (`packages/ui/src/hooks/useProfileSave.ts`) — shared hook wrapping `upsertCandidateProfile` (single table since migration 028)
+- `mapProfileToFormData` (`packages/ui/src/services/profile.ts`) — maps a `candidate_profiles` row to ProfileForm initial values
+- `PersonalInfoPanel` — collapsible panel in `ResumeBuilderPage` for inline profile editing with live preview sync
 
 ## Routes
 - `/` — Home (JD paste + quick actions)
@@ -68,7 +77,7 @@ pnpm gen-types        # Generate Supabase types
 - `/resumes/:id/edit` — Resume builder (drag-and-drop sections, bullet palette, live preview)
 - `/upload-resume` — PDF resume upload
 - `/telemetry` — Runs dashboard
-- `/settings` — User settings
+- `/settings` — Profile & Settings (edit name, contact info, links; danger zone)
 
 ## Edge Functions
 - `interview` — Conversational interview (context-aware: blank/resume/gaps)
@@ -80,8 +89,7 @@ pnpm gen-types        # Generate Supabase types
 - `transcribe` — OpenAI Whisper STT for voice interview
 
 ## DB Tables (Odie)
-- `user_profiles` — Account metadata
-- `candidate_profiles` — Resume header (headline, summary, phone, location, linkedin_url, github_url, website_url)
+- `candidate_profiles` — Unified user profile: display_name, headline, summary, phone, location, links JSONB [{label, url}], profile_completed_at, profile_version, created_at. One row per user (merged from user_profiles in migration 028).
 - `positions` — Work experience entries
 - `bullets` — STAR bullets with embeddings
 - `resumes` — Curated bullet selections (content JSON has sections with `SubSectionData[]` and items of type `subsection` | `bullet`)
@@ -105,9 +113,9 @@ pnpm gen-types        # Generate Supabase types
 **MVP Feature Complete** - All phases implemented + UI polish + resume upload + gap analysis
 
 ### Test Coverage
-- **700 unit/integration tests** (Vitest + Testing Library)
-- **95 E2E tests** (Playwright)
-- **94%+ code coverage**
+- **761 unit/integration tests** (Vitest + Testing Library)
+- **95+ E2E tests** (Playwright)
+- **96%+ code coverage** (>95% quality gate)
 
 ### Completed Phases
 - Phase 0.5: Schema Inventory + Repo Alignment

@@ -1,12 +1,12 @@
 import { supabase } from '../client'
 import type { Database } from '../types'
 
-type UserProfile = Database['public']['Tables']['user_profiles']['Row']
+type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
 
 export interface ProfileRequirements {
   version: number
-  requiredFields: (keyof UserProfile)[]
-  customValidations?: ((profile: UserProfile) => boolean)[]
+  requiredFields: (keyof CandidateProfile)[]
+  customValidations?: ((profile: CandidateProfile) => boolean)[]
 }
 
 // Current profile requirements - easy to update later
@@ -20,18 +20,22 @@ export const CURRENT_PROFILE_REQUIREMENTS: ProfileRequirements = {
 }
 
 /**
- * Check if a user profile is complete based on current requirements
+ * Check if a candidate profile is complete based on current requirements
  */
-export function isProfileComplete(profile: UserProfile | null): boolean {
+export function isProfileComplete(profile: CandidateProfile | null): boolean {
   if (!profile) return false
-  
+
   const requirements = CURRENT_PROFILE_REQUIREMENTS
-  
+
   // Check if profile was completed for current version
-  if (profile.profile_version && profile.profile_version >= requirements.version && profile.profile_completed_at) {
+  if (
+    profile.profile_version &&
+    profile.profile_version >= requirements.version &&
+    profile.profile_completed_at
+  ) {
     return true
   }
-  
+
   // Check if all required fields are present and valid
   for (const field of requirements.requiredFields) {
     const value = profile[field]
@@ -39,7 +43,7 @@ export function isProfileComplete(profile: UserProfile | null): boolean {
       return false
     }
   }
-  
+
   // Run custom validations if any
   if (requirements.customValidations) {
     for (const validation of requirements.customValidations) {
@@ -48,49 +52,47 @@ export function isProfileComplete(profile: UserProfile | null): boolean {
       }
     }
   }
-  
+
   return true
 }
 
 /**
- * Get user profile with completion status
+ * Get candidate profile with completion status
  */
 export async function getUserProfileWithCompletion(userId: string): Promise<{
-  profile: UserProfile | null
+  profile: CandidateProfile | null
   isComplete: boolean
   needsUpdate: boolean
 }> {
-  const { getUserProfile } = await import('./users')
-  const profile = await getUserProfile(userId)
+  const { getProfile } = await import('./candidate-profiles')
+  const profile = await getProfile(userId)
   const complete = isProfileComplete(profile)
-  const needsUpdate = profile ? 
-    (!profile.profile_version || profile.profile_version < CURRENT_PROFILE_REQUIREMENTS.version) : 
-    false
-    
+  const needsUpdate = profile
+    ? !profile.profile_version ||
+      profile.profile_version < CURRENT_PROFILE_REQUIREMENTS.version
+    : false
+
   return {
     profile,
     isComplete: complete,
-    needsUpdate
+    needsUpdate,
   }
 }
 
 /**
  * Mark profile as completed for current version
  */
-export async function markProfileComplete(userId: string): Promise<UserProfile> {
+export async function markProfileComplete(userId: string): Promise<CandidateProfile> {
   const { data, error } = await supabase
-    .from('user_profiles')
+    .from('candidate_profiles')
     .update({
       profile_completed_at: new Date().toISOString(),
-      profile_version: CURRENT_PROFILE_REQUIREMENTS.version
+      profile_version: CURRENT_PROFILE_REQUIREMENTS.version,
     })
     .eq('user_id', userId)
     .select()
     .single()
 
-  if (error) {
-    throw error
-  }
-
+  if (error) throw error
   return data
-} 
+}

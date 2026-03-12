@@ -44,6 +44,16 @@ Rules:
 
 ---
 
+## DB Integration Tests
+Added in Step 7b (profile table merge). Location: `packages/db/src/__tests__/`
+- Require local Supabase (`pnpm supabase start`) or remote (falls back to `.env` `SUPABASE_URL`)
+- Run: `pnpm --filter @odie/db test:integration`
+- Standard: every new query function in `@odie/db` should have an integration test
+- Use `createTestUser()` + `cleanupTestUser()` for isolation (creates real auth users to satisfy FK constraints)
+- `cleanupTestUser` must be called in `afterEach` (not `afterAll`) so tests are fully isolated
+
+---
+
 ## Debug Workflow
 - All fixes go through `debug-agent`
 - 4 phases: Understand → Plan → Execute → Validate

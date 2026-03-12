@@ -256,6 +256,120 @@ describe('resume-upload service', () => {
       }
     })
 
+    it('falls back to server-side extraction when client extraction returns short text', async () => {
+      // Import the module so we can change the extractTextFromPdf return value
+      const pdfExtract = await import('../../lib/pdf-extract')
+      vi.mocked(pdfExtract.extractTextFromPdf).mockResolvedValueOnce('short') // < 50 chars
+
+      const { uploadAndParseResume } = await import('../../services/resume-upload')
+
+      mockGetUploadedResumeByHash.mockResolvedValue(null)
+      // Server-side extraction: first getSession call for extract-pdf
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'tok' } },
+      })
+      // extract-pdf returns text, then parse-resume also needs session
+      mockFunctionsInvoke
+        .mockResolvedValueOnce({ data: { text: 'This is the server-side extracted text that is long enough for parsing' }, error: null })
+        .mockResolvedValueOnce({ data: validParsedData, error: null })
+      mockUploadResumeFile.mockResolvedValue('path')
+      mockCreateUploadedResume.mockResolvedValue({
+        id: 'server-extract-resume',
+        user_id: 'user-123',
+        file_name: 'resume.pdf',
+        file_hash: 'abcdef12',
+        storage_path: 'path',
+        extracted_text: 'text',
+        parsed_data: validParsedData,
+        created_at: '2024-01-15T10:00:00Z',
+      })
+      mockCreatePositionWithBullets.mockResolvedValue({ bulletIds: ['b1'] })
+      mockEmbedBullets.mockResolvedValue(undefined)
+
+      const file = createMockFile()
+      const result = await uploadAndParseResume('user-123', file)
+
+      // First functions invoke should be extract-pdf
+      expect(mockFunctionsInvoke).toHaveBeenCalledWith('extract-pdf', expect.any(Object))
+      expect(result.uploadedResumeId).toBe('server-extract-resume')
+    })
+
+    it('falls back to server-side extraction when client extraction throws', async () => {
+      const pdfExtract = await import('../../lib/pdf-extract')
+      vi.mocked(pdfExtract.extractTextFromPdf).mockRejectedValueOnce(new Error('pdfjs error'))
+
+      const { uploadAndParseResume } = await import('../../services/resume-upload')
+
+      mockGetUploadedResumeByHash.mockResolvedValue(null)
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'tok' } },
+      })
+      mockFunctionsInvoke
+        .mockResolvedValueOnce({ data: { text: 'Sufficient server-extracted PDF text content here for parsing purposes' }, error: null })
+        .mockResolvedValueOnce({ data: validParsedData, error: null })
+      mockUploadResumeFile.mockResolvedValue('path')
+      mockCreateUploadedResume.mockResolvedValue({
+        id: 'fallback-resume',
+        user_id: 'user-123',
+        file_name: 'resume.pdf',
+        file_hash: 'abcdef12',
+        storage_path: 'path',
+        extracted_text: 'text',
+        parsed_data: validParsedData,
+        created_at: '2024-01-15T10:00:00Z',
+      })
+      mockCreatePositionWithBullets.mockResolvedValue({ bulletIds: ['b1'] })
+      mockEmbedBullets.mockResolvedValue(undefined)
+
+      const file = createMockFile()
+      const result = await uploadAndParseResume('user-123', file)
+
+      expect(mockFunctionsInvoke).toHaveBeenCalledWith('extract-pdf', expect.any(Object))
+      expect(result.uploadedResumeId).toBe('fallback-resume')
+    })
+
+    it('throws when extracted text is too short (< 10 chars)', async () => {
+      const pdfExtract = await import('../../lib/pdf-extract')
+      // Return very short text from client side (< 50 chars, triggers server fallback)
+      vi.mocked(pdfExtract.extractTextFromPdf).mockResolvedValueOnce('tiny')
+
+      const { uploadAndParseResume } = await import('../../services/resume-upload')
+
+      mockGetUploadedResumeByHash.mockResolvedValue(null)
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'tok' } },
+      })
+      // Server-side also returns empty text → triggers the < 10 check
+      mockFunctionsInvoke.mockResolvedValueOnce({ data: { text: '' }, error: null })
+
+      const file = createMockFile()
+
+      await expect(uploadAndParseResume('user-123', file)).rejects.toThrow(
+        'Could not extract text from PDF. Please try a different file.'
+      )
+    })
+
+    it('throws when server-side extraction returns an error', async () => {
+      const pdfExtract = await import('../../lib/pdf-extract')
+      vi.mocked(pdfExtract.extractTextFromPdf).mockResolvedValueOnce('short')
+
+      const { uploadAndParseResume } = await import('../../services/resume-upload')
+
+      mockGetUploadedResumeByHash.mockResolvedValue(null)
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'tok' } },
+      })
+      // extract-pdf returns an error
+      mockFunctionsInvoke.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Server PDF extraction failed' },
+      })
+
+      const file = createMockFile()
+
+      await expect(uploadAndParseResume('user-123', file)).rejects.toThrow('Server PDF extraction failed')
+    })
+
     it('creates position with only strong and fixable bullets', async () => {
       const { uploadAndParseResume } = await import('../../services/resume-upload')
 

@@ -201,5 +201,39 @@ describe('interview service', () => {
         'Invalid response format from interview service'
       )
     })
+
+    it('throws fallback message when edge function error has no message', async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+      })
+
+      // error object with empty message — exercises the || 'Interview request failed' branch
+      mockFunctionsInvoke.mockResolvedValue({
+        data: null,
+        error: { message: '' },
+      })
+
+      const messages = [makeMessage('user', 'test')]
+
+      await expect(sendInterviewMessage(messages)).rejects.toThrow('Interview request failed')
+    })
+  })
+
+  describe('getMockResponse fallback', () => {
+    it('returns MOCK_RESPONSES[6] when mockMessageCount exceeds array length', async () => {
+      const messages = [makeMessage('user', 'test')]
+
+      // Exhaust all 7 mock responses (indices 0-6)
+      for (let i = 0; i < 7; i++) {
+        await sendInterviewMessage(messages, { useMock: true })
+      }
+
+      // 8th call → mockMessageCount is now 7, which is past the end → fallback to index 6
+      const result = await sendInterviewMessage(messages, { useMock: true })
+      // Index 6 has shouldContinue: false (same as end of conversation)
+      expect(result.shouldContinue).toBe(false)
+      expect(typeof result.response).toBe('string')
+      expect(result.response.length).toBeGreaterThan(0)
+    })
   })
 })

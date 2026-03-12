@@ -24,6 +24,8 @@ import { BulletPalette } from '../components/resume/BulletPalette'
 import { ResumePreview } from '../components/resume/ResumePreview'
 import { TemplateSelector } from '../components/resume/TemplateSelector'
 import { BulletEditor } from '../components/bullets'
+import { ProfileForm } from '../components/ProfileForm'
+import { useProfileSave } from '../hooks/useProfileSave'
 import { DEFAULT_TEMPLATE_ID } from '../templates'
 import {
   getResumeWithBullets,
@@ -37,6 +39,7 @@ import {
   type SubSectionData,
   type BulletWithPosition,
 } from '@odie/db'
+import type { ProfileFormData } from '@odie/shared'
 import './ResumeBuilderPage.css'
 
 /**
@@ -56,6 +59,35 @@ export function ResumeBuilderPage() {
   const [editingBulletId, setEditingBulletId] = useState<string | null>(null)
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isPersonalInfoOpen, setIsPersonalInfoOpen] = useState(false)
+
+  const userId = user?.id ?? ''
+  const { save: saveProfile, isSaving: isSavingProfile } = useProfileSave(userId)
+
+  const handleSavePersonalInfo = useCallback(
+    async (data: ProfileFormData) => {
+      await saveProfile(data)
+      setResume((prev) =>
+        prev
+          ? {
+              ...prev,
+              candidateInfo: prev.candidateInfo
+                ? {
+                    ...prev.candidateInfo,
+                    displayName: data.displayName,
+                    headline: data.headline,
+                    summary: data.summary,
+                    phone: data.phone,
+                    location: data.location,
+                    links: data.links,
+                  }
+                : undefined,
+            }
+          : null
+      )
+    },
+    [saveProfile]
+  )
 
   // DnD sensors
   const sensors = useSensors(
@@ -569,6 +601,37 @@ export function ResumeBuilderPage() {
       >
         {!isPreviewMode && (
           <aside className="resume-builder__editor" data-testid="builder-editor">
+            {resume.candidateInfo && (
+              <div
+                className="resume-builder__personal-info-panel"
+                data-testid="personal-info-panel"
+              >
+                <button
+                  className="resume-builder__personal-info-toggle"
+                  data-testid="btn-toggle-personal-info"
+                  onClick={() => setIsPersonalInfoOpen((prev) => !prev)}
+                  type="button"
+                >
+                  Personal Info {isPersonalInfoOpen ? '▼' : '▶'}
+                </button>
+                {isPersonalInfoOpen && (
+                  <ProfileForm
+                    initialData={{
+                      displayName: resume.candidateInfo.displayName ?? '',
+                      headline: resume.candidateInfo.headline ?? null,
+                      summary: resume.candidateInfo.summary ?? null,
+                      phone: resume.candidateInfo.phone ?? null,
+                      location: resume.candidateInfo.location ?? null,
+                      links: resume.candidateInfo.links ?? [],
+                    }}
+                    email={resume.candidateInfo.email ?? user?.email ?? ''}
+                    isSaving={isSavingProfile}
+                    onSave={handleSavePersonalInfo}
+                  />
+                )}
+              </div>
+            )}
+
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}

@@ -171,6 +171,116 @@ describe('BulletsPage', () => {
     expect(mockUpdateMutate).toHaveBeenCalled()
   })
 
+  it('should deselect bullet when deleted bullet was selected (onSuccess callback)', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    // Make deleteMutate call onSuccess immediately
+    mockDeleteMutate.mockImplementation((_id: string, callbacks: { onSuccess?: () => void }) => {
+      callbacks?.onSuccess?.()
+    })
+
+    renderBulletsPage()
+
+    // Select bullet-1 first
+    const bulletItem = screen.getByText('Led team of 5 engineers to deliver project on time')
+    await userEvent.click(bulletItem)
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Led team of 5 engineers to deliver project on time')).toBeInTheDocument()
+    })
+
+    // Delete the selected bullet — onSuccess should clear selection
+    const deleteButtons = screen.getAllByTestId(/delete-bullet/)
+    await userEvent.click(deleteButtons[0])
+
+    await waitFor(() => {
+      expect(screen.getByText('Select a bullet to edit')).toBeInTheDocument()
+    })
+  })
+
+  it('should log error when delete mutation fails (onError callback)', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    // Make deleteMutate call onError immediately
+    mockDeleteMutate.mockImplementation((_id: string, callbacks: { onError?: (err: Error) => void }) => {
+      callbacks?.onError?.(new Error('Delete failed'))
+    })
+
+    renderBulletsPage()
+
+    const deleteButtons = screen.getAllByTestId(/delete-bullet/)
+    await userEvent.click(deleteButtons[0])
+
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to delete bullet:', expect.any(Error))
+    consoleSpy.mockRestore()
+  })
+
+  it('should call onSuccess callback silently when update succeeds', async () => {
+    // Make updateMutate call onSuccess immediately
+    mockUpdateMutate.mockImplementation((_payload: unknown, callbacks: { onSuccess?: () => void }) => {
+      callbacks?.onSuccess?.()
+    })
+
+    renderBulletsPage()
+
+    // Select a bullet
+    const bulletItem = screen.getByText('Led team of 5 engineers to deliver project on time')
+    await userEvent.click(bulletItem)
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Led team of 5 engineers to deliver project on time')).toBeInTheDocument()
+    })
+
+    // Make a change and save
+    const textInput = screen.getByTestId('bullet-editor-text')
+    await userEvent.clear(textInput)
+    await userEvent.type(textInput, 'Updated bullet text')
+
+    const saveButton = screen.getByTestId('bullet-editor-save')
+    await userEvent.click(saveButton)
+
+    // onSuccess fires without error — bullet should remain selected (no error thrown)
+    expect(mockUpdateMutate).toHaveBeenCalled()
+  })
+
+  it('should log error when update mutation fails (onError callback)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    mockUpdateMutate.mockImplementation((_payload: unknown, callbacks: { onError?: (err: Error) => void }) => {
+      callbacks?.onError?.(new Error('Update failed'))
+    })
+
+    renderBulletsPage()
+
+    // Select a bullet
+    const bulletItem = screen.getByText('Led team of 5 engineers to deliver project on time')
+    await userEvent.click(bulletItem)
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Led team of 5 engineers to deliver project on time')).toBeInTheDocument()
+    })
+
+    const textInput = screen.getByTestId('bullet-editor-text')
+    await userEvent.clear(textInput)
+    await userEvent.type(textInput, 'Another update')
+
+    const saveButton = screen.getByTestId('bullet-editor-save')
+    await userEvent.click(saveButton)
+
+    expect(consoleSpy).toHaveBeenCalledWith('Failed to update bullet:', expect.any(Error))
+    consoleSpy.mockRestore()
+  })
+
+  it('should log when add bullet is clicked', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    renderBulletsPage()
+
+    const addButton = screen.getByTestId('add-bullet-btn')
+    await userEvent.click(addButton)
+
+    expect(consoleSpy).toHaveBeenCalledWith('Add bullet clicked')
+    consoleSpy.mockRestore()
+  })
+
   it('should handle cancel edit', async () => {
     renderBulletsPage()
 

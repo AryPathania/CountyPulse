@@ -10,9 +10,9 @@ function ResumeHeader({ resume }: TemplateProps) {
   if (resume.candidateInfo) {
     const info = resume.candidateInfo
     if (info.email) contactParts.push({ label: info.email })
-    if (info.linkedinUrl) contactParts.push({ label: 'LinkedIn', href: info.linkedinUrl })
-    if (info.githubUrl) contactParts.push({ label: 'GitHub', href: info.githubUrl })
-    if (info.websiteUrl) contactParts.push({ label: info.websiteUrl, href: info.websiteUrl })
+    for (const link of info.links ?? []) {
+      contactParts.push({ label: link.label, href: link.url })
+    }
     if (info.phone) contactParts.push({ label: info.phone })
   }
 

@@ -4,6 +4,7 @@
  */
 import type { BulletWithPosition, ResumeWithBullets, Position } from '@odie/db'
 import type { ResumeContent } from '@odie/db'
+import type { ProfileLink } from '@odie/shared'
 
 /** Shape of candidateInfo on ResumeWithBullets */
 type CandidateInfo = NonNullable<ResumeWithBullets['candidateInfo']>
@@ -195,9 +196,10 @@ export function createMockCandidateInfo(
     summary: 'Experienced engineer with 10 years in full-stack development.',
     phone: '(555) 123-4567',
     location: 'San Francisco, CA',
-    linkedinUrl: 'https://linkedin.com/in/janedoe',
-    githubUrl: 'https://github.com/janedoe',
-    websiteUrl: 'https://janedoe.dev',
+    links: [
+      { label: 'LinkedIn', url: 'https://linkedin.com/in/janedoe' },
+      { label: 'GitHub', url: 'https://github.com/janedoe' },
+    ] as ProfileLink[],
     ...overrides,
   }
 }

@@ -1,5 +1,6 @@
 import { supabase } from '../client'
 import type { Database, Json } from '../types'
+import type { ProfileLink } from '@odie/shared'
 
 type Resume = Database['public']['Tables']['resumes']['Row']
 type NewResume = Database['public']['Tables']['resumes']['Insert']
@@ -143,9 +144,7 @@ export interface ResumeWithBullets extends Resume {
     summary: string | null
     phone: string | null
     location: string | null
-    linkedinUrl: string | null
-    githubUrl: string | null
-    websiteUrl: string | null
+    links: ProfileLink[]
   }
 }
 
@@ -261,33 +260,23 @@ export async function getResumeWithBullets(resumeId: string): Promise<ResumeWith
   }
 
   // Fetch candidate info
-  const [userProfileResult, candidateProfileResult] = await Promise.all([
-    supabase
-      .from('user_profiles')
-      .select('display_name')
-      .eq('user_id', resume.user_id)
-      .single(),
-    supabase
-      .from('candidate_profiles')
-      .select('headline, summary, phone, location, linkedin_url, github_url, website_url')
-      .eq('user_id', resume.user_id)
-      .single(),
+  const { getProfile } = await import('./candidate-profiles')
+  const [profile, { data: { user: authUser } }] = await Promise.all([
+    getProfile(resume.user_id),
+    supabase.auth.getUser(),
   ])
 
-  // Get email from auth user session
-  const { data: { user: authUser } } = await supabase.auth.getUser()
-
-  const candidateInfo = userProfileResult.data ? {
-    displayName: userProfileResult.data.display_name,
-    email: authUser?.email ?? null,
-    headline: candidateProfileResult.data?.headline ?? null,
-    summary: candidateProfileResult.data?.summary ?? null,
-    phone: candidateProfileResult.data?.phone ?? null,
-    location: candidateProfileResult.data?.location ?? null,
-    linkedinUrl: candidateProfileResult.data?.linkedin_url ?? null,
-    githubUrl: candidateProfileResult.data?.github_url ?? null,
-    websiteUrl: candidateProfileResult.data?.website_url ?? null,
-  } : undefined
+  const candidateInfo = profile?.display_name
+    ? {
+        displayName: profile.display_name,
+        email: authUser?.email ?? null,
+        headline: profile.headline ?? null,
+        summary: profile.summary ?? null,
+        phone: profile.phone ?? null,
+        location: profile.location ?? null,
+        links: (profile.links as ProfileLink[] | null) ?? [],
+      }
+    : undefined
 
   console.debug('[getResumeWithBullets] loaded candidate info for %s', candidateInfo?.displayName)
 

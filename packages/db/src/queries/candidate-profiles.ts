@@ -1,48 +1,52 @@
 import { supabase } from '../client'
-import type { Database } from '../types'
+import type { Database, Json } from '../types'
+import type { ProfileLink } from '@odie/shared'
+import { CURRENT_PROFILE_REQUIREMENTS } from './profile-completion'
 
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
 
+export type { CandidateProfile }
+
 export interface CandidateProfileFields {
+  display_name?: string
   headline?: string | null
   summary?: string | null
   phone?: string | null
   location?: string | null
-  linkedin_url?: string | null
-  github_url?: string | null
-  website_url?: string | null
+  links?: ProfileLink[]
 }
 
 /**
- * Get candidate profile for a user
+ * Get candidate profile for a user (returns null if not found)
  */
-export async function getCandidateProfile(userId: string): Promise<CandidateProfile | null> {
+export async function getProfile(userId: string): Promise<CandidateProfile | null> {
   const { data, error } = await supabase
     .from('candidate_profiles')
     .select('*')
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
 
-  if (error) {
-    if (error.code === 'PGRST116') return null
-    throw error
-  }
+  if (error) throw error
   return data
 }
 
 /**
- * Upsert candidate profile (create or update)
+ * Upsert candidate profile — always stamps profile_completed_at and profile_version.
  */
-export async function upsertCandidateProfile(
+export async function upsertProfile(
   userId: string,
   fields: CandidateProfileFields
 ): Promise<CandidateProfile> {
+  const { links, ...rest } = fields
   const { data, error } = await supabase
     .from('candidate_profiles')
     .upsert(
       {
         user_id: userId,
-        ...fields,
+        ...rest,
+        links: (links ?? []) as unknown as Json,
+        profile_completed_at: new Date().toISOString(),
+        profile_version: CURRENT_PROFILE_REQUIREMENTS.version,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id' }

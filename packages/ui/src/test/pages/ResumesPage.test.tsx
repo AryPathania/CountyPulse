@@ -276,6 +276,46 @@ describe('ResumesPage', () => {
     expect(mockDeleteJobDraft).not.toHaveBeenCalled()
   })
 
+  it('should show error state when data fetch fails', async () => {
+    mockGetJobDrafts.mockRejectedValue(new Error('Network error'))
+
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('resumes-error')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('resumes-error')).toHaveTextContent('Network error')
+  })
+
+  it('should show empty state when no drafts or uploaded resumes exist', async () => {
+    mockGetJobDrafts.mockResolvedValue([])
+    mockGetUploadedResumes.mockResolvedValue([])
+
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('resumes-empty')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('No resumes yet. Paste a job description to get started!')).toBeInTheDocument()
+  })
+
+  it('should navigate to home when Create Your First Resume is clicked in empty state', async () => {
+    mockGetJobDrafts.mockResolvedValue([])
+    mockGetUploadedResumes.mockResolvedValue([])
+
+    renderResumesPage()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('resumes-empty')).toBeInTheDocument()
+    })
+
+    await userEvent.click(screen.getByText('Create Your First Resume'))
+
+    expect(mockNavigate).toHaveBeenCalledWith('/')
+  })
+
   describe('Uploaded Resumes section', () => {
     // Valid parsed_data that passes ResumeContextSchema when spread with mode:'resume'
     const validParsedData = {

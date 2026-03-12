@@ -1,25 +1,66 @@
+import { useQuery } from '@tanstack/react-query'
+import { getProfile } from '@odie/db'
 import { Navigation } from '../components/layout'
+import { mapProfileToFormData } from '../services/profile'
 import { ResetAccountButton } from '../components/account'
+import { ProfileForm } from '../components/ProfileForm'
+import { useAuth } from '../components/auth/AuthProvider'
+import { useProfileSave } from '../hooks/useProfileSave'
 import './SettingsPage.css'
 
 /**
- * Settings page with account management options.
- * Contains a "Danger Zone" section for destructive account operations.
+ * Settings page with profile editing and account management options.
+ * Contains a "Profile" section with ProfileForm and a "Danger Zone" section.
  */
 export function SettingsPage() {
+  const { user } = useAuth()
+  const userId = user?.id ?? ''
+
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ['profile', userId],
+    queryFn: () => getProfile(userId),
+    enabled: !!userId,
+  })
+
+  const { save, isSaving } = useProfileSave(userId)
+
+  const initialData = mapProfileToFormData(profile ?? null)
+
   return (
     <div className="settings-page" data-testid="settings-page">
       <Navigation />
 
       <header className="settings-page__header">
-        <h1 className="settings-page__title">Settings</h1>
+        <h1 className="settings-page__title">Profile &amp; Settings</h1>
         <p className="settings-page__subtitle">
-          Manage your account and preferences
+          Manage your profile and account preferences
         </p>
       </header>
 
       <div className="settings-page__content">
-        <section className="settings-page__section settings-page__section--danger" data-testid="danger-zone">
+        <section
+          className="settings-page__section"
+          data-testid="settings-profile-section"
+        >
+          <h2 className="settings-page__section-title">Profile</h2>
+          {isLoading ? (
+            <div className="settings-page__loading" data-testid="settings-loading">
+              Loading profile…
+            </div>
+          ) : (
+            <ProfileForm
+              initialData={initialData}
+              email={user?.email ?? ''}
+              isSaving={isSaving}
+              onSave={save}
+            />
+          )}
+        </section>
+
+        <section
+          className="settings-page__section settings-page__section--danger"
+          data-testid="danger-zone"
+        >
           <h2 className="settings-page__section-title">Danger Zone</h2>
           <p className="settings-page__section-description">
             Irreversible actions that affect your account data

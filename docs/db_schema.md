@@ -4,7 +4,7 @@ This file is the human-readable source of truth for table/column names, relation
 
 **Updated by:** DB Agent only
 **Updated when:** any migration changes schema
-**Last updated:** 2026-03-10 (migrations 022-026)
+**Last updated:** 2026-03-11 (migrations 022-028)
 
 ---
 
@@ -17,51 +17,24 @@ This file is the human-readable source of truth for table/column names, relation
 
 ---
 
-## Retained Tables
-
-### user_profiles
-
-**Purpose:** User account metadata from onboarding (retained from CountyPulse)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| id | uuid | no | gen_random_uuid() |
-| user_id | uuid | no | - |
-| display_name | text | no | - |
-| profile_completed_at | timestamptz | yes | - |
-| profile_version | integer | yes | - |
-| created_at | timestamptz | yes | now() |
-| updated_at | timestamptz | yes | now() |
-
-**Constraints:**
-- PK: `id`
-- UNIQUE: `user_id`
-- FK: `user_id -> auth.users(id) ON DELETE CASCADE`
-
-**Indexes:**
-- `user_profiles_user_id_idx` on `(user_id)`
-
-**RLS:**
-- SELECT/INSERT/UPDATE/DELETE: `user_id = auth.uid()`
-
----
-
 ## Odie Resume Tables
 
 ### candidate_profiles
 
-**Purpose:** Professional headline and summary for resume header (one per user)
+**Purpose:** Unified user profile — account metadata (display name, completion tracking) merged with professional resume header fields (headline, summary, contact, links). One row per user. Previously split across `user_profiles` and `candidate_profiles`; merged in migration 028.
 
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|
 | user_id | uuid | no | - |
+| display_name | text | no | '' |
 | headline | text | yes | - |
 | summary | text | yes | - |
 | phone | text | yes | - |
 | location | text | yes | - |
-| linkedin_url | text | yes | - |
-| github_url | text | yes | - |
-| website_url | text | yes | - |
+| links | JSONB | no | '[]'::jsonb |
+| profile_completed_at | timestamptz | yes | - |
+| profile_version | integer | yes | 1 |
+| created_at | timestamptz | yes | now() |
 | updated_at | timestamptz | no | now() |
 
 **Constraints:**
@@ -74,7 +47,10 @@ This file is the human-readable source of truth for table/column names, relation
 - SELECT/INSERT/UPDATE/DELETE: `user_id = auth.uid()`
 
 **Notes:**
-- Contact fields (phone, location, linkedin_url, github_url, website_url) added in migration 026 for resume header display
+- `display_name`, `profile_completed_at`, `profile_version`, `created_at` migrated from the now-dropped `user_profiles` table (migration 028).
+- Contact fields (phone, location) added in migration 026 for resume header display.
+- `links` is a flexible array of `{label: string, url: string}` objects (migration 027). Replaces the three separate `linkedin_url`, `github_url`, `website_url` columns that were dropped. Max 8 links enforced at the app layer.
+- `profile_completed_at` and `profile_version` are stamped on every `upsertProfile` call (not just the first save).
 
 ---
 
@@ -321,11 +297,11 @@ match_bullets(
 
 **Purpose:** Wipe all user data for account reset (testing/dev)
 
-Deletes from: `uploaded_resumes`, `resumes`, `bullets`, `positions`, `job_drafts`, `runs`, `candidate_profiles`, `user_profiles` (in order, respecting FK constraints).
+Deletes from: `bullets`, `positions`, `resumes`, `job_drafts`, `uploaded_resumes`, `runs`, `candidate_profiles` (in order, respecting FK constraints).
 
 **Security:** Only callable by the owning user (`auth.uid() = target_user_id`)
 
-**Updated:** Migration 024 added `uploaded_resumes` deletion. Migration 025 added storage bucket RLS policies for `resumes` bucket.
+**Updated:** Migration 024 added `uploaded_resumes` deletion. Migration 025 added storage bucket RLS policies for `resumes` bucket. Migration 028 removed `user_profiles` deletion (table dropped).
 
 ---
 
@@ -344,9 +320,9 @@ Policies are applied to the `authenticated` role only.
 
 ---
 
-## Dropped Tables (CountyPulse)
+## Dropped Tables
 
-The following tables were dropped in migration 016:
+### CountyPulse tables (migration 016)
 
 - sources
 - raw_items
@@ -363,3 +339,7 @@ The following tables were dropped in migration 016:
 - item_events
 
 The `vector` extension was retained for bullet embeddings.
+
+### user_profiles (migration 028)
+
+Dropped after merging into `candidate_profiles`. All columns (`display_name`, `profile_completed_at`, `profile_version`, `created_at`) were added to `candidate_profiles`. Existing data was migrated. The `id` surrogate key was dropped (table now uses `user_id` as PK, consistent with `candidate_profiles`).

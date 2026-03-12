@@ -70,9 +70,10 @@ test.describe('Resume Builder Editor', () => {
       summary: null,
       phone: '555-123-4567',
       location: 'San Francisco, CA',
-      linkedinUrl: 'https://linkedin.com/in/testuser',
-      githubUrl: 'https://github.com/testuser',
-      websiteUrl: null,
+      links: [
+        { label: 'LinkedIn', url: 'https://linkedin.com/in/testuser' },
+        { label: 'GitHub', url: 'https://github.com/testuser' },
+      ],
     }
 
     // Set up comprehensive mocks for the builder
@@ -123,28 +124,20 @@ test.describe('Resume Builder Editor', () => {
       })
     })
 
-    await page.route('**/rest/v1/user_profiles*', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          display_name: 'Test User',
-        }),
-      })
-    })
-
     await page.route('**/rest/v1/candidate_profiles*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
+          display_name: 'Test User',
           headline: null,
           summary: null,
           phone: '555-123-4567',
           location: 'San Francisco, CA',
-          linkedin_url: 'https://linkedin.com/in/testuser',
-          github_url: 'https://github.com/testuser',
-          website_url: null,
+          links: [
+            { label: 'LinkedIn', url: 'https://linkedin.com/in/testuser' },
+            { label: 'GitHub', url: 'https://github.com/testuser' },
+          ],
         }),
       })
     })

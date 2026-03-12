@@ -178,7 +178,7 @@ describe('ClassicTemplate', () => {
       expect(screen.queryByText('My Resume')).not.toBeInTheDocument()
     })
 
-    it('should render contact line with email, LinkedIn, GitHub, phone separated by dots', () => {
+    it('should render contact line with email, links, phone separated by dots', () => {
       const resume = createMockResume({
         candidateInfo: createMockCandidateInfo(),
       })
@@ -240,9 +240,7 @@ describe('ClassicTemplate', () => {
           email: 'partial@test.com',
           phone: null,
           location: null,
-          linkedinUrl: null,
-          githubUrl: null,
-          websiteUrl: null,
+          links: [],
           summary: null,
         }),
       })
@@ -265,9 +263,7 @@ describe('ClassicTemplate', () => {
         candidateInfo: createMockCandidateInfo({
           email: null,
           phone: null,
-          linkedinUrl: null,
-          githubUrl: null,
-          websiteUrl: null,
+          links: [],
         }),
       })
       render(<ClassicTemplate resume={resume} />)

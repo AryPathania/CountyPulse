@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test'
 import { TEST_USER } from './auth'
 
+export { TEST_USER }
+
 /**
  * Mock data for E2E tests.
  * These fixtures match the database schema types.
@@ -271,19 +273,15 @@ export async function setupApiMocks(page: Page) {
     }
   })
 
-  // Mock user profile
-  await page.route('**/rest/v1/user_profiles*', async (route) => {
+  // Mock candidate profile
+  await page.route('**/rest/v1/candidate_profiles*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify([
         {
-          id: TEST_USER.id,
-          email: TEST_USER.email,
-          full_name: 'Test User',
-          linkedin_url: null,
-          github_url: null,
-          portfolio_url: null,
+          user_id: TEST_USER.id,
+          display_name: 'Test User',
           created_at: '2024-01-01T00:00:00Z',
           updated_at: '2024-01-01T00:00:00Z',
         },

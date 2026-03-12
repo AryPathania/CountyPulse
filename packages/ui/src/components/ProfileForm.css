@@ -1,0 +1,122 @@
+/*
+ * ProfileForm styles — reuses theme.css variables
+ */
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.profile-form__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 0.25rem);
+}
+
+.profile-form__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+
+.profile-form__input,
+.profile-form__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem 1rem;
+  font-size: var(--font-size-md);
+  font-family: var(--font-family);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition-fast);
+}
+
+.profile-form__input:focus,
+.profile-form__textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-muted);
+}
+
+.profile-form__input:read-only {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.profile-form__textarea {
+  resize: vertical;
+  min-height: 6rem;
+}
+
+.profile-form__links-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-xs, 0.25rem);
+}
+
+.profile-form__links-header span {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  margin-right: auto;
+}
+
+.profile-form__link-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-bottom: var(--space-xs, 0.25rem);
+}
+
+.profile-form__link-row .profile-form__input {
+  flex: 1;
+}
+
+.profile-form__btn-remove-link {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.profile-form__btn-remove-link:hover:not(:disabled) {
+  border-color: var(--color-error, #e74c3c);
+  color: var(--color-error, #e74c3c);
+}
+
+.profile-form__quick-add-btn {
+  padding: 0.25rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.profile-form__quick-add-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.profile-form__quick-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.profile-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-sm);
+}

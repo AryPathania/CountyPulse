@@ -25,20 +25,14 @@ vi.mock('../../components/auth/AuthProvider', () => ({
 }))
 
 // Mock @odie/db functions
-const mockGetUserProfile = vi.fn().mockResolvedValue(null)
-const mockGetCandidateProfile = vi.fn().mockResolvedValue(null)
-const mockCreateUserProfile = vi.fn().mockResolvedValue({})
-const mockUpdateUserProfile = vi.fn().mockResolvedValue({})
+const mockGetProfile = vi.fn().mockResolvedValue(null)
+const mockUpsertProfile = vi.fn().mockResolvedValue({})
 const mockMarkProfileComplete = vi.fn().mockResolvedValue({})
-const mockUpsertCandidateProfile = vi.fn().mockResolvedValue({})
 
 vi.mock('@odie/db', () => ({
-  getUserProfile: (...args: unknown[]) => mockGetUserProfile(...args),
-  getCandidateProfile: (...args: unknown[]) => mockGetCandidateProfile(...args),
-  createUserProfile: (...args: unknown[]) => mockCreateUserProfile(...args),
-  updateUserProfile: (...args: unknown[]) => mockUpdateUserProfile(...args),
+  getProfile: (...args: unknown[]) => mockGetProfile(...args),
+  upsertProfile: (...args: unknown[]) => mockUpsertProfile(...args),
   markProfileComplete: (...args: unknown[]) => mockMarkProfileComplete(...args),
-  upsertCandidateProfile: (...args: unknown[]) => mockUpsertCandidateProfile(...args),
 }))
 
 function renderCompleteProfile() {
@@ -52,39 +46,47 @@ function renderCompleteProfile() {
 describe('CompleteProfile', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockGetUserProfile.mockResolvedValue(null)
-    mockGetCandidateProfile.mockResolvedValue(null)
+    mockGetProfile.mockResolvedValue(null)
+    mockUpsertProfile.mockResolvedValue({})
+    mockMarkProfileComplete.mockResolvedValue({})
   })
 
-  it('should render the profile form with all fields', () => {
+  it('should render the profile form with basic fields', async () => {
     renderCompleteProfile()
 
-    expect(screen.getByTestId('input-display-name')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByTestId('input-display-name')).toBeInTheDocument()
+    })
     expect(screen.getByTestId('input-phone')).toBeInTheDocument()
     expect(screen.getByTestId('input-location')).toBeInTheDocument()
-    expect(screen.getByTestId('input-linkedin')).toBeInTheDocument()
-    expect(screen.getByTestId('input-github')).toBeInTheDocument()
-    expect(screen.getByTestId('input-website')).toBeInTheDocument()
+    expect(screen.getByTestId('btn-add-link-LinkedIn')).toBeInTheDocument()
   })
 
-  it('should render labels for contact fields', () => {
+  it('should render labels for contact fields', async () => {
     renderCompleteProfile()
 
-    expect(screen.getByLabelText(/phone/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByLabelText(/phone/i)).toBeInTheDocument()
+    })
     expect(screen.getByLabelText(/location/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/linkedin/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/github/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/website/i)).toBeInTheDocument()
   })
 
   it('should load existing profile data on mount', async () => {
-    mockGetUserProfile.mockResolvedValue({ display_name: 'Existing User' })
-    mockGetCandidateProfile.mockResolvedValue({
+    mockGetProfile.mockResolvedValue({
+      user_id: 'test-user-id',
+      display_name: 'Existing User',
       phone: '(555) 999-1234',
       location: 'New York, NY',
-      linkedin_url: 'https://linkedin.com/in/existing',
-      github_url: 'https://github.com/existing',
-      website_url: 'https://existing.dev',
+      links: [
+        { label: 'LinkedIn', url: 'https://linkedin.com/in/existing' },
+        { label: 'GitHub', url: 'https://github.com/existing' },
+      ],
+      headline: null,
+      summary: null,
+      profile_completed_at: null,
+      profile_version: 1,
+      created_at: null,
+      updated_at: '2024-01-01T00:00:00Z',
     })
 
     renderCompleteProfile()
@@ -94,64 +96,90 @@ describe('CompleteProfile', () => {
     })
     expect(screen.getByTestId('input-phone')).toHaveValue('(555) 999-1234')
     expect(screen.getByTestId('input-location')).toHaveValue('New York, NY')
-    expect(screen.getByTestId('input-linkedin')).toHaveValue('https://linkedin.com/in/existing')
-    expect(screen.getByTestId('input-github')).toHaveValue('https://github.com/existing')
-    expect(screen.getByTestId('input-website')).toHaveValue('https://existing.dev')
+    expect(screen.getByTestId('input-link-label-0')).toHaveValue('LinkedIn')
+    expect(screen.getByTestId('input-link-url-0')).toHaveValue('https://linkedin.com/in/existing')
+    expect(screen.getByTestId('input-link-label-1')).toHaveValue('GitHub')
+    expect(screen.getByTestId('input-link-url-1')).toHaveValue('https://github.com/existing')
   })
 
-  it('should submit form with contact fields for new user', async () => {
+  it('should submit form with links for new user (create mode)', async () => {
     const user = userEvent.setup()
     renderCompleteProfile()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('input-display-name')).toBeInTheDocument()
+    })
 
     await user.type(screen.getByTestId('input-display-name'), 'New User')
     await user.type(screen.getByTestId('input-phone'), '(555) 111-2222')
     await user.type(screen.getByTestId('input-location'), 'Austin, TX')
-    await user.type(screen.getByTestId('input-linkedin'), 'https://linkedin.com/in/newuser')
-    await user.type(screen.getByTestId('input-github'), 'https://github.com/newuser')
-    await user.type(screen.getByTestId('input-website'), 'https://newuser.dev')
 
-    await user.click(screen.getByRole('button', { name: /continue/i }))
+    // Add a LinkedIn link via quick-add button
+    await user.click(screen.getByTestId('btn-add-link-LinkedIn'))
+    await user.type(screen.getByTestId('input-link-url-0'), 'https://linkedin.com/in/newuser')
+
+    await user.click(screen.getByTestId('btn-save-profile'))
 
     await waitFor(() => {
-      expect(mockCreateUserProfile).toHaveBeenCalledWith({
-        user_id: 'test-user-id',
-        display_name: 'New User',
-      })
-    })
-
-    expect(mockUpsertCandidateProfile).toHaveBeenCalledWith('test-user-id', {
-      phone: '(555) 111-2222',
-      location: 'Austin, TX',
-      linkedin_url: 'https://linkedin.com/in/newuser',
-      github_url: 'https://github.com/newuser',
-      website_url: 'https://newuser.dev',
+      expect(mockUpsertProfile).toHaveBeenCalledWith(
+        'test-user-id',
+        expect.objectContaining({
+          display_name: 'New User',
+          phone: '(555) 111-2222',
+          location: 'Austin, TX',
+          links: [{ label: 'LinkedIn', url: 'https://linkedin.com/in/newuser' }],
+        })
+      )
     })
 
     expect(mockNavigate).toHaveBeenCalledWith('/')
   })
 
-  it('should not call upsertCandidateProfile when no contact fields are filled', async () => {
+  it('should allow adding and removing links', async () => {
     const user = userEvent.setup()
     renderCompleteProfile()
 
-    await user.type(screen.getByTestId('input-display-name'), 'Name Only')
-    await user.click(screen.getByRole('button', { name: /continue/i }))
-
     await waitFor(() => {
-      expect(mockCreateUserProfile).toHaveBeenCalled()
+      expect(screen.getByTestId('btn-add-link-LinkedIn')).toBeInTheDocument()
     })
-    expect(mockUpsertCandidateProfile).not.toHaveBeenCalled()
+
+    // Add two links via quick-add buttons
+    await user.click(screen.getByTestId('btn-add-link-LinkedIn'))
+    await user.click(screen.getByTestId('btn-add-link-GitHub'))
+    expect(screen.getByTestId('input-link-label-0')).toBeInTheDocument()
+    expect(screen.getByTestId('input-link-label-1')).toBeInTheDocument()
+
+    // Remove the first one
+    await user.click(screen.getByTestId('btn-remove-link-0'))
+    expect(screen.queryByTestId('input-link-label-1')).not.toBeInTheDocument()
+    expect(screen.getByTestId('input-link-label-0')).toBeInTheDocument()
   })
 
-  it('should disable submit when display name is empty', () => {
+  it('should disable submit when display name is empty', async () => {
     renderCompleteProfile()
 
-    const submitButton = screen.getByRole('button', { name: /continue/i })
+    await waitFor(() => {
+      expect(screen.getByTestId('btn-save-profile')).toBeInTheDocument()
+    })
+
+    const submitButton = screen.getByTestId('btn-save-profile')
     expect(submitButton).toBeDisabled()
   })
 
   it('should show Update Profile heading when existing profile is loaded', async () => {
-    mockGetUserProfile.mockResolvedValue({ display_name: 'Existing' })
+    mockGetProfile.mockResolvedValue({
+      user_id: 'test-user-id',
+      display_name: 'Existing',
+      headline: null,
+      summary: null,
+      phone: null,
+      location: null,
+      links: [],
+      profile_completed_at: null,
+      profile_version: 1,
+      created_at: null,
+      updated_at: '2024-01-01T00:00:00Z',
+    })
 
     renderCompleteProfile()
 
@@ -160,23 +188,66 @@ describe('CompleteProfile', () => {
     })
   })
 
-  it('should show Complete Your Profile heading for new users', () => {
+  it('should show Complete Your Profile heading for new users', async () => {
     renderCompleteProfile()
 
-    expect(screen.getByText('Complete Your Profile')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Complete Your Profile')).toBeInTheDocument()
+    })
   })
 
   it('should display error message on submission failure', async () => {
     const user = userEvent.setup()
-    mockCreateUserProfile.mockRejectedValue(new Error('Network error'))
+    mockUpsertProfile.mockRejectedValue(new Error('Network error'))
 
     renderCompleteProfile()
 
+    await waitFor(() => {
+      expect(screen.getByTestId('input-display-name')).toBeInTheDocument()
+    })
+
     await user.type(screen.getByTestId('input-display-name'), 'Test User')
-    await user.click(screen.getByRole('button', { name: /continue/i }))
+    await user.click(screen.getByTestId('btn-save-profile'))
 
     await waitFor(() => {
       expect(screen.getByText('Network error')).toBeInTheDocument()
     })
+  })
+
+  it('should call upsertProfile and markProfileComplete in update mode', async () => {
+    mockGetProfile.mockResolvedValue({
+      user_id: 'test-user-id',
+      display_name: 'Old Name',
+      headline: null,
+      summary: null,
+      phone: '(555) 000-0000',
+      location: null,
+      links: [],
+      profile_completed_at: null,
+      profile_version: 1,
+      created_at: null,
+      updated_at: '2024-01-01T00:00:00Z',
+    })
+
+    const user = userEvent.setup()
+    renderCompleteProfile()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('input-display-name')).toHaveValue('Old Name')
+    })
+
+    // Clear and retype display name
+    await user.clear(screen.getByTestId('input-display-name'))
+    await user.type(screen.getByTestId('input-display-name'), 'New Name')
+    await user.click(screen.getByTestId('btn-save-profile'))
+
+    await waitFor(() => {
+      expect(mockUpsertProfile).toHaveBeenCalledWith(
+        'test-user-id',
+        expect.objectContaining({ display_name: 'New Name' })
+      )
+    })
+    expect(mockMarkProfileComplete).toHaveBeenCalledWith('test-user-id')
+    expect(mockNavigate).toHaveBeenCalledWith('/')
   })
 })

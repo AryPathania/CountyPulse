@@ -4,6 +4,31 @@ import userEvent from '@testing-library/user-event'
 import { InterviewChat } from '../../../components/interview/InterviewChat'
 import { resetMockState } from '../../../services/interview'
 
+// Mock @odie/db so the live path can be tested for error states
+const mockGetSession = vi.fn()
+const mockFunctionsInvoke = vi.fn()
+vi.mock('@odie/db', () => ({
+  supabase: {
+    auth: { getSession: () => mockGetSession() },
+    functions: { invoke: (...args: unknown[]) => mockFunctionsInvoke(...args) },
+  },
+}))
+
+// Controllable mock for useVoiceInput so tests can set isTranscribing
+const mockStartRecording = vi.fn()
+const mockStopRecording = vi.fn()
+let mockIsTranscribing = false
+
+vi.mock('../../../hooks/useVoiceInput', () => ({
+  useVoiceInput: ({ onTranscript }: { onTranscript?: (text: string) => void }) => ({
+    isRecording: false,
+    isTranscribing: mockIsTranscribing,
+    startRecording: mockStartRecording,
+    stopRecording: mockStopRecording,
+    _onTranscript: onTranscript, // expose for tests
+  }),
+}))
+
 describe('InterviewChat', () => {
   const mockOnComplete = vi.fn()
   const mockOnCancel = vi.fn()
@@ -228,6 +253,115 @@ describe('InterviewChat', () => {
     await waitFor(() => {
       const preview = screen.getByTestId('interview-preview')
       expect(preview).toHaveTextContent('1 bullets')
+    })
+  })
+
+  describe('error handling', () => {
+    it('should display error message when sendInterviewMessage throws in live mode', async () => {
+      // Use live mode (no useMock) — supabase is mocked to return unauthenticated
+      mockGetSession.mockResolvedValue({ data: { session: null } })
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          // No useMock: true — uses live mode
+        />
+      )
+
+      // Wait for initial greeting message (getInitialMessage runs synchronously)
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-input')).toBeInTheDocument()
+      })
+
+      const input = screen.getByTestId('interview-input')
+      await userEvent.type(input, 'I worked at Acme Corp')
+      await userEvent.click(screen.getByTestId('interview-send'))
+
+      // Since session is null, sendInterviewMessage throws "Not authenticated"
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-error')).toBeInTheDocument()
+      })
+
+      expect(screen.getByTestId('interview-error')).toHaveTextContent('Not authenticated')
+    })
+  })
+
+  describe('voice features', () => {
+    beforeEach(() => {
+      mockIsTranscribing = false
+    })
+
+    it('should show transcribing indicator when isTranscribing is true', () => {
+      mockIsTranscribing = true
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+        />
+      )
+
+      expect(screen.getByTestId('transcribing-indicator')).toBeInTheDocument()
+      expect(screen.getByTestId('transcribing-indicator')).toHaveTextContent('Transcribing...')
+    })
+
+    it('should not show transcribing indicator when isTranscribing is false', () => {
+      mockIsTranscribing = false
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+        />
+      )
+
+      expect(screen.queryByTestId('transcribing-indicator')).not.toBeInTheDocument()
+    })
+
+    it('should show speak buttons on assistant messages when voice output is enabled', async () => {
+      // Enable voice output via localStorage before rendering
+      localStorage.setItem('voice-settings', JSON.stringify({ inputEnabled: false, outputEnabled: true, voice: 'nova' }))
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+        />
+      )
+
+      // Initial message from assistant should show speak button
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-messages')).toBeInTheDocument()
+        // At least one assistant message should exist
+        const assistantMessages = screen.getAllByTestId('message-assistant')
+        expect(assistantMessages.length).toBeGreaterThan(0)
+      })
+
+      // Speak buttons should be visible
+      const speakButtons = screen.getAllByTestId('speak-button')
+      expect(speakButtons.length).toBeGreaterThan(0)
+
+      localStorage.removeItem('voice-settings')
+    })
+
+    it('should not show speak buttons when voice output is disabled', () => {
+      localStorage.setItem('voice-settings', JSON.stringify({ inputEnabled: false, outputEnabled: false, voice: 'nova' }))
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+        />
+      )
+
+      expect(screen.queryByTestId('speak-button')).not.toBeInTheDocument()
+
+      localStorage.removeItem('voice-settings')
     })
   })
 

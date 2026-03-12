@@ -8,3 +8,6 @@ export * from './jd-parse'
 
 // Resume parsing contracts
 export * from './resume-parse'
+
+// Profile contracts
+export * from './profile'

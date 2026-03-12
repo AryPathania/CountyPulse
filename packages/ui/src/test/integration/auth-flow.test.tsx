@@ -26,6 +26,10 @@ vi.mock('../../components/auth/AuthProvider', () => ({
 }))
 
 // Mock database functions
+const mockGetProfile = vi.fn().mockResolvedValue(null)
+const mockUpsertProfile = vi.fn()
+const mockMarkProfileComplete = vi.fn()
+
 vi.mock('@odie/db', () => ({
   supabase: {
     auth: {
@@ -35,12 +39,9 @@ vi.mock('@odie/db', () => ({
       }),
     },
   },
-  getUserProfile: vi.fn().mockResolvedValue(null),
-  getCandidateProfile: vi.fn().mockResolvedValue(null),
-  createUserProfile: vi.fn(),
-  updateUserProfile: vi.fn(),
-  markProfileComplete: vi.fn(),
-  upsertCandidateProfile: vi.fn(),
+  getProfile: (...args: unknown[]) => mockGetProfile(...args),
+  upsertProfile: (...args: unknown[]) => mockUpsertProfile(...args),
+  markProfileComplete: (...args: unknown[]) => mockMarkProfileComplete(...args),
 }))
 
 const renderWithRouter = (component: React.ReactElement) => {
@@ -57,63 +58,74 @@ describe('Auth Flow Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockNavigate.mockClear()
+    mockGetProfile.mockResolvedValue(null)
   })
 
   describe('CompleteProfile', () => {
     it('should create new profile and redirect to dashboard', async () => {
-      const { createUserProfile } = await import('@odie/db')
-      
-      vi.mocked(createUserProfile).mockResolvedValue({
-        id: 'new-profile-id',
+      mockUpsertProfile.mockResolvedValue({
         user_id: 'test-user',
         display_name: 'New User',
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-01-01T00:00:00.000Z',
         profile_completed_at: '2024-01-01T00:00:00.000Z',
         profile_version: 1,
+        headline: null,
+        summary: null,
+        phone: null,
+        location: null,
+        links: [],
       })
 
       renderWithRouter(<CompleteProfile />)
 
-      const displayNameInput = screen.getByLabelText('Display Name')
-      const continueButton = screen.getByRole('button', { name: 'Continue' })
+      await waitFor(() => {
+        expect(screen.getByTestId('input-display-name')).toBeInTheDocument()
+      })
+
+      const displayNameInput = screen.getByTestId('input-display-name')
+      const saveButton = screen.getByTestId('btn-save-profile')
 
       await user.type(displayNameInput, 'New User')
-      await user.click(continueButton)
+      await user.click(saveButton)
 
       await waitFor(() => {
-        expect(createUserProfile).toHaveBeenCalledWith({
-          user_id: 'test-user',
-          display_name: 'New User',
-        })
+        expect(mockUpsertProfile).toHaveBeenCalledWith(
+          'test-user',
+          expect.objectContaining({
+            display_name: 'New User',
+          })
+        )
         expect(mockNavigate).toHaveBeenCalledWith('/')
       })
     })
 
     it('should prevent double submission', async () => {
-      const { createUserProfile } = await import('@odie/db')
-      
-      // Make createUserProfile hang to simulate slow network
-      vi.mocked(createUserProfile).mockImplementation(
+      // Make upsertProfile hang to simulate slow network
+      mockUpsertProfile.mockImplementation(
         () => new Promise(() => {})
       )
 
       renderWithRouter(<CompleteProfile />)
 
-      const displayNameInput = screen.getByLabelText('Display Name')
-      const continueButton = screen.getByRole('button', { name: 'Continue' })
+      await waitFor(() => {
+        expect(screen.getByTestId('input-display-name')).toBeInTheDocument()
+      })
+
+      const displayNameInput = screen.getByTestId('input-display-name')
+      const saveButton = screen.getByTestId('btn-save-profile')
 
       await user.type(displayNameInput, 'New User')
-      
+
       // Click multiple times quickly
-      await user.click(continueButton)
-      await user.click(continueButton)
-      await user.click(continueButton)
+      await user.click(saveButton)
+      await user.click(saveButton)
+      await user.click(saveButton)
 
       // Should only call once
       await waitFor(() => {
-        expect(createUserProfile).toHaveBeenCalledTimes(1)
+        expect(mockUpsertProfile).toHaveBeenCalledTimes(1)
       })
     })
   })
-}) 
+})

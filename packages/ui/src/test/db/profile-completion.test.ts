@@ -19,7 +19,6 @@ const mockProfileRequirements = {
 // Mock functions
 const mockIsProfileComplete = vi.fn()
 const mockGetUserProfileWithCompletion = vi.fn()
-const mockGetUserProfile = vi.fn()
 
 vi.mock('@odie/db', () => ({
   supabase: {
@@ -32,7 +31,6 @@ vi.mock('@odie/db', () => ({
   },
   isProfileComplete: mockIsProfileComplete,
   getUserProfileWithCompletion: mockGetUserProfileWithCompletion,
-  getUserProfile: mockGetUserProfile,
   CURRENT_PROFILE_REQUIREMENTS: mockProfileRequirements,
 }))
 

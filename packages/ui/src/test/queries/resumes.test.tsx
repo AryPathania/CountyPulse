@@ -166,6 +166,75 @@ describe('resume queries', () => {
       expect(result.current.data).toEqual(mockResumeWithBullets)
       expect(mockGetResumeWithBullets).toHaveBeenCalledWith('resume-1')
     })
+
+    it('should resolve with candidateInfo undefined when candidate_profiles returns 0 rows', async () => {
+      // Simulates getProfile() returning null (no candidate_profiles row)
+      const resumeWithNoCandidateInfo = {
+        ...mockResumeWithBullets,
+        candidateInfo: undefined,
+      }
+      mockGetResumeWithBullets.mockResolvedValue(resumeWithNoCandidateInfo)
+
+      const { result } = renderHook(() => useResumeWithBullets('resume-1'), {
+        wrapper: createWrapper(),
+      })
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true)
+      })
+
+      expect(result.current.data).toBeDefined()
+      expect(result.current.data!.candidateInfo).toBeUndefined()
+    })
+
+    it('should resolve with candidateInfo undefined when profile has no display_name', async () => {
+      // getProfile() returns a row with empty display_name → candidateInfo is undefined
+      const resumeWithNoUserProfile = {
+        ...mockResumeWithBullets,
+        candidateInfo: undefined,
+      }
+      mockGetResumeWithBullets.mockResolvedValue(resumeWithNoUserProfile)
+
+      const { result } = renderHook(() => useResumeWithBullets('resume-1'), {
+        wrapper: createWrapper(),
+      })
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true)
+      })
+
+      expect(result.current.data!.candidateInfo).toBeUndefined()
+    })
+
+    it('should resolve with candidateInfo having empty links when profile links is empty', async () => {
+      // getProfile() returns data with display_name → candidateInfo is populated; links defaults to []
+      const resumeWithNoCandidateProfile = {
+        ...mockResumeWithBullets,
+        candidateInfo: {
+          displayName: 'Test User',
+          email: 'test@example.com',
+          headline: null,
+          summary: null,
+          phone: null,
+          location: null,
+          links: [],
+        },
+      }
+      mockGetResumeWithBullets.mockResolvedValue(resumeWithNoCandidateProfile)
+
+      const { result } = renderHook(() => useResumeWithBullets('resume-1'), {
+        wrapper: createWrapper(),
+      })
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true)
+      })
+
+      const candidateInfo = result.current.data!.candidateInfo!
+      expect(candidateInfo.displayName).toBe('Test User')
+      expect(candidateInfo.links).toEqual([])
+      expect(candidateInfo.headline).toBeNull()
+    })
   })
 
   describe('useCreateResume', () => {

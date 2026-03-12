@@ -38,7 +38,7 @@ vi.mock('@odie/db', () => ({
       signOut: vi.fn().mockResolvedValue({ error: null }),
     },
   },
-  getUserProfile: vi.fn().mockResolvedValue(null),
+  getProfile: vi.fn().mockResolvedValue(null),
   getUserProfileWithCompletion: vi.fn().mockResolvedValue({
     profile: null,
     isComplete: false,
