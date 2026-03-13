@@ -1,6 +1,7 @@
 import { supabase } from '../client'
 import type { Database, Json } from '../types'
 import type { ProfileLink } from '@odie/shared'
+import { mapProfileToFormData } from './candidate-profiles'
 
 type Resume = Database['public']['Tables']['resumes']['Row']
 type NewResume = Database['public']['Tables']['resumes']['Insert']
@@ -266,16 +267,8 @@ export async function getResumeWithBullets(resumeId: string): Promise<ResumeWith
     supabase.auth.getUser(),
   ])
 
-  const candidateInfo = profile?.display_name
-    ? {
-        displayName: profile.display_name,
-        email: authUser?.email ?? null,
-        headline: profile.headline ?? null,
-        summary: profile.summary ?? null,
-        phone: profile.phone ?? null,
-        location: profile.location ?? null,
-        links: (profile.links as ProfileLink[] | null) ?? [],
-      }
+  const candidateInfo = authUser
+    ? { ...mapProfileToFormData(profile), email: authUser.email ?? null }
     : undefined
 
   console.debug('[getResumeWithBullets] loaded candidate info for %s', candidateInfo?.displayName)

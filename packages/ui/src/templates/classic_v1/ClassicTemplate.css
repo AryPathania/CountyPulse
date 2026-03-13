@@ -120,3 +120,9 @@
 .classic-template__empty p {
   margin: 0.5rem 0;
 }
+
+.classic-template__name--placeholder {
+  color: #888;
+  font-style: italic;
+  font-weight: 400;
+}

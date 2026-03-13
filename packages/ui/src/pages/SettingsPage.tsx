@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { getProfile } from '@odie/db'
+import { getProfile, mapProfileToFormData } from '@odie/db'
 import { Navigation } from '../components/layout'
-import { mapProfileToFormData } from '../services/profile'
 import { ResetAccountButton } from '../components/account'
 import { ProfileForm } from '../components/ProfileForm'
 import { useAuth } from '../components/auth/AuthProvider'

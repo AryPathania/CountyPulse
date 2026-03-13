@@ -11,8 +11,46 @@ describe('ClassicTemplate', () => {
     expect(screen.getByTestId('template-classic')).toBeInTheDocument()
   })
 
-  it('should display resume name in header', () => {
-    const resume = createMockResume({ name: 'My Professional Resume' })
+  describe('placeholder name behavior', () => {
+    it('should render "Your Name" with placeholder class when candidateInfo.displayName is empty', () => {
+      const resume = createMockResume({
+        candidateInfo: createMockCandidateInfo({ displayName: '' }),
+      })
+      render(<ClassicTemplate resume={resume} />)
+
+      const nameEl = screen.getByText('Your Name')
+      expect(nameEl).toBeInTheDocument()
+      expect(nameEl).toHaveClass('classic-template__name--placeholder')
+    })
+
+    it('should render real displayName without placeholder class when displayName is set', () => {
+      const resume = createMockResume({
+        candidateInfo: createMockCandidateInfo({ displayName: 'Alice Smith' }),
+      })
+      render(<ClassicTemplate resume={resume} />)
+
+      const nameEl = screen.getByText('Alice Smith')
+      expect(nameEl).toBeInTheDocument()
+      expect(nameEl).not.toHaveClass('classic-template__name--placeholder')
+      expect(screen.queryByText('Your Name')).not.toBeInTheDocument()
+    })
+
+    it('should render "Your Name" with placeholder class when candidateInfo is absent', () => {
+      const resume = createMockResume()
+      delete (resume as Record<string, unknown>).candidateInfo
+      render(<ClassicTemplate resume={resume} />)
+
+      const nameEl = screen.getByText('Your Name')
+      expect(nameEl).toBeInTheDocument()
+      expect(nameEl).toHaveClass('classic-template__name--placeholder')
+    })
+  })
+
+  it('should display candidateInfo.displayName in header when set', () => {
+    const resume = createMockResume({
+      name: 'My Professional Resume',
+      candidateInfo: createMockCandidateInfo({ displayName: 'My Professional Resume' }),
+    })
     render(<ClassicTemplate resume={resume} />)
 
     expect(screen.getByText('My Professional Resume')).toBeInTheDocument()
@@ -224,13 +262,15 @@ describe('ClassicTemplate', () => {
       ).toBeInTheDocument()
     })
 
-    it('should fall back to resume.name when candidateInfo is not present', () => {
+    it('should show placeholder "Your Name" when candidateInfo is not present', () => {
       const resume = createMockResume({ name: 'Fallback Resume Name' })
       // Ensure no candidateInfo
       delete (resume as Record<string, unknown>).candidateInfo
       render(<ClassicTemplate resume={resume} />)
 
-      expect(screen.getByText('Fallback Resume Name')).toBeInTheDocument()
+      expect(screen.getByText('Your Name')).toBeInTheDocument()
+      const nameEl = screen.getByText('Your Name').closest('h1')
+      expect(nameEl).toHaveClass('classic-template__name--placeholder')
     })
 
     it('should handle partial candidateInfo with some fields null', () => {

@@ -25,6 +25,7 @@ function renderWithRouter(component: React.ReactNode, initialRoute = '/') {
 describe('Navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
   })
 
   it('should render navigation with all links', () => {
@@ -61,6 +62,34 @@ describe('Navigation', () => {
 
     const bulletsLink = screen.getByTestId('nav-link-bullets')
     expect(bulletsLink).toHaveClass('nav__link--active')
+  })
+
+  it('should show "Edit ↗" link when localStorage.lastEditedResume is set', () => {
+    localStorage.setItem(
+      'lastEditedResume',
+      JSON.stringify({ id: 'resume-abc', name: 'My Resume' })
+    )
+
+    renderWithRouter(<Navigation />)
+
+    const editLink = screen.getByTestId('nav-continue-editing')
+    expect(editLink).toBeInTheDocument()
+    expect(editLink).toHaveTextContent('Edit ↗')
+    expect(editLink).toHaveAttribute('href', '/resumes/resume-abc/edit')
+  })
+
+  it('should NOT show "Edit ↗" link when localStorage.lastEditedResume is not set', () => {
+    renderWithRouter(<Navigation />)
+
+    expect(screen.queryByTestId('nav-continue-editing')).not.toBeInTheDocument()
+  })
+
+  it('should NOT show "Edit ↗" link when localStorage.lastEditedResume contains malformed JSON', () => {
+    localStorage.setItem('lastEditedResume', 'not-valid-json')
+
+    renderWithRouter(<Navigation />)
+
+    expect(screen.queryByTestId('nav-continue-editing')).not.toBeInTheDocument()
   })
 
   it('should call signOut when sign out button is clicked', async () => {

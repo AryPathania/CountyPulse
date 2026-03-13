@@ -21,6 +21,14 @@ const mockUpsertProfile = vi.fn()
 vi.mock('@odie/db', () => ({
   getProfile: (...args: unknown[]) => mockGetProfile(...args),
   upsertProfile: (...args: unknown[]) => mockUpsertProfile(...args),
+  mapProfileToFormData: (profile: { display_name?: string | null; headline?: string | null; summary?: string | null; phone?: string | null; location?: string | null; links?: unknown[] | null } | null) => ({
+    displayName: profile?.display_name ?? '',
+    headline: profile?.headline ?? null,
+    summary: profile?.summary ?? null,
+    phone: profile?.phone ?? null,
+    location: profile?.location ?? null,
+    links: (profile?.links ?? []) as { label: string; url: string }[],
+  }),
 }))
 
 // Mock ResetAccountButton to avoid deep dependency chains

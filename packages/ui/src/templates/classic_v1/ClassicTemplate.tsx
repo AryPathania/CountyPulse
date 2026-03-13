@@ -18,32 +18,30 @@ function ResumeHeader({ resume }: TemplateProps) {
 
   return (
     <header className="classic-template__header">
-      <h1 className="classic-template__name">
-        {resume.candidateInfo?.displayName || resume.name}
+      <h1
+        className={`classic-template__name${!resume.candidateInfo?.displayName ? ' classic-template__name--placeholder' : ''}`}
+      >
+        {resume.candidateInfo?.displayName || 'Your Name'}
       </h1>
-      {resume.candidateInfo && (
-        <>
-          {contactParts.length > 0 && (
-            <div className="classic-template__contact" data-testid="template-contact">
-              {contactParts.map((part, i) => (
-                <span key={i}>
-                  {i > 0 && <span className="classic-template__separator"> · </span>}
-                  {part.href ? (
-                    <a href={part.href} className="classic-template__link">{part.label}</a>
-                  ) : (
-                    <span>{part.label}</span>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
-          {resume.candidateInfo.location && (
-            <div className="classic-template__location">{resume.candidateInfo.location}</div>
-          )}
-          {resume.candidateInfo.summary && (
-            <div className="classic-template__summary">{resume.candidateInfo.summary}</div>
-          )}
-        </>
+      {contactParts.length > 0 && (
+        <div className="classic-template__contact" data-testid="template-contact">
+          {contactParts.map((part, i) => (
+            <span key={i}>
+              {i > 0 && <span className="classic-template__separator"> · </span>}
+              {part.href ? (
+                <a href={part.href} className="classic-template__link">{part.label}</a>
+              ) : (
+                <span>{part.label}</span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+      {resume.candidateInfo?.location && (
+        <div className="classic-template__location">{resume.candidateInfo.location}</div>
+      )}
+      {resume.candidateInfo?.summary && (
+        <div className="classic-template__summary">{resume.candidateInfo.summary}</div>
       )}
     </header>
   )

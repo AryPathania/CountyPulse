@@ -5,11 +5,11 @@ import {
   getProfile,
   upsertProfile,
   markProfileComplete,
+  mapProfileToFormData,
 } from '@odie/db'
 import { useProfileSave } from '../hooks/useProfileSave'
 import { ProfileForm } from '../components/ProfileForm'
 import type { ProfileFormData } from '@odie/shared'
-import { mapProfileToFormData } from '../services/profile'
 
 export const CompleteProfile: React.FC = () => {
   const [initialData, setInitialData] = useState<ProfileFormData>({

@@ -60,6 +60,7 @@ export function ResumeBuilderPage() {
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isPersonalInfoOpen, setIsPersonalInfoOpen] = useState(false)
+  const [hasAutoExpandedPersonalInfo, setHasAutoExpandedPersonalInfo] = useState(false)
 
   const userId = user?.id ?? ''
   const { save: saveProfile, isSaving: isSavingProfile } = useProfileSave(userId)
@@ -71,22 +72,20 @@ export function ResumeBuilderPage() {
         prev
           ? {
               ...prev,
-              candidateInfo: prev.candidateInfo
-                ? {
-                    ...prev.candidateInfo,
-                    displayName: data.displayName,
-                    headline: data.headline,
-                    summary: data.summary,
-                    phone: data.phone,
-                    location: data.location,
-                    links: data.links,
-                  }
-                : undefined,
+              candidateInfo: {
+                ...(prev.candidateInfo ?? { email: user?.email ?? null }),
+                displayName: data.displayName,
+                headline: data.headline,
+                summary: data.summary,
+                phone: data.phone,
+                location: data.location,
+                links: data.links,
+              },
             }
           : null
       )
     },
-    [saveProfile]
+    [saveProfile, user?.email]
   )
 
   // DnD sensors
@@ -127,6 +126,23 @@ export function ResumeBuilderPage() {
 
     loadResume()
   }, [id, user?.id])
+
+  // Auto-expand personal info panel if no displayName set yet
+  useEffect(() => {
+    if (resume && !hasAutoExpandedPersonalInfo) {
+      setHasAutoExpandedPersonalInfo(true)
+      if (!resume.candidateInfo?.displayName) {
+        setIsPersonalInfoOpen(true)
+      }
+    }
+  }, [resume, hasAutoExpandedPersonalInfo])
+
+  // Persist last edited resume to localStorage for quick nav access
+  useEffect(() => {
+    if (id && resume?.name) {
+      localStorage.setItem('lastEditedResume', JSON.stringify({ id, name: resume.name }))
+    }
+  }, [id, resume?.name])
 
   // Compute which bullets are already used in the resume
   const usedBulletIds = useMemo(() => {
@@ -601,36 +617,34 @@ export function ResumeBuilderPage() {
       >
         {!isPreviewMode && (
           <aside className="resume-builder__editor" data-testid="builder-editor">
-            {resume.candidateInfo && (
-              <div
-                className="resume-builder__personal-info-panel"
-                data-testid="personal-info-panel"
+            <div
+              className="resume-builder__personal-info-panel"
+              data-testid="personal-info-panel"
+            >
+              <button
+                className="resume-builder__personal-info-toggle"
+                data-testid="btn-toggle-personal-info"
+                onClick={() => setIsPersonalInfoOpen((prev) => !prev)}
+                type="button"
               >
-                <button
-                  className="resume-builder__personal-info-toggle"
-                  data-testid="btn-toggle-personal-info"
-                  onClick={() => setIsPersonalInfoOpen((prev) => !prev)}
-                  type="button"
-                >
-                  Personal Info {isPersonalInfoOpen ? '▼' : '▶'}
-                </button>
-                {isPersonalInfoOpen && (
-                  <ProfileForm
-                    initialData={{
-                      displayName: resume.candidateInfo.displayName ?? '',
-                      headline: resume.candidateInfo.headline ?? null,
-                      summary: resume.candidateInfo.summary ?? null,
-                      phone: resume.candidateInfo.phone ?? null,
-                      location: resume.candidateInfo.location ?? null,
-                      links: resume.candidateInfo.links ?? [],
-                    }}
-                    email={resume.candidateInfo.email ?? user?.email ?? ''}
-                    isSaving={isSavingProfile}
-                    onSave={handleSavePersonalInfo}
-                  />
-                )}
-              </div>
-            )}
+                Personal Info {isPersonalInfoOpen ? '▼' : '▶'}
+              </button>
+              {isPersonalInfoOpen && (
+                <ProfileForm
+                  initialData={{
+                    displayName: resume.candidateInfo?.displayName ?? '',
+                    headline: resume.candidateInfo?.headline ?? null,
+                    summary: resume.candidateInfo?.summary ?? null,
+                    phone: resume.candidateInfo?.phone ?? null,
+                    location: resume.candidateInfo?.location ?? null,
+                    links: resume.candidateInfo?.links ?? [],
+                  }}
+                  email={resume.candidateInfo?.email ?? user?.email ?? ''}
+                  isSaving={isSavingProfile}
+                  onSave={handleSavePersonalInfo}
+                />
+              )}
+            </div>
 
             <DndContext
               sensors={sensors}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ResumePreview } from '../../../components/resume/ResumePreview'
-import { createMockResume } from '../../fixtures'
+import { createMockResume, createMockCandidateInfo } from '../../fixtures'
 
 describe('ResumePreview', () => {
   it('should render resume preview container', () => {
@@ -18,8 +18,10 @@ describe('ResumePreview', () => {
     expect(screen.getByTestId('template-classic')).toBeInTheDocument()
   })
 
-  it('should display resume name', () => {
-    const resume = createMockResume()
+  it('should display candidateInfo.displayName as resume name', () => {
+    const resume = createMockResume({
+      candidateInfo: createMockCandidateInfo({ displayName: 'Test Resume' }),
+    })
     render(<ResumePreview resume={resume} />)
 
     expect(screen.getByText('Test Resume')).toBeInTheDocument()

@@ -1,11 +1,26 @@
 import { supabase } from '../client'
 import type { Database, Json } from '../types'
-import type { ProfileLink } from '@odie/shared'
+import type { ProfileFormData, ProfileLink } from '@odie/shared'
 import { CURRENT_PROFILE_REQUIREMENTS } from './profile-completion'
 
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
 
 export type { CandidateProfile }
+
+/**
+ * Maps a DB candidate_profiles row (or null) to the ProfileFormData shape
+ * consumed by ProfileForm and resume builder.
+ */
+export function mapProfileToFormData(profile: CandidateProfile | null): ProfileFormData {
+  return {
+    displayName: profile?.display_name ?? '',
+    headline: profile?.headline ?? null,
+    summary: profile?.summary ?? null,
+    phone: profile?.phone ?? null,
+    location: profile?.location ?? null,
+    links: (profile?.links as ProfileLink[] | null) ?? [],
+  }
+}
 
 export interface CandidateProfileFields {
   display_name?: string

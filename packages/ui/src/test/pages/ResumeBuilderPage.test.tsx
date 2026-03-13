@@ -1183,7 +1183,7 @@ describe('ResumeBuilderPage', () => {
       })
     })
 
-    it('should not render personal-info-panel when resume has no candidateInfo', async () => {
+    it('should always render personal-info-panel even when resume has no candidateInfo', async () => {
       const resumeWithoutCandidate = { ...mockResume, candidateInfo: undefined }
       mockGetResumeWithBullets.mockResolvedValue(resumeWithoutCandidate)
 
@@ -1193,7 +1193,45 @@ describe('ResumeBuilderPage', () => {
         expect(screen.getByTestId('builder-editor')).toBeInTheDocument()
       })
 
-      expect(screen.queryByTestId('personal-info-panel')).not.toBeInTheDocument()
+      expect(screen.getByTestId('personal-info-panel')).toBeInTheDocument()
+    })
+
+    it('should always render personal-info-panel regardless of candidateInfo presence', async () => {
+      // This tests the new behavior: panel always present, not gated on candidateInfo
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-editor')).toBeInTheDocument()
+      })
+
+      expect(screen.getByTestId('personal-info-panel')).toBeInTheDocument()
+    })
+
+    it('should auto-expand panel on first load when displayName is empty', async () => {
+      const resumeNoName = {
+        ...mockResume,
+        candidateInfo: { ...mockResume.candidateInfo, displayName: '' },
+      }
+      mockGetResumeWithBullets.mockResolvedValue(resumeNoName)
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        // Panel is auto-expanded — ProfileForm should be immediately visible
+        expect(screen.getByTestId('profile-form')).toBeInTheDocument()
+      })
+    })
+
+    it('should NOT auto-expand panel on first load when displayName is already set', async () => {
+      // mockResume already has displayName: 'Jane Doe'
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('personal-info-panel')).toBeInTheDocument()
+      })
+
+      // Panel should start collapsed
+      expect(screen.queryByTestId('profile-form')).not.toBeInTheDocument()
     })
 
     it('should toggle open and close when toggle button is clicked', async () => {

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import './Navigation.css'
@@ -14,6 +15,19 @@ const NAV_ITEMS = [
 export function Navigation() {
   const location = useLocation()
   const { user, signOut } = useAuth()
+
+  const [lastEdited, setLastEdited] = useState<{ id: string; name: string } | null>(null)
+
+  useEffect(() => {
+    const stored = localStorage.getItem('lastEditedResume')
+    if (stored) {
+      try {
+        setLastEdited(JSON.parse(stored))
+      } catch {
+        // ignore malformed data
+      }
+    }
+  }, [])
 
   const handleSignOut = async () => {
     try {
@@ -43,6 +57,17 @@ export function Navigation() {
             </Link>
           </li>
         ))}
+        {lastEdited && (
+          <li key="continue-editing">
+            <Link
+              to={`/resumes/${lastEdited.id}/edit`}
+              className={`nav__link ${location.pathname === `/resumes/${lastEdited.id}/edit` ? 'nav__link--active' : ''}`}
+              data-testid="nav-continue-editing"
+            >
+              Edit ↗
+            </Link>
+          </li>
+        )}
       </ul>
 
       <div className="nav__account">
