@@ -3,15 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import './Navigation.css'
 
-const NAV_ITEMS = [
-  { path: '/', label: 'Home' },
-  { path: '/resumes', label: 'Resumes' },
-  { path: '/bullets', label: 'Bullets' },
-  { path: '/interview', label: 'Interview' },
-  { path: '/telemetry', label: 'Telemetry' },
-  { path: '/settings', label: 'Settings' },
-]
-
 export function Navigation() {
   const location = useLocation()
   const { user, signOut } = useAuth()
@@ -28,6 +19,18 @@ export function Navigation() {
       }
     }
   }, [])
+
+  const navItems = [
+    { path: '/', label: 'Home', testId: 'nav-link-home' },
+    { path: '/resumes', label: 'Resumes', testId: 'nav-link-resumes' },
+    ...(lastEdited
+      ? [{ path: `/resumes/${lastEdited.id}/edit`, label: 'Edit Resume', testId: 'nav-continue-editing' }]
+      : []),
+    { path: '/bullets', label: 'Bullets', testId: 'nav-link-bullets' },
+    { path: '/interview', label: 'Interview', testId: 'nav-link-interview' },
+    { path: '/telemetry', label: 'Telemetry', testId: 'nav-link-telemetry' },
+    { path: '/settings', label: 'Settings', testId: 'nav-link-settings' },
+  ]
 
   const handleSignOut = async () => {
     try {
@@ -46,28 +49,17 @@ export function Navigation() {
       </div>
 
       <ul className="nav__links">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <li key={item.path}>
             <Link
               to={item.path}
               className={`nav__link ${location.pathname === item.path ? 'nav__link--active' : ''}`}
-              data-testid={`nav-link-${item.label.toLowerCase()}`}
+              data-testid={item.testId}
             >
               {item.label}
             </Link>
           </li>
         ))}
-        {lastEdited && (
-          <li key="continue-editing">
-            <Link
-              to={`/resumes/${lastEdited.id}/edit`}
-              className={`nav__link ${location.pathname === `/resumes/${lastEdited.id}/edit` ? 'nav__link--active' : ''}`}
-              data-testid="nav-continue-editing"
-            >
-              Edit ↗
-            </Link>
-          </li>
-        )}
       </ul>
 
       <div className="nav__account">

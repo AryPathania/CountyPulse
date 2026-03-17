@@ -64,7 +64,7 @@ describe('Navigation', () => {
     expect(bulletsLink).toHaveClass('nav__link--active')
   })
 
-  it('should show "Edit ↗" link when localStorage.lastEditedResume is set', () => {
+  it('should show "Edit Resume" link when localStorage.lastEditedResume is set', () => {
     localStorage.setItem(
       'lastEditedResume',
       JSON.stringify({ id: 'resume-abc', name: 'My Resume' })
@@ -74,17 +74,17 @@ describe('Navigation', () => {
 
     const editLink = screen.getByTestId('nav-continue-editing')
     expect(editLink).toBeInTheDocument()
-    expect(editLink).toHaveTextContent('Edit ↗')
+    expect(editLink).toHaveTextContent('Edit Resume')
     expect(editLink).toHaveAttribute('href', '/resumes/resume-abc/edit')
   })
 
-  it('should NOT show "Edit ↗" link when localStorage.lastEditedResume is not set', () => {
+  it('should NOT show "Edit Resume" link when localStorage.lastEditedResume is not set', () => {
     renderWithRouter(<Navigation />)
 
     expect(screen.queryByTestId('nav-continue-editing')).not.toBeInTheDocument()
   })
 
-  it('should NOT show "Edit ↗" link when localStorage.lastEditedResume contains malformed JSON', () => {
+  it('should NOT show "Edit Resume" link when localStorage.lastEditedResume contains malformed JSON', () => {
     localStorage.setItem('lastEditedResume', 'not-valid-json')
 
     renderWithRouter(<Navigation />)
