@@ -10,6 +10,7 @@ import {
   createResumeFromDraft,
   type Resume,
   type ResumeContent,
+  type ResumeFromDraftOptions,
 } from '@odie/db'
 
 // Query keys for cache management
@@ -139,11 +140,13 @@ export function useCreateResumeFromDraft() {
       userId,
       name,
       bulletIds,
+      options,
     }: {
       userId: string
       name: string
       bulletIds: string[]
-    }) => createResumeFromDraft(userId, name, bulletIds),
+      options?: ResumeFromDraftOptions
+    }) => createResumeFromDraft(userId, name, bulletIds, options),
     onSuccess: (newResume: Resume) => {
       queryClient.invalidateQueries({ queryKey: resumeKeys.lists() })
       queryClient.setQueryData(resumeKeys.detail(newResume.id), newResume)

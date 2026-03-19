@@ -112,10 +112,18 @@ export function InterviewChat({
 
     hasAutoStarted.current = true
 
+    const mode = config.context?.mode
+    let autoContent = "Yes, let's get started!"
+    if (mode === 'resume') {
+      autoContent = "Yes, let's get started! I'd like to focus on strengthening my weaker bullets and filling in any gaps."
+    } else if (mode === 'gaps') {
+      autoContent = "Yes, let's work on those gaps. I'd like to build strong bullets for the areas I'm missing."
+    }
+
     const autoMessage: ChatMessage = {
       id: `user-auto-${Date.now()}`,
       role: 'user',
-      content: "Yes, let's get started!",
+      content: autoContent,
       timestamp: new Date().toISOString(),
     }
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
+import { StartInterviewButton } from '../components/interview/StartInterviewButton'
 import { uploadAndParseResume, type ResumeUploadResult } from '../services/resume-upload'
 import './ResumeUploadPage.css'
 
@@ -62,12 +63,6 @@ export function ResumeUploadPage() {
       setStep('select')
     }
   }, [user?.id, queryClient])
-
-  const handleStartInterview = useCallback(() => {
-    if (result) {
-      navigate('/interview', { state: { interviewContext: result.context } })
-    }
-  }, [navigate, result])
 
   const stepLabels: Record<UploadStep, string> = {
     select: 'Select a file',
@@ -131,14 +126,20 @@ export function ResumeUploadPage() {
                 <span className="resume-upload-page__stat-value">{result.stats.weakBullets}</span>
                 <span className="resume-upload-page__stat-label">To discuss</span>
               </div>
+              {result.stats.educationEntries > 0 && (
+                <div className="resume-upload-page__stat">
+                  <span className="resume-upload-page__stat-value">{result.stats.educationEntries}</span>
+                  <span className="resume-upload-page__stat-label">Education</span>
+                </div>
+              )}
+              {result.stats.skillsCount > 0 && (
+                <div className="resume-upload-page__stat">
+                  <span className="resume-upload-page__stat-value">{result.stats.skillsCount}</span>
+                  <span className="resume-upload-page__stat-label">Skills</span>
+                </div>
+              )}
             </div>
-            <button
-              onClick={handleStartInterview}
-              className="btn-primary"
-              data-testid="start-interview-btn"
-            >
-              Start Interview
-            </button>
+            <StartInterviewButton context={result.context} />
             <button
               onClick={() => navigate('/bullets')}
               className="btn-secondary"

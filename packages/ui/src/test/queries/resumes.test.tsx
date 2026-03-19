@@ -386,7 +386,8 @@ describe('resume queries', () => {
       expect(mockCreateResumeFromDraft).toHaveBeenCalledWith(
         'user-123',
         'Draft Resume',
-        ['bullet-1', 'bullet-2']
+        ['bullet-1', 'bullet-2'],
+        undefined
       )
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: resumeKeys.lists() })
       expect(setQueryDataSpy).toHaveBeenCalledWith(resumeKeys.detail('draft-resume'), newResume)

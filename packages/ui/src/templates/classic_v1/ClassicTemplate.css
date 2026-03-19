@@ -111,6 +111,12 @@
   flex: 1;
 }
 
+.classic-template__text-items {
+  margin: 0.25rem 0;
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
 .classic-template__empty {
   text-align: center;
   padding: 3rem;

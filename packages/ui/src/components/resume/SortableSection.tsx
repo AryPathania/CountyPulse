@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -22,6 +23,8 @@ interface SortableSectionProps {
   onEditSubSection?: (subsectionId: string, data: Partial<SubSectionData>) => void
   onDeleteSubSection?: (subsectionId: string) => void
   onAddSubSection?: () => void
+  onDeleteSection?: () => void
+  onRenameSection?: (newTitle: string) => void
 }
 
 export function SortableSection({
@@ -32,7 +35,20 @@ export function SortableSection({
   onEditSubSection,
   onDeleteSubSection,
   onAddSubSection,
+  onDeleteSection,
+  onRenameSection,
 }: SortableSectionProps) {
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [editTitle, setEditTitle] = useState(section.title)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [isEditingTitle])
+
   const {
     attributes,
     listeners,
@@ -45,6 +61,36 @@ export function SortableSection({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+  }
+
+  const handleTitleClick = () => {
+    if (onRenameSection) {
+      setEditTitle(section.title)
+      setIsEditingTitle(true)
+    }
+  }
+
+  const handleTitleSave = () => {
+    const trimmed = editTitle.trim()
+    if (trimmed && trimmed !== section.title) {
+      onRenameSection?.(trimmed)
+    }
+    setIsEditingTitle(false)
+  }
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleSave()
+    } else if (e.key === 'Escape') {
+      setIsEditingTitle(false)
+      setEditTitle(section.title)
+    }
+  }
+
+  const handleDeleteClick = () => {
+    if (onDeleteSection && window.confirm(`Delete the "${section.title}" section?`)) {
+      onDeleteSection()
+    }
   }
 
   // Get bullet data for each item
@@ -77,7 +123,42 @@ export function SortableSection({
         {...listeners}
       >
         <span className="sortable-section__handle">&#8942;&#8942;</span>
-        <h3 className="sortable-section__title">{section.title}</h3>
+        {isEditingTitle ? (
+          <input
+            ref={titleInputRef}
+            className="sortable-section__title-input"
+            data-testid={`section-title-input-${section.id}`}
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onBlur={handleTitleSave}
+            onKeyDown={handleTitleKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <h3
+            className="sortable-section__title"
+            data-testid={`section-title-${section.id}`}
+            onClick={(e) => { e.stopPropagation(); handleTitleClick() }}
+            onPointerDown={(e) => { if (onRenameSection) e.stopPropagation() }}
+            title={onRenameSection ? 'Click to rename' : undefined}
+            style={onRenameSection ? { cursor: 'text' } : undefined}
+          >
+            {section.title}
+          </h3>
+        )}
+        {onDeleteSection && (
+          <button
+            type="button"
+            className="sortable-section__delete-btn"
+            data-testid={`delete-section-${section.id}`}
+            onClick={(e) => { e.stopPropagation(); handleDeleteClick() }}
+            onPointerDown={(e) => e.stopPropagation()}
+            title="Delete section"
+          >
+            x
+          </button>
+        )}
       </div>
 
       <div className="sortable-section__items">

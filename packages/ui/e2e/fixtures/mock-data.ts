@@ -98,8 +98,9 @@ export const MOCK_GAP_ANALYSIS = {
   ],
   gaps: [
     { description: 'GraphQL experience', category: 'Backend', importance: 'nice_to_have' },
+    { description: 'Team leadership skills', category: 'Soft Skills', importance: 'must_have', skillMatch: 'Leadership' },
   ],
-  totalRequirements: 2,
+  totalRequirements: 3,
   coveredCount: 1,
   analyzedAt: '2024-01-15T00:00:00Z',
 }
@@ -148,6 +149,20 @@ export const MOCK_RESUMES = [
             { type: 'subsection', subsectionId: 'sub-pos-1' },
             { type: 'bullet', bulletId: 'bullet-1' },
             { type: 'bullet', bulletId: 'bullet-2' },
+          ],
+        },
+        {
+          id: 'section-skills',
+          title: 'Skills',
+          subsections: [
+            {
+              id: 'sub-skills-hard',
+              title: 'Technical Skills',
+              textItems: ['React', 'TypeScript', 'AWS', 'Docker'],
+            },
+          ],
+          items: [
+            { type: 'subsection', subsectionId: 'sub-skills-hard' },
           ],
         },
       ],

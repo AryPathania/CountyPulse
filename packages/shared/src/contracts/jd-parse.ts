@@ -45,6 +45,7 @@ export type CoveredRequirement = z.infer<typeof CoveredRequirementSchema>
 export const GapRequirementSchema = z.object({
   requirement: JdRequirementSchema,
   suggestedQuestion: z.string().nullish(),
+  skillMatch: z.string().nullish(),
 })
 
 export type GapRequirement = z.infer<typeof GapRequirementSchema>

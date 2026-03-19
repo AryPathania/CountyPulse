@@ -4,7 +4,7 @@ This file is the human-readable source of truth for table/column names, relation
 
 **Updated by:** DB Agent only
 **Updated when:** any migration changes schema
-**Last updated:** 2026-03-11 (migrations 022-028)
+**Last updated:** 2026-03-19 (migrations 022-028; content JSON schema documented)
 
 ---
 
@@ -151,7 +151,12 @@ This file is the human-readable source of truth for table/column names, relation
 - SELECT/INSERT/UPDATE/DELETE: `user_id = auth.uid()`
 
 **Notes:**
-- `content` JSONB structure: `{ sections: [{ title, bullet_ids: [] }] }`
+- `content` JSONB structure: `{ sections: [{ id, title, items: [{ id, type, ... }] }] }`
+  - Each section has a unique `id`, a `title` (editable, deletable), and an `items` array
+  - Item types: `'subsection'` (grouping header via `SubSectionData`) or `'bullet'` (reference to bullets table)
+  - `SubSectionData` fields: `id`, `type: 'subsection'`, `title`, `subtitle?`, `meta?`, `textItems?: string[]`
+  - `textItems` holds non-bullet content (e.g., education entries, skills lists) rendered as comma-separated text in templates
+  - Sections support full CRUD: add (from defaults/suggested/custom), rename, delete. Deleted defaults reappear in the Add Section menu.
 - `template_id` references template registry (MVP: only 'default')
 
 ---

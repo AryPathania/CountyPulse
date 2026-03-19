@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { processJobDescription, analyzeJobDescriptionGaps, buildInterviewContextFromGaps, buildGapDataFromStored } from '../../services/jd-processing'
+import { processJobDescription, analyzeJobDescriptionGaps, buildInterviewContextFromGaps, buildGapDataFromStored, findSkillMatch } from '../../services/jd-processing'
 
 // Mock @odie/db
 const mockGetSession = vi.fn()
@@ -480,6 +480,63 @@ describe('jd-processing service', () => {
         analyzeJobDescriptionGaps('user-1', 'JD', 'draft-1')
       ).rejects.toThrow('Embedding service unavailable')
     })
+
+    it('adds skillMatch to gaps when user skills match requirement text', async () => {
+      setupAuthenticatedSession()
+      setupParseJdResponse()
+      setupEmbedResponse()
+
+      mockMatchBulletsPerRequirement.mockResolvedValue([
+        {
+          requirement: { description: 'Experience with React', category: 'Frontend', importance: 'must_have' },
+          matches: [{ id: 'b1', current_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
+          isCovered: true,
+        },
+        {
+          requirement: { description: 'Team leadership', category: 'Leadership', importance: 'must_have' },
+          matches: [],
+          isCovered: false,
+        },
+        {
+          requirement: { description: 'AWS experience', category: 'Cloud', importance: 'nice_to_have' },
+          matches: [],
+          isCovered: false,
+        },
+      ])
+      mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
+
+      const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1', {
+        hard: ['AWS', 'Docker'],
+        soft: ['Leadership'],
+      })
+
+      expect(result.gaps).toHaveLength(2)
+      // 'Team leadership' matches soft skill 'Leadership'
+      expect(result.gaps[0].skillMatch).toBe('Leadership')
+      // 'AWS experience' matches hard skill 'AWS'
+      expect(result.gaps[1].skillMatch).toBe('AWS')
+    })
+
+    it('does not add skillMatch when no skills provided', async () => {
+      setupAuthenticatedSession()
+      setupParseJdResponse()
+      setupEmbedResponse()
+
+      mockMatchBulletsPerRequirement.mockResolvedValue([
+        {
+          requirement: { description: 'Experience with React', category: 'Frontend', importance: 'must_have' },
+          matches: [],
+          isCovered: false,
+        },
+      ])
+      mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
+
+      const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+      expect(result.gaps[0].skillMatch).toBeUndefined()
+    })
   })
 
   describe('buildInterviewContextFromGaps', () => {
@@ -598,6 +655,82 @@ describe('jd-processing service', () => {
 
       expect(result.interviewContext).toBeNull()
       expect(result.gaps).toHaveLength(0)
+    })
+
+    it('preserves skillMatch from stored gap data', () => {
+      const stored = {
+        jobTitle: 'Engineer',
+        company: 'Acme' as string | null,
+        covered: [],
+        gaps: [
+          { description: 'AWS experience', category: 'Cloud', importance: 'must_have' as const, skillMatch: 'AWS' },
+          { description: 'Team leadership', category: 'Leadership', importance: 'must_have' as const },
+        ],
+        totalRequirements: 2,
+        coveredCount: 0,
+        analyzedAt: '2024-01-15T00:00:00Z',
+      }
+
+      const result = buildGapDataFromStored('draft-1', stored)
+
+      expect(result.gaps[0].skillMatch).toBe('AWS')
+      expect(result.gaps[1].skillMatch).toBeUndefined()
+    })
+  })
+
+  describe('findSkillMatch', () => {
+    it('returns matching hard skill (case-insensitive)', () => {
+      const result = findSkillMatch('Experience with React and TypeScript', {
+        hard: ['react', 'Node.js'],
+        soft: [],
+      })
+      expect(result).toBe('react')
+    })
+
+    it('returns matching soft skill', () => {
+      const result = findSkillMatch('Team leadership and communication', {
+        hard: [],
+        soft: ['Leadership', 'Communication'],
+      })
+      expect(result).toBe('Leadership')
+    })
+
+    it('returns undefined when no skills match', () => {
+      const result = findSkillMatch('Experience with Go and Kubernetes', {
+        hard: ['React', 'Node.js'],
+        soft: ['Communication'],
+      })
+      expect(result).toBeUndefined()
+    })
+
+    it('returns undefined when skills is undefined', () => {
+      const result = findSkillMatch('Experience with React')
+      expect(result).toBeUndefined()
+    })
+
+    it('returns first matching skill when multiple match', () => {
+      const result = findSkillMatch('React and TypeScript required', {
+        hard: ['TypeScript', 'React'],
+        soft: [],
+      })
+      // Returns first in the array order
+      expect(result).toBe('TypeScript')
+    })
+
+    it('handles empty skill arrays', () => {
+      const result = findSkillMatch('React experience', {
+        hard: [],
+        soft: [],
+      })
+      expect(result).toBeUndefined()
+    })
+
+    it('is case-insensitive for both skill and requirement', () => {
+      const result = findSkillMatch('DOCKER containerization', {
+        hard: ['docker'],
+        soft: [],
+      })
+      expect(result).toBe('docker')
     })
   })
 })

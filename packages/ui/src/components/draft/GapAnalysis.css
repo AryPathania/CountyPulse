@@ -80,6 +80,17 @@
   color: #2ecc71;
 }
 
+.gap-analysis__badge--partial {
+  background: rgba(241, 196, 15, 0.2);
+  color: #f1c40f;
+}
+
+.gap-analysis__skill-match {
+  color: #f1c40f;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
 .gap-analysis__description {
   flex: 1;
 }

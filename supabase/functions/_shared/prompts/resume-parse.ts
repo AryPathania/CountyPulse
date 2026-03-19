@@ -34,7 +34,7 @@ export const DEFAULT_RESUME_PARSE_CONFIG: ResumeParseConfig = {
 }
 
 /** Prompt version identifier logged in the `runs` table for telemetry. */
-export const RESUME_PARSE_PROMPT_ID = 'resume_parse_v1'
+export const RESUME_PARSE_PROMPT_ID = 'resume_parse_v2'
 
 // ---------------------------------------------------------------------------
 // Section builders
@@ -84,6 +84,7 @@ function buildExtractionRulesSection(): string {
 - For each position, classify every bullet using the quality standards above
 - For fixable bullets, provide the corrected text in fixedText
 - For weak bullets, generate a specific follow-up question in suggestedQuestion that would help the candidate strengthen the bullet
+- When fixing a bullet (fixedText), preserve ALL metrics from the original text exactly as stated. Never drop, round, or rephrase specific numbers.
 - Assign a category to each bullet (e.g., "Leadership", "Frontend", "Backend", "Data", "DevOps", "Design", "Communication", "Project Management")
 
 ### Skills

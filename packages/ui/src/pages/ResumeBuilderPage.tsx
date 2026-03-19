@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -33,6 +33,8 @@ import {
   updateResume,
   getBullets,
   logRun,
+  DEFAULT_SECTIONS,
+  SUGGESTED_SECTIONS,
   type ResumeWithBullets,
   type ResumeContent,
   type ResumeSection,
@@ -61,6 +63,10 @@ export function ResumeBuilderPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isPersonalInfoOpen, setIsPersonalInfoOpen] = useState(false)
   const [hasAutoExpandedPersonalInfo, setHasAutoExpandedPersonalInfo] = useState(false)
+  const [isAddSectionOpen, setIsAddSectionOpen] = useState(false)
+  const [customSectionInput, setCustomSectionInput] = useState('')
+  const [showCustomInput, setShowCustomInput] = useState(false)
+  const addSectionRef = useRef<HTMLDivElement>(null)
 
   const userId = user?.id ?? ''
   const { save: saveProfile, isSaving: isSavingProfile } = useProfileSave(userId)
@@ -416,6 +422,71 @@ export function ResumeBuilderPage() {
     [updateSection]
   )
 
+  // Handle adding a new section
+  const handleAddSection = useCallback(
+    (title: string) => {
+      if (!resume) return
+      const newSection: ResumeSection = {
+        id: `custom-${crypto.randomUUID()}`,
+        title,
+        items: [],
+        subsections: [],
+      }
+      const newContent: ResumeContent = {
+        sections: [...resume.parsedContent.sections, newSection],
+      }
+      applyContent(newContent)
+      setIsAddSectionOpen(false)
+      setShowCustomInput(false)
+      setCustomSectionInput('')
+    },
+    [resume, applyContent]
+  )
+
+  // Handle deleting a section
+  const handleDeleteSection = useCallback(
+    (sectionId: string) => {
+      if (!resume) return
+      if (resume.parsedContent.sections.length <= 1) return
+      const newContent: ResumeContent = {
+        sections: resume.parsedContent.sections.filter((s) => s.id !== sectionId),
+      }
+      applyContent(newContent)
+    },
+    [resume, applyContent]
+  )
+
+  // Handle renaming a section
+  const handleRenameSection = useCallback(
+    (sectionId: string, newTitle: string) => {
+      updateSection(sectionId, (section) => ({
+        ...section,
+        title: newTitle,
+      }))
+    },
+    [updateSection]
+  )
+
+  // Close add-section dropdown on outside click
+  useEffect(() => {
+    if (!isAddSectionOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addSectionRef.current && !addSectionRef.current.contains(e.target as Node)) {
+        setIsAddSectionOpen(false)
+        setShowCustomInput(false)
+        setCustomSectionInput('')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isAddSectionOpen])
+
+  // Compute which section titles already exist (for add-section menu)
+  const existingSectionTitles = useMemo(() => {
+    if (!resume) return new Set<string>()
+    return new Set(resume.parsedContent.sections.map((s) => s.title))
+  }, [resume])
+
   // Handle drag end for sections
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -666,9 +737,99 @@ export function ResumeBuilderPage() {
                     onEditSubSection={(subsectionId, data) => handleEditSubSection(section.id, subsectionId, data)}
                     onDeleteSubSection={(subsectionId) => handleDeleteSubSection(section.id, subsectionId)}
                     onAddSubSection={() => handleAddSubSection(section.id)}
+                    onDeleteSection={resume.parsedContent.sections.length > 1 ? () => handleDeleteSection(section.id) : undefined}
+                    onRenameSection={(newTitle) => handleRenameSection(section.id, newTitle)}
                   />
                 ))}
               </SortableContext>
+
+              <div className="add-section" ref={addSectionRef} data-testid="add-section">
+                <button
+                  type="button"
+                  className="add-section__trigger"
+                  data-testid="add-section-btn"
+                  onClick={() => setIsAddSectionOpen(!isAddSectionOpen)}
+                >
+                  + Add Section
+                </button>
+                {isAddSectionOpen && (
+                  <div className="add-section__dropdown" data-testid="add-section-dropdown">
+                    {/* Missing default sections */}
+                    {DEFAULT_SECTIONS.filter((title) => !existingSectionTitles.has(title)).length > 0 && (
+                      <>
+                        <div className="add-section__group-label">Restore Default</div>
+                        {DEFAULT_SECTIONS.filter((title) => !existingSectionTitles.has(title)).map((title) => (
+                          <button
+                            key={title}
+                            type="button"
+                            className="add-section__option add-section__option--default"
+                            data-testid={`add-section-option-${title}`}
+                            onClick={() => handleAddSection(title)}
+                          >
+                            {title}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    {/* Suggested sections */}
+                    <div className="add-section__group-label">Suggested</div>
+                    {SUGGESTED_SECTIONS.filter((title) => !existingSectionTitles.has(title)).map((title) => (
+                      <button
+                        key={title}
+                        type="button"
+                        className="add-section__option"
+                        data-testid={`add-section-option-${title}`}
+                        onClick={() => handleAddSection(title)}
+                      >
+                        {title}
+                      </button>
+                    ))}
+                    {/* Custom section input */}
+                    {!showCustomInput ? (
+                      <button
+                        type="button"
+                        className="add-section__option add-section__option--custom"
+                        data-testid="add-section-custom-btn"
+                        onClick={() => setShowCustomInput(true)}
+                      >
+                        Custom...
+                      </button>
+                    ) : (
+                      <div className="add-section__custom-input" data-testid="add-section-custom-input">
+                        <input
+                          type="text"
+                          placeholder="Section name"
+                          value={customSectionInput}
+                          onChange={(e) => setCustomSectionInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && customSectionInput.trim()) {
+                              handleAddSection(customSectionInput.trim())
+                            } else if (e.key === 'Escape') {
+                              setShowCustomInput(false)
+                              setCustomSectionInput('')
+                            }
+                          }}
+                          autoFocus
+                          data-testid="add-section-custom-name"
+                        />
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          data-testid="add-section-custom-confirm"
+                          disabled={!customSectionInput.trim()}
+                          onClick={() => {
+                            if (customSectionInput.trim()) {
+                              handleAddSection(customSectionInput.trim())
+                            }
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <DragOverlay>
                 {activeItem?.type === 'section' && (

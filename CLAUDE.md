@@ -48,7 +48,9 @@ pnpm gen-types        # Generate Supabase types
 - **Interview Context**: Discriminated union (`blank` | `resume` | `gaps`) parameterizes interview prompt
 - **Bullet Quality Rules**: Shared prompt section in `supabase/functions/_shared/prompts/bullet-quality.ts`
 - **Resume Dedup**: SHA-256 file hash with unique index on `(user_id, file_hash)`
-- **Resume Sub-Sections**: Generic editable grouping headers stored in resume content JSON (`SubSectionData`). Draggable, editable, deletable. Used for positions, education, projects. Auto-generated from positions via `groupBulletsByPosition()`, editable by users. Old `type: 'position'` items normalized to `type: 'subsection'` on read.
+- **Resume Sub-Sections**: Generic editable grouping headers stored in resume content JSON (`SubSectionData`). Draggable, editable, deletable. Used for positions, education, projects. Auto-generated from positions via `groupBulletsByPosition()`, editable by users. Old `type: 'position'` items normalized to `type: 'subsection'` on read. `SubSectionData` supports an optional `textItems?: string[]` for non-bullet content (e.g., education entries, skills lists) rendered as comma-separated text.
+- **Custom Sections**: All resume sections (including defaults like Experience, Education, Skills) are editable and deletable. An "Add Section" dropdown offers missing defaults, suggested sections (Projects, Certifications, etc.), and a custom-name option. Deleted defaults reappear in the menu for re-addition. Section CRUD is handled in `ResumeBuilderPage`.
+- **Metric Preservation**: LLM prompts enforce an always-on rule to preserve original metrics/numbers in bullets. Applied across `bullet-quality.ts`, `resume-parse.ts` (`resume_parse_v2`), and `interview.ts` (`interview_v3`).
 - **Profile Links**: Flexible `links JSONB NOT NULL DEFAULT '[]'` on `candidate_profiles`. Each entry is `{label, url}`. Max 8 enforced at app layer. Common types (LinkedIn, GitHub, Twitter, Website) offered as quick-add presets; fully custom labels supported. No fixed URL columns.
 
 ## Security
@@ -76,6 +78,8 @@ See `docs/adr/006_security_model.md` for the full security model. Summary:
 - `useProfileSave` (`packages/ui/src/hooks/useProfileSave.ts`) — shared hook wrapping `upsertCandidateProfile` (single table since migration 028)
 - `mapProfileToFormData` (`packages/ui/src/services/profile.ts`) — maps a `candidate_profiles` row to ProfileForm initial values
 - `PersonalInfoPanel` — collapsible panel in `ResumeBuilderPage` for inline profile editing with live preview sync
+- `StartInterviewButton` (`packages/ui/src/components/interview/StartInterviewButton.tsx`) — reusable button that navigates to `/interview` with the correct `interviewContext`; used by ResumeUploadPage and DraftResumePage
+- `buildSectionEntries()` / `buildEducationEntries()` / `buildSkillsEntries()` (`packages/db/src/queries/resumes.ts`) — pure helpers that construct resume content sections from parsed data (positions, education, skills)
 
 ## Routes
 - `/` — Home (JD paste + quick actions)
@@ -89,7 +93,7 @@ See `docs/adr/006_security_model.md` for the full security model. Summary:
 - `/settings` — Profile & Settings (edit name, contact info, links; danger zone)
 
 ## Edge Functions
-- `interview` — Conversational interview (context-aware: blank/resume/gaps)
+- `interview` — Conversational interview (context-aware: blank/resume/gaps; auto-start supported via `StartInterviewButton`)
 - `embed` — Batch text embeddings (`texts: string[]` → `embeddings: number[][]`)
 - `parse-resume` — LLM resume parsing (positions, bullets with quality classification)
 - `parse-jd` — JD requirement extraction (structured requirements with importance)
@@ -122,7 +126,7 @@ See `docs/adr/006_security_model.md` for the full security model. Summary:
 **MVP Feature Complete** - All phases implemented + UI polish + resume upload + gap analysis
 
 ### Test Coverage
-- **761 unit/integration tests** (Vitest + Testing Library)
+- **794+ unit/integration tests** (Vitest + Testing Library)
 - **95+ E2E tests** (Playwright)
 - **96%+ code coverage** (>95% quality gate)
 

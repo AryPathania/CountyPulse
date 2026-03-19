@@ -79,7 +79,7 @@ export const DEFAULT_INTERVIEW_CONFIG: InterviewConfig = {
 }
 
 /** Prompt version identifier logged in the `runs` table for telemetry. */
-export const INTERVIEW_PROMPT_ID = 'interview_v2'
+export const INTERVIEW_PROMPT_ID = 'interview_v3'
 
 // ---------------------------------------------------------------------------
 // Section builders
@@ -143,11 +143,17 @@ ${strongBulletSummary}
 
 ${weakBulletQuestions}
 
-**Interview approach with resume context:**
-- Phase 1: Acknowledge you've reviewed their resume. Summarize the strong highlights briefly and ask if they want to add or correct anything.
-- Phase 2: For each weak bullet, ask the suggested question to get more detail. Create bullets once the user provides enough info.
-- Phase 3: After covering all weak bullets, explore any positions or experiences not well covered in the resume.
-- Do NOT re-ask about details already captured as strong bullets unless the user wants to expand on them.`
+**Interview approach with resume context — SYSTEMATIC COVERAGE:**
+- Phase 1: Acknowledge you've reviewed their resume. Briefly mention 1-2 strong highlights, then immediately transition to the first weak bullet that needs work.
+- Phase 2: Address EACH weak bullet one at a time. For each:
+  1. Quote the bullet and explain specifically what's missing (e.g., "This bullet about improving API performance is missing a concrete metric — do you know by how much it improved?")
+  2. Probe for the missing information (metrics, context, result, etc.)
+  3. You may need 2-3 back-and-forths per bullet to get enough detail
+  4. Only move to the next weak bullet when: (a) the user has provided enough info to strengthen it, OR (b) the user explicitly says they want to skip it
+  5. Track your progress — do NOT skip any weak bullets
+- Phase 3: After ALL weak bullets are addressed, transition to normal exploratory interview mode — discover additional experience not on the resume.
+- Do NOT re-ask about details already captured as strong bullets unless the user wants to expand on them.
+- CRITICAL: You must address every single weak bullet before moving to Phase 3. Do not rush through them.`
 }
 
 function buildGapContextSection(context: GapContext): string {
@@ -172,12 +178,17 @@ ${context.existingBulletSummary}
 
 ${gapList}
 
-**Interview approach with gap context:**
-- Focus on the gap areas — ask targeted questions to uncover relevant experience the user may not have mentioned.
-- Start with must-have gaps before nice-to-have gaps.
-- For each gap, ask if they have any relevant experience, projects, or transferable skills.
-- If the user has experience in a gap area, probe for specifics (metrics, scope, impact) to create strong bullets.
-- If the user genuinely lacks experience in an area, acknowledge it and move on — do not force it.`
+**Interview approach with gap context — SYSTEMATIC COVERAGE:**
+- Phase 1: Address EACH gap one at a time, starting with must-have gaps before nice-to-have gaps. For each gap:
+  1. Explain what the job requires (e.g., "The role requires experience with distributed systems, and I don't see that on your resume yet")
+  2. Ask if they have any relevant experience, projects, or transferable skills
+  3. If the user shares experience: VERIFY CLOSURE — does the information actually fill the gap? Do we now have a concrete bullet or experience that maps to the JD requirement? If not, keep probing.
+  4. You may need 2-3 back-and-forths per gap to fully close it
+  5. Only move to the next gap when: (a) the gap is closed (you have a concrete experience/bullet for it), OR (b) the user explicitly says they don't have relevant experience
+  6. Track your progress — do NOT skip any gaps
+- Phase 2: After ALL gaps are addressed, transition to normal exploratory interview mode — discover additional strengths and experience.
+- CRITICAL: You must address every single gap before moving to Phase 2. Must-have gaps should be probed more deeply than nice-to-have gaps.
+- If the user genuinely lacks experience in an area, acknowledge it gracefully and move to the next gap — do not force it, but make sure to ask clearly first.`
 }
 
 function buildInterviewStrategySection(config: InterviewConfig): string {
@@ -277,7 +288,8 @@ For each accomplishment shared, internally extract:
 3. Category (Leadership, Frontend, Backend, Data, Communication, etc.)
 4. Hard skills (Python, React, SQL, etc.) and soft skills (teamwork, communication, etc.)
 
-Never invent metrics — if you don't have them, that's what follow-up questions are for.`
+Never invent metrics — if you don't have them, that's what follow-up questions are for.
+- Preserve exact numbers the user states. '40%' stays '40%', not 'significant improvement'.`
 }
 
 function buildOutputFormatSection(): string {

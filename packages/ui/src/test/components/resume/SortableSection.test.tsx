@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { SortableSection } from '../../../components/resume/SortableSection'
 import type { ResumeSection } from '@odie/db'
 import type { ReactNode } from 'react'
@@ -360,6 +361,178 @@ describe('SortableSection', () => {
       editBtn.click()
 
       expect(onEditBullet).toHaveBeenCalledWith('bullet-1')
+    })
+  })
+
+  describe('section delete', () => {
+    it('should render delete button when onDeleteSection is provided', () => {
+      const section: ResumeSection = {
+        id: 'experience',
+        title: 'Experience',
+        items: [],
+      }
+
+      render(
+        <SortableSection
+          section={section}
+          {...defaultProps}
+          onDeleteSection={vi.fn()}
+        />
+      )
+
+      expect(screen.getByTestId('delete-section-experience')).toBeInTheDocument()
+    })
+
+    it('should not render delete button when onDeleteSection is not provided', () => {
+      const section: ResumeSection = {
+        id: 'experience',
+        title: 'Experience',
+        items: [],
+      }
+
+      render(<SortableSection section={section} {...defaultProps} />)
+
+      expect(screen.queryByTestId('delete-section-experience')).not.toBeInTheDocument()
+    })
+
+    it('should call onDeleteSection after confirm', () => {
+      const onDelete = vi.fn()
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+      const section: ResumeSection = {
+        id: 'skills',
+        title: 'Skills',
+        items: [],
+      }
+
+      render(
+        <SortableSection
+          section={section}
+          {...defaultProps}
+          onDeleteSection={onDelete}
+        />
+      )
+
+      screen.getByTestId('delete-section-skills').click()
+      expect(window.confirm).toHaveBeenCalled()
+      expect(onDelete).toHaveBeenCalled()
+    })
+
+    it('should not call onDeleteSection when confirm is cancelled', () => {
+      const onDelete = vi.fn()
+      vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+      const section: ResumeSection = {
+        id: 'skills',
+        title: 'Skills',
+        items: [],
+      }
+
+      render(
+        <SortableSection
+          section={section}
+          {...defaultProps}
+          onDeleteSection={onDelete}
+        />
+      )
+
+      screen.getByTestId('delete-section-skills').click()
+      expect(onDelete).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('section rename', () => {
+    it('should enter edit mode when title is clicked and onRenameSection is provided', async () => {
+      const section: ResumeSection = {
+        id: 'experience',
+        title: 'Experience',
+        items: [],
+      }
+
+      render(
+        <SortableSection
+          section={section}
+          {...defaultProps}
+          onRenameSection={vi.fn()}
+        />
+      )
+
+      const title = screen.getByTestId('section-title-experience')
+      fireEvent.click(title)
+
+      expect(screen.getByTestId('section-title-input-experience')).toBeInTheDocument()
+    })
+
+    it('should not enter edit mode when onRenameSection is not provided', () => {
+      const section: ResumeSection = {
+        id: 'experience',
+        title: 'Experience',
+        items: [],
+      }
+
+      render(<SortableSection section={section} {...defaultProps} />)
+
+      const title = screen.getByTestId('section-title-experience')
+      fireEvent.click(title)
+
+      expect(screen.queryByTestId('section-title-input-experience')).not.toBeInTheDocument()
+    })
+
+    it('should call onRenameSection when Enter is pressed with new title', async () => {
+      const onRename = vi.fn()
+      const user = userEvent.setup()
+
+      const section: ResumeSection = {
+        id: 'experience',
+        title: 'Experience',
+        items: [],
+      }
+
+      render(
+        <SortableSection
+          section={section}
+          {...defaultProps}
+          onRenameSection={onRename}
+        />
+      )
+
+      const title = screen.getByTestId('section-title-experience')
+      fireEvent.click(title)
+
+      const input = screen.getByTestId('section-title-input-experience')
+      await user.clear(input)
+      await user.type(input, 'Work History{Enter}')
+
+      expect(onRename).toHaveBeenCalledWith('Work History')
+    })
+
+    it('should cancel edit on Escape without calling onRenameSection', async () => {
+      const onRename = vi.fn()
+      const user = userEvent.setup()
+
+      const section: ResumeSection = {
+        id: 'experience',
+        title: 'Experience',
+        items: [],
+      }
+
+      render(
+        <SortableSection
+          section={section}
+          {...defaultProps}
+          onRenameSection={onRename}
+        />
+      )
+
+      const title = screen.getByTestId('section-title-experience')
+      fireEvent.click(title)
+
+      const input = screen.getByTestId('section-title-input-experience')
+      await user.type(input, 'New Name{Escape}')
+
+      expect(onRename).not.toHaveBeenCalled()
+      // Should return to display mode
+      expect(screen.getByTestId('section-title-experience')).toBeInTheDocument()
     })
   })
 })

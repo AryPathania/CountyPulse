@@ -138,4 +138,28 @@ test.describe('Gap Analysis on Draft Page', () => {
     await expect(page.getByRole('heading', { name: MOCK_JOB_DRAFTS[0].job_title, level: 1 })).toBeVisible()
     await expect(page.getByText(MOCK_JOB_DRAFTS[0].company).first()).toBeVisible()
   })
+
+  test('gap with skill match shows Partial badge', async ({ page }) => {
+    await page.goto('/resumes/draft-1')
+
+    await expect(page.getByTestId('gap-analysis')).toBeVisible({ timeout: 10000 })
+
+    const gapItems = page.getByTestId('gap-item')
+    await expect(gapItems).toHaveCount(2)
+
+    // One gap should show "Partial" (the one with skillMatch)
+    await expect(gapItems.filter({ hasText: 'Partial' })).toHaveCount(1)
+    // One gap should show "Gap" (the one without skillMatch)
+    await expect(gapItems.filter({ hasText: 'Gap' })).toHaveCount(1)
+  })
+
+  test('skill match label displays matching skill name', async ({ page }) => {
+    await page.goto('/resumes/draft-1')
+
+    await expect(page.getByTestId('gap-analysis')).toBeVisible({ timeout: 10000 })
+
+    const skillMatch = page.getByTestId('skill-match')
+    await expect(skillMatch).toBeVisible()
+    await expect(skillMatch).toContainText('Skill match: Leadership')
+  })
 })

@@ -18,7 +18,10 @@ export function SortableSubSection({ subsection, onEdit, onDelete }: SortableSub
     startDate: subsection.startDate ?? '',
     endDate: subsection.endDate ?? '',
     location: subsection.location ?? '',
+    textItems: subsection.textItems?.join(', ') ?? '',
   })
+
+  const hasTextItems = !!(subsection.textItems && subsection.textItems.length > 0)
 
   const {
     attributes,
@@ -35,12 +38,16 @@ export function SortableSubSection({ subsection, onEdit, onDelete }: SortableSub
   }
 
   const handleSave = () => {
+    const textItemsArray = editForm.textItems
+      ? editForm.textItems.split(',').map(s => s.trim()).filter(Boolean)
+      : undefined
     onEdit({
       title: editForm.title,
       subtitle: editForm.subtitle || undefined,
       startDate: editForm.startDate || undefined,
       endDate: editForm.endDate || undefined,
       location: editForm.location || undefined,
+      textItems: textItemsArray,
     })
     setIsEditing(false)
     console.debug('[SortableSubSection] sub-section edited: %s', subsection.id)
@@ -53,6 +60,7 @@ export function SortableSubSection({ subsection, onEdit, onDelete }: SortableSub
       startDate: subsection.startDate ?? '',
       endDate: subsection.endDate ?? '',
       location: subsection.location ?? '',
+      textItems: subsection.textItems?.join(', ') ?? '',
     })
     setIsEditing(false)
   }
@@ -109,6 +117,16 @@ export function SortableSubSection({ subsection, onEdit, onDelete }: SortableSub
             className="sortable-subsection__input"
             data-testid={`subsection-location-input-${subsection.id}`}
           />
+          {(hasTextItems || editForm.textItems) && (
+            <input
+              type="text"
+              value={editForm.textItems}
+              onChange={(e) => setEditForm({ ...editForm, textItems: e.target.value })}
+              placeholder="Items (comma-separated, e.g., Python, TypeScript, AWS)"
+              className="sortable-subsection__input"
+              data-testid={`subsection-textitems-input-${subsection.id}`}
+            />
+          )}
           <div className="sortable-subsection__edit-actions">
             <button type="button" className="btn-primary" onClick={handleSave} data-testid={`subsection-save-${subsection.id}`}>
               Save
@@ -146,14 +164,20 @@ export function SortableSubSection({ subsection, onEdit, onDelete }: SortableSub
             </span>
           )}
         </div>
-        <div className="sortable-subsection__bottom">
-          {subsection.subtitle && (
-            <span className="sortable-subsection__subtitle">{subsection.subtitle}</span>
-          )}
-          {subsection.location && (
-            <span className="sortable-subsection__location">{subsection.location}</span>
-          )}
-        </div>
+        {hasTextItems ? (
+          <div className="sortable-subsection__text-items">
+            {subsection.textItems!.join(', ')}
+          </div>
+        ) : (
+          <div className="sortable-subsection__bottom">
+            {subsection.subtitle && (
+              <span className="sortable-subsection__subtitle">{subsection.subtitle}</span>
+            )}
+            {subsection.location && (
+              <span className="sortable-subsection__location">{subsection.location}</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="sortable-subsection__actions">

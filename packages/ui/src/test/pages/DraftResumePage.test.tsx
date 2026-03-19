@@ -246,7 +246,8 @@ describe('DraftResumePage', () => {
       expect(mockCreateResumeFromDraft).toHaveBeenCalledWith(
         'test-user-id',
         'Senior Software Engineer',
-        ['bullet-1', 'bullet-2']
+        ['bullet-1', 'bullet-2'],
+        undefined
       )
     })
 
@@ -316,7 +317,8 @@ describe('DraftResumePage', () => {
       expect(mockAnalyzeJobDescriptionGaps).toHaveBeenCalledWith(
         'test-user-id',
         mockDraft.jd_text,
-        mockDraft.id
+        mockDraft.id,
+        undefined
       )
     })
   })
@@ -351,7 +353,8 @@ describe('DraftResumePage', () => {
       expect(mockAnalyzeJobDescriptionGaps).toHaveBeenCalledWith(
         'test-user-id',
         mockDraft.jd_text,
-        mockDraft.id
+        mockDraft.id,
+        undefined
       )
     })
   })
@@ -380,7 +383,8 @@ describe('DraftResumePage', () => {
     expect(mockAnalyzeJobDescriptionGaps).toHaveBeenCalledWith(
       'test-user-id',
       mockDraft.jd_text,
-      mockDraft.id
+      mockDraft.id,
+      undefined
     )
   })
 

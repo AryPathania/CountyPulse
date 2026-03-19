@@ -109,8 +109,8 @@ describe('buildInterviewPrompt', () => {
 })
 
 describe('INTERVIEW_PROMPT_ID', () => {
-  it('equals "interview_v2"', () => {
-    expect(INTERVIEW_PROMPT_ID).toBe('interview_v2')
+  it('equals "interview_v3"', () => {
+    expect(INTERVIEW_PROMPT_ID).toBe('interview_v3')
   })
 })
 

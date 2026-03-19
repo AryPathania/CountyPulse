@@ -50,5 +50,7 @@ A weak bullet lacks substance and needs more information:
   - "fixed poorly written code" -> "Refactored legacy codebase to improve maintainability"
   - "inherited a bad system" -> "Modernized inherited system architecture"
   - "previous team failed to..." -> "Led initiative to establish..."
-- NEVER invent or guess metrics — if information is missing, classify as weak and generate a question`
+- NEVER invent or guess metrics — if information is missing, classify as weak and generate a question
+
+CRITICAL: When rewriting any bullet, every metric from the original (40%, $2M, 10k users, etc.) MUST appear verbatim in the output. Never drop, round, or rephrase specific numbers, percentages, dollar amounts, or counts.`
 }

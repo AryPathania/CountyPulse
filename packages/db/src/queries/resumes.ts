@@ -19,6 +19,7 @@ export interface SubSectionData {
   endDate?: string
   location?: string
   positionId?: string
+  textItems?: string[]
 }
 
 /**
@@ -349,12 +350,97 @@ export async function deleteResume(resumeId: string): Promise<void> {
   if (error) throw error
 }
 
+/** Default section IDs for the three built-in resume sections. */
+export const DEFAULT_SECTIONS = ['Experience', 'Skills', 'Education'] as const
+
+/** Suggested custom sections users can add. */
+export const SUGGESTED_SECTIONS = [
+  'Projects', 'Awards', 'Certifications', 'Publications',
+  'Volunteer', 'Hobbies', 'Languages', 'Summary',
+] as const
+
 /**
  * Result of grouping bullets by position into sub-sections.
  */
 export interface GroupedBulletsResult {
   items: ResumeContentItem[]
   subsections: SubSectionData[]
+}
+
+/**
+ * Build section entries from an array of sub-section descriptors.
+ * Pure function — creates one `subsection` ResumeContentItem per entry.
+ *
+ * This is the generic building block for populating any section
+ * (education, skills, projects, etc.) with structured sub-sections.
+ */
+export function buildSectionEntries(
+  entries: Array<Omit<SubSectionData, 'positionId'>>
+): GroupedBulletsResult {
+  const items: ResumeContentItem[] = []
+  const subsections: SubSectionData[] = []
+
+  for (const entry of entries) {
+    subsections.push(entry)
+    items.push({ type: 'subsection', subsectionId: entry.id })
+  }
+
+  return { items, subsections }
+}
+
+/** Education entry shape from the parse-resume pipeline. */
+export interface ParsedEducation {
+  institution: string
+  degree?: string | null
+  field?: string | null
+  graduationDate?: string | null
+}
+
+/**
+ * Convert parsed education entries into section entries.
+ */
+export function buildEducationEntries(
+  education: ParsedEducation[]
+): GroupedBulletsResult {
+  return buildSectionEntries(
+    education.map((e, i) => ({
+      id: `edu-${i}`,
+      title: [e.degree, e.field].filter(Boolean).join(' in ') || e.institution,
+      subtitle: e.institution,
+      endDate: e.graduationDate ?? undefined,
+    }))
+  )
+}
+
+/** Skills shape from the parse-resume pipeline. */
+export interface ParsedSkills {
+  hard: string[]
+  soft: string[]
+}
+
+/**
+ * Convert parsed skills into section entries with textItems.
+ * Creates one sub-section per non-empty category.
+ */
+export function buildSkillsEntries(
+  skills: ParsedSkills
+): GroupedBulletsResult {
+  const entries: Array<Omit<SubSectionData, 'positionId'>> = []
+
+  if (skills.hard.length > 0) {
+    entries.push({ id: 'skills-hard', title: 'Technical Skills', textItems: skills.hard })
+  }
+  if (skills.soft.length > 0) {
+    entries.push({ id: 'skills-soft', title: 'Interpersonal Skills', textItems: skills.soft })
+  }
+
+  return buildSectionEntries(entries)
+}
+
+/** Options for populating education and skills when creating a resume from a draft. */
+export interface ResumeFromDraftOptions {
+  education?: ParsedEducation[]
+  skills?: ParsedSkills
 }
 
 /**
@@ -429,7 +515,8 @@ export function groupBulletsByPosition(
 export async function createResumeFromDraft(
   userId: string,
   name: string,
-  bulletIds: string[]
+  bulletIds: string[],
+  options?: ResumeFromDraftOptions
 ): Promise<Resume> {
   let experienceResult: GroupedBulletsResult = { items: [], subsections: [] }
 
@@ -472,6 +559,15 @@ export async function createResumeFromDraft(
     )
   }
 
+  // Build education and skills sections from parsed data when available
+  const educationResult = options?.education?.length
+    ? buildEducationEntries(options.education)
+    : { items: [], subsections: [] }
+
+  const skillsResult = options?.skills
+    ? buildSkillsEntries(options.skills)
+    : { items: [], subsections: [] }
+
   const content: ResumeContent = {
     sections: [
       {
@@ -483,14 +579,14 @@ export async function createResumeFromDraft(
       {
         id: 'skills',
         title: 'Skills',
-        items: [],
-        subsections: [],
+        items: skillsResult.items,
+        subsections: skillsResult.subsections,
       },
       {
         id: 'education',
         title: 'Education',
-        items: [],
-        subsections: [],
+        items: educationResult.items,
+        subsections: educationResult.subsections,
       },
     ],
   }

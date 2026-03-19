@@ -353,4 +353,98 @@ test.describe('Resume Builder Editor', () => {
     // "New Sub-Section" text should appear after clicking add
     await expect(sectionEl.getByText('New Sub-Section')).toBeVisible()
   })
+
+  test('textItems render as comma-separated list in template preview', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    const subsection = page.getByTestId('template-subsection-sub-skills-hard')
+    await expect(subsection).toBeVisible()
+    await expect(subsection).toContainText('Technical Skills')
+    await expect(subsection).toContainText('React, TypeScript, AWS, Docker')
+  })
+
+  test('textItems render in builder editor', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    const subsection = page.getByTestId('subsection-sub-skills-hard')
+    await expect(subsection).toBeVisible()
+    await expect(subsection).toContainText('React, TypeScript, AWS, Docker')
+  })
+
+  test('Add Section button opens dropdown', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    const addBtn = page.getByTestId('add-section-btn')
+    await expect(addBtn).toBeVisible()
+    await addBtn.click()
+
+    const dropdown = page.getByTestId('add-section-dropdown')
+    await expect(dropdown).toBeVisible()
+
+    // "Projects" should be a suggested option
+    await expect(page.getByTestId('add-section-option-Projects')).toBeVisible()
+  })
+
+  test('can add a custom section', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    // Open add-section dropdown
+    await page.getByTestId('add-section-btn').click()
+    await expect(page.getByTestId('add-section-dropdown')).toBeVisible()
+
+    // Click custom section button
+    await page.getByTestId('add-section-custom-btn').click()
+
+    // Fill in custom section name
+    const nameInput = page.getByTestId('add-section-custom-name')
+    await expect(nameInput).toBeVisible()
+    await nameInput.fill('Certifications')
+
+    // Confirm
+    await page.getByTestId('add-section-custom-confirm').click()
+
+    // A section with title "Certifications" should appear in the editor
+    await expect(page.getByText('Certifications')).toBeVisible()
+  })
+
+  test('can rename a section', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    // Click the section title to enter edit mode
+    const titleEl = page.getByTestId('section-title-section-experience')
+    await expect(titleEl).toBeVisible()
+    await titleEl.click()
+
+    // The input should appear
+    const titleInput = page.getByTestId('section-title-input-section-experience')
+    await expect(titleInput).toBeVisible()
+
+    // Clear and type new name
+    await titleInput.clear()
+    await titleInput.fill('Work Experience')
+    await titleInput.press('Enter')
+
+    // The section title should now show the new name
+    await expect(page.getByTestId('section-title-section-experience')).toContainText('Work Experience')
+  })
+
+  test('can delete a section', async ({ page }) => {
+    await page.goto('/resumes/resume-1/edit')
+
+    // Both sections should be visible (Experience + Skills)
+    await expect(page.getByTestId('section-section-experience')).toBeVisible()
+    await expect(page.getByTestId('section-section-skills')).toBeVisible()
+
+    // Auto-accept the confirm dialog
+    page.on('dialog', (dialog) => dialog.accept())
+
+    // Click delete on the skills section
+    await page.getByTestId('delete-section-section-skills').click()
+
+    // Skills section should be removed
+    await expect(page.getByTestId('section-section-skills')).not.toBeVisible()
+
+    // Add section button should still exist
+    await expect(page.getByTestId('add-section-btn')).toBeVisible()
+  })
 })

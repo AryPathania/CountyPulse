@@ -191,7 +191,8 @@ describe('job-drafts queries', () => {
       expect(mockAnalyzeJobDescriptionGaps).toHaveBeenCalledWith(
         'user-123',
         'Looking for a senior engineer...',
-        'draft-1'
+        'draft-1',
+        undefined
       )
     })
 

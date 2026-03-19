@@ -21,6 +21,8 @@ export interface ResumeUploadResult {
     fixableBullets: number
     weakBullets: number
     positions: number
+    educationEntries: number
+    skillsCount: number
   }
 }
 
@@ -225,6 +227,8 @@ function buildResult(
       fixableBullets: fixableBullets.length,
       weakBullets: weakBullets.length,
       positions: parsedData.positions.length,
+      educationEntries: parsedData.education.length,
+      skillsCount: parsedData.skills.hard.length + parsedData.skills.soft.length,
     },
   }
 }

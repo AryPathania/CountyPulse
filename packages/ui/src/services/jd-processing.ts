@@ -96,15 +96,45 @@ export interface CoveredRequirement {
   matchedBullets: MatchedBullet[]
 }
 
+export interface UserSkills {
+  hard: string[]
+  soft: string[]
+}
+
+export interface GapItem {
+  requirement: RequirementInfo
+  skillMatch?: string
+}
+
 export interface GapAnalysisServiceResult {
   draftId: string
   jobTitle: string
   company: string | null
   covered: CoveredRequirement[]
-  gaps: Array<{ requirement: RequirementInfo }>
+  gaps: GapItem[]
   totalRequirements: number
   coveredCount: number
   interviewContext: InterviewContext | null
+}
+
+/**
+ * Check if any user skill (case-insensitive) appears in the requirement text.
+ * Returns the first matching skill name, or undefined if none match.
+ * Pure function — no side effects.
+ */
+export function findSkillMatch(
+  requirementText: string,
+  skills?: UserSkills
+): string | undefined {
+  if (!skills) return undefined
+  const lower = requirementText.toLowerCase()
+  const allSkills = [...skills.hard, ...skills.soft]
+  for (const skill of allSkills) {
+    if (skill && lower.includes(skill.toLowerCase())) {
+      return skill
+    }
+  }
+  return undefined
 }
 
 /**
@@ -147,13 +177,16 @@ export function buildGapDataFromStored(
     jobTitle: string
     company: string | null
     covered: CoveredRequirement[]
-    gaps: RequirementInfo[]
+    gaps: Array<RequirementInfo & { skillMatch?: string }>
     totalRequirements: number
     coveredCount: number
     analyzedAt: string
   }
 ): GapAnalysisServiceResult & { analyzedAt: string } {
-  const gaps = storedGapAnalysis.gaps.map(g => ({ requirement: g }))
+  const gaps = storedGapAnalysis.gaps.map(g => {
+    const { skillMatch, ...requirement } = g
+    return { requirement, ...(skillMatch ? { skillMatch } : {}) }
+  })
   const interviewContext = buildInterviewContextFromGaps(
     gaps,
     storedGapAnalysis.covered,
@@ -186,7 +219,8 @@ export function buildGapDataFromStored(
 export async function analyzeJobDescriptionGaps(
   userId: string,
   jdText: string,
-  draftId: string
+  draftId: string,
+  skills?: UserSkills
 ): Promise<GapAnalysisServiceResult> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not authenticated')
@@ -248,9 +282,13 @@ export async function analyzeJobDescriptionGaps(
 
   const gaps = matchResults
     .filter(r => !r.isCovered)
-    .map(r => ({
-      requirement: r.requirement,
-    }))
+    .map(r => {
+      const skillMatch = findSkillMatch(r.requirement.description, skills)
+      return {
+        requirement: r.requirement,
+        ...(skillMatch ? { skillMatch } : {}),
+      }
+    })
 
   // 5. Store results on job_drafts (with full bullet data, not just IDs)
   const gapAnalysis = {
@@ -260,7 +298,7 @@ export async function analyzeJobDescriptionGaps(
       requirement: c.requirement,
       matchedBullets: c.matchedBullets,
     })),
-    gaps: gaps.map(g => g.requirement),
+    gaps: gaps.map(g => ({ ...g.requirement, ...(g.skillMatch ? { skillMatch: g.skillMatch } : {}) })),
     totalRequirements: requirements.length,
     coveredCount: covered.length,
     analyzedAt: new Date().toISOString(),

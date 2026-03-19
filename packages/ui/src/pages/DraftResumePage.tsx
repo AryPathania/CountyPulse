@@ -1,12 +1,14 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getUploadedResumes } from '@odie/db'
+import type { ResumeParseOutput } from '@odie/shared'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
 import { useJobDraftWithBullets, useRunGapAnalysis } from '../queries/job-drafts'
 import { useCreateResumeFromDraft } from '../queries/resumes'
-import { bulletKeys } from '../queries/bullets'
-import { buildGapDataFromStored, type GapAnalysisServiceResult } from '../services/jd-processing'
+import { bulletKeys, useBullets } from '../queries/bullets'
+import { buildGapDataFromStored, type GapAnalysisServiceResult, type UserSkills } from '../services/jd-processing'
 import { GapAnalysis } from '../components/draft/GapAnalysis'
 import './DraftResumePage.css'
 
@@ -25,6 +27,41 @@ export function DraftResumePage() {
   const { data: draft, isLoading, error: loadError } = useJobDraftWithBullets(
     id && id !== 'draft' ? id : undefined
   )
+
+  // Fetch most recent uploaded resume to get education/skills parsed data
+  const { data: uploadedResumes } = useQuery({
+    queryKey: ['uploadedResumes', user?.id],
+    queryFn: () => getUploadedResumes(user!.id),
+    enabled: !!user?.id,
+  })
+
+  // Fetch user bullets for skill aggregation
+  const { data: userBullets } = useBullets(user?.id)
+
+  // Aggregate skills from uploaded resume parsed data + bullet skills
+  const aggregatedSkills: UserSkills | undefined = useMemo(() => {
+    const hard = new Set<string>()
+    const soft = new Set<string>()
+
+    // From uploaded resume parsed data
+    const latestUpload = uploadedResumes?.[0]
+    const parsedData = latestUpload?.parsed_data as ResumeParseOutput | null | undefined
+    if (parsedData?.skills) {
+      parsedData.skills.hard.forEach(s => hard.add(s))
+      parsedData.skills.soft.forEach(s => soft.add(s))
+    }
+
+    // From bullet hard_skills / soft_skills
+    if (userBullets) {
+      for (const bullet of userBullets) {
+        bullet.hard_skills?.forEach(s => hard.add(s))
+        bullet.soft_skills?.forEach(s => soft.add(s))
+      }
+    }
+
+    if (hard.size === 0 && soft.size === 0) return undefined
+    return { hard: [...hard], soft: [...soft] }
+  }, [uploadedResumes, userBullets])
 
   // Gap analysis mutation
   const gapAnalysis = useRunGapAnalysis()
@@ -53,19 +90,32 @@ export function DraftResumePage() {
   // Auto-trigger gap analysis when needed
   useEffect(() => {
     if (needsAnalysis && !isAnalyzing && !gapAnalysis.data && draft?.jd_text && user?.id) {
-      gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id })
+      gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id, skills: aggregatedSkills })
     }
-  }, [needsAnalysis, isAnalyzing, gapAnalysis, draft?.id, draft?.jd_text, user?.id])
+  }, [needsAnalysis, isAnalyzing, gapAnalysis, draft?.id, draft?.jd_text, user?.id, aggregatedSkills])
 
   const handleCreateResume = useCallback(() => {
     if (!draft || !user?.id) return
     const bulletIds = draft.bullets.map(b => b.id)
     const name = gapData?.jobTitle || draft.job_title || 'Untitled Resume'
+
+    // Extract education/skills from the most recent uploaded resume's parsed data
+    const latestUpload = uploadedResumes?.[0]
+    const parsedData = latestUpload?.parsed_data as ResumeParseOutput | null | undefined
+
     createResume.mutate(
-      { userId: user.id, name, bulletIds },
+      {
+        userId: user.id,
+        name,
+        bulletIds,
+        options: parsedData ? {
+          education: parsedData.education,
+          skills: parsedData.skills,
+        } : undefined,
+      },
       { onSuccess: (resume) => navigate(`/resumes/${resume.id}/edit`) }
     )
-  }, [draft, user?.id, gapData?.jobTitle, createResume, navigate])
+  }, [draft, user?.id, gapData?.jobTitle, createResume, navigate, uploadedResumes])
 
   const error = loadError instanceof Error ? loadError.message : loadError ? String(loadError) : null
 
@@ -196,7 +246,7 @@ export function DraftResumePage() {
               <button
                 onClick={() => {
                   if (draft?.jd_text && user?.id) {
-                    gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id })
+                    gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id, skills: aggregatedSkills })
                   }
                 }}
                 className="btn-secondary"

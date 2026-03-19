@@ -100,6 +100,20 @@ export function ClassicTemplate({ resume }: TemplateProps) {
                   const subsection = getSubSectionById(item.subsectionId, section.subsections)
                   if (!subsection) return null
 
+                  // Subsections with textItems render as comma-separated lists (e.g., skills)
+                  if (subsection.textItems && subsection.textItems.length > 0) {
+                    return (
+                      <div
+                        key={`sub-${item.subsectionId}-${index}`}
+                        className="classic-template__text-items"
+                        data-testid={`template-subsection-${item.subsectionId}`}
+                      >
+                        <strong>{subsection.title}:</strong>{' '}
+                        {subsection.textItems.join(', ')}
+                      </div>
+                    )
+                  }
+
                   return (
                     <div
                       key={`sub-${item.subsectionId}-${index}`}

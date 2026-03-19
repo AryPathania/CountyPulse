@@ -59,8 +59,8 @@ export function useRunGapAnalysis() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ userId, jdText, draftId }: { userId: string; jdText: string; draftId: string }) => {
-      return analyzeJobDescriptionGaps(userId, jdText, draftId)
+    mutationFn: async ({ userId, jdText, draftId, skills }: { userId: string; jdText: string; draftId: string; skills?: { hard: string[]; soft: string[] } }) => {
+      return analyzeJobDescriptionGaps(userId, jdText, draftId, skills)
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: jobDraftKeys.withBullets(variables.draftId) })

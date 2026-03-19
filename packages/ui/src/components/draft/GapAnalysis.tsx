@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import type { InterviewContext, CoveredRequirement, GapRequirement } from '@odie/shared'
+import { StartInterviewButton } from '../interview/StartInterviewButton'
 import './GapAnalysis.css'
 
 // UI-specific covered requirement shape (bullet fields renamed for display)
@@ -28,14 +28,7 @@ export function GapAnalysis({
   coveredCount,
   interviewContext,
 }: GapAnalysisProps) {
-  const navigate = useNavigate()
   const [expandedReq, setExpandedReq] = useState<number | null>(null)
-
-  const handleInterviewForGaps = useCallback(() => {
-    if (interviewContext) {
-      navigate('/interview', { state: { interviewContext } })
-    }
-  }, [navigate, interviewContext])
 
   return (
     <div className="gap-analysis" data-testid="gap-analysis">
@@ -57,9 +50,16 @@ export function GapAnalysis({
           <ul className="gap-analysis__list">
             {gaps.map((g, i) => (
               <li key={`gap-${i}`} className="gap-analysis__item gap-analysis__item--gap" data-testid="gap-item">
-                <span className="gap-analysis__badge gap-analysis__badge--gap">Gap</span>
+                <span className={`gap-analysis__badge gap-analysis__badge--${g.skillMatch ? 'partial' : 'gap'}`}>
+                  {g.skillMatch ? 'Partial' : 'Gap'}
+                </span>
                 <span className="gap-analysis__description">{g.requirement.description}</span>
                 <span className="gap-analysis__category">{g.requirement.category}</span>
+                {g.skillMatch && (
+                  <span className="gap-analysis__skill-match" data-testid="skill-match">
+                    Skill match: {g.skillMatch}
+                  </span>
+                )}
                 {g.requirement.importance === 'must_have' && (
                   <span className="gap-analysis__importance">Required</span>
                 )}
@@ -107,13 +107,11 @@ export function GapAnalysis({
 
       {interviewContext && gaps.length > 0 && (
         <div className="gap-analysis__actions">
-          <button
-            onClick={handleInterviewForGaps}
-            className="btn-primary"
+          <StartInterviewButton
+            context={interviewContext}
+            label="Interview for Gaps"
             data-testid="interview-for-gaps"
-          >
-            Interview for Gaps
-          </button>
+          />
         </div>
       )}
     </div>
