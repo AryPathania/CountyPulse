@@ -1,7 +1,9 @@
 import { useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getUploadedResumes } from '@odie/db'
+import { getUploadedResumes, getProfileEntries, toSubSectionData } from '@odie/db'
+import { CATEGORY_LABELS } from '@odie/shared'
+import type { ProfileEntryCategory } from '@odie/shared'
 import type { ResumeParseOutput } from '@odie/shared'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
@@ -32,6 +34,13 @@ export function DraftResumePage() {
   const { data: uploadedResumes } = useQuery({
     queryKey: ['uploadedResumes', user?.id],
     queryFn: () => getUploadedResumes(user!.id),
+    enabled: !!user?.id,
+  })
+
+  // Fetch profile entries (education, certifications, awards, etc.)
+  const { data: profileEntries } = useQuery({
+    queryKey: ['profileEntries', user?.id],
+    queryFn: () => getProfileEntries(user!.id),
     enabled: !!user?.id,
   })
 
@@ -94,6 +103,23 @@ export function DraftResumePage() {
     }
   }, [needsAnalysis, isAnalyzing, gapAnalysis, draft?.id, draft?.jd_text, user?.id, aggregatedSkills])
 
+  // Group profile entries by category for resume creation
+  const groupedProfileEntries = useMemo(() => {
+    if (!profileEntries || profileEntries.length === 0) return undefined
+    const grouped = profileEntries.reduce(
+      (acc, entry) => {
+        if (!acc[entry.category]) acc[entry.category] = []
+        acc[entry.category].push(toSubSectionData(entry))
+        return acc
+      },
+      {} as Record<string, ReturnType<typeof toSubSectionData>[]>
+    )
+    return Object.entries(grouped).map(([category, entries]) => ({
+      category: CATEGORY_LABELS[category as ProfileEntryCategory] ?? category,
+      entries,
+    }))
+  }, [profileEntries])
+
   const handleCreateResume = useCallback(() => {
     if (!draft || !user?.id) return
     const bulletIds = draft.bullets.map(b => b.id)
@@ -108,14 +134,17 @@ export function DraftResumePage() {
         userId: user.id,
         name,
         bulletIds,
-        options: parsedData ? {
-          education: parsedData.education,
-          skills: parsedData.skills,
-        } : undefined,
+        options: {
+          ...(parsedData ? {
+            education: parsedData.education,
+            skills: parsedData.skills,
+          } : {}),
+          profileEntries: groupedProfileEntries,
+        },
       },
       { onSuccess: (resume) => navigate(`/resumes/${resume.id}/edit`) }
     )
-  }, [draft, user?.id, gapData?.jobTitle, createResume, navigate, uploadedResumes])
+  }, [draft, user?.id, gapData?.jobTitle, createResume, navigate, uploadedResumes, groupedProfileEntries])
 
   const error = loadError instanceof Error ? loadError.message : loadError ? String(loadError) : null
 

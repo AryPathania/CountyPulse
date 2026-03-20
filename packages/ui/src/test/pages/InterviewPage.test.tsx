@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 import { InterviewPage } from '../../pages/InterviewPage'
-import type { ExtractedInterviewData } from '@odie/shared'
+import type { ExtractedInterviewData, ChatMessage } from '@odie/shared'
 
 // Create a fresh QueryClient for each test
 function createTestQueryClient() {
@@ -48,27 +48,33 @@ const mockCreatePosition = vi.fn()
 const mockCreateDraftBullet = vi.fn()
 const mockFinalizeDraftBullets = vi.fn()
 const mockEmbedBullets = vi.fn()
+const mockCreateProfileEntry = vi.fn()
 vi.mock('@odie/db', () => ({
   createPositionWithBullets: (...args: unknown[]) => mockCreatePositionWithBullets(...args),
   createPosition: (...args: unknown[]) => mockCreatePosition(...args),
   createDraftBullet: (...args: unknown[]) => mockCreateDraftBullet(...args),
   finalizeDraftBullets: (...args: unknown[]) => mockFinalizeDraftBullets(...args),
   embedBullets: (...args: unknown[]) => mockEmbedBullets(...args),
+  createProfileEntry: (...args: unknown[]) => mockCreateProfileEntry(...args),
 }))
 
-// Capture onComplete so tests can invoke it with arbitrary data
+// Capture onComplete and onStateChange so tests can invoke them with arbitrary data
 let capturedOnComplete: ((data: ExtractedInterviewData) => void) | null = null
+let capturedOnStateChange: ((messages: ChatMessage[], extractedData: ExtractedInterviewData) => void) | null = null
 
 // Mock InterviewChat component to control its behavior
 vi.mock('../../components/interview/InterviewChat', () => ({
   InterviewChat: ({
     onComplete,
     onCancel,
+    onStateChange,
   }: {
     onComplete: (data: ExtractedInterviewData) => void
     onCancel: () => void
+    onStateChange?: (messages: ChatMessage[], extractedData: ExtractedInterviewData) => void
   }) => {
     capturedOnComplete = onComplete
+    capturedOnStateChange = onStateChange ?? null
     return (
       <div data-testid="mock-interview-chat">
         <button onClick={() => onComplete({ positions: [] })} data-testid="complete-empty">
@@ -194,7 +200,9 @@ describe('InterviewPage', () => {
     vi.clearAllMocks()
     mockUseAuth.mockReturnValue(defaultAuthReturn())
     capturedOnComplete = null
+    capturedOnStateChange = null
     mockConfirm.mockReturnValue(false)
+    mockCreateProfileEntry.mockResolvedValue({ id: 'entry-1' })
     mockLocalStorage.getItem.mockReturnValue(null)
     mockFinalizeDraftBullets.mockResolvedValue(undefined)
     mockEmbedBullets.mockResolvedValue(undefined)
@@ -809,6 +817,100 @@ describe('InterviewPage', () => {
 
       // Verify jobDrafts queries were invalidated
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ['jobDrafts'] })
+    })
+  })
+
+  describe('profile entry persistence via handleStateChange', () => {
+    it('should call createProfileEntry with date normalization when entries exist', async () => {
+      renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnStateChange).not.toBeNull()
+      })
+
+      const messages: ChatMessage[] = [
+        { id: 'msg-1', role: 'assistant', content: 'Hello', timestamp: new Date().toISOString() },
+      ]
+      const extractedData: ExtractedInterviewData = {
+        positions: [],
+        entries: [
+          {
+            category: 'education',
+            title: 'B.S. Computer Science',
+            subtitle: 'MIT',
+            startDate: '2018-09',
+            endDate: '2022-06',
+            location: 'Cambridge, MA',
+          },
+        ],
+      }
+
+      await act(async () => {
+        capturedOnStateChange!(messages, extractedData)
+      })
+
+      await waitFor(() => {
+        expect(mockCreateProfileEntry).toHaveBeenCalledWith('test-user-id', {
+          category: 'education',
+          title: 'B.S. Computer Science',
+          subtitle: 'MIT',
+          start_date: '2018-09-01',
+          end_date: '2022-06-01',
+          location: 'Cambridge, MA',
+        })
+      })
+    })
+
+    it('should not call createProfileEntry a second time for duplicate entry key', async () => {
+      renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnStateChange).not.toBeNull()
+      })
+
+      const messages: ChatMessage[] = [
+        { id: 'msg-1', role: 'assistant', content: 'Hello', timestamp: new Date().toISOString() },
+      ]
+      const entry = {
+        category: 'certification' as const,
+        title: 'AWS Certified',
+        subtitle: null,
+        startDate: null,
+        endDate: null,
+        location: null,
+      }
+      const extractedData: ExtractedInterviewData = {
+        positions: [],
+        entries: [entry],
+      }
+
+      // First call - should create the entry
+      await act(async () => {
+        capturedOnStateChange!(messages, extractedData)
+      })
+
+      await waitFor(() => {
+        expect(mockCreateProfileEntry).toHaveBeenCalledTimes(1)
+      })
+
+      // Second call with same entry - should be deduped via savedEntryKeysRef
+      await act(async () => {
+        capturedOnStateChange!(messages, extractedData)
+      })
+
+      // Allow any pending async work to settle
+      await waitFor(() => {
+        // Still only called once - dedup prevented the second call
+        expect(mockCreateProfileEntry).toHaveBeenCalledTimes(1)
+      })
     })
   })
 })

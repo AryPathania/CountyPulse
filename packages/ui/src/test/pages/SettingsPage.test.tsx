@@ -21,6 +21,10 @@ const mockUpsertProfile = vi.fn()
 vi.mock('@odie/db', () => ({
   getProfile: (...args: unknown[]) => mockGetProfile(...args),
   upsertProfile: (...args: unknown[]) => mockUpsertProfile(...args),
+  getProfileEntries: vi.fn().mockResolvedValue([]),
+  createProfileEntry: vi.fn().mockResolvedValue({}),
+  updateProfileEntry: vi.fn().mockResolvedValue({}),
+  deleteProfileEntry: vi.fn().mockResolvedValue(undefined),
   mapProfileToFormData: (profile: { display_name?: string | null; headline?: string | null; summary?: string | null; phone?: string | null; location?: string | null; links?: unknown[] | null } | null) => ({
     displayName: profile?.display_name ?? '',
     headline: profile?.headline ?? null,

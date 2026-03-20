@@ -4,7 +4,7 @@ This file is the human-readable source of truth for table/column names, relation
 
 **Updated by:** DB Agent only
 **Updated when:** any migration changes schema
-**Last updated:** 2026-03-19 (migrations 022-028; content JSON schema documented)
+**Last updated:** 2026-03-19 (migrations 022-030; profile_entries table added)
 
 ---
 
@@ -270,6 +270,44 @@ This file is the human-readable source of truth for table/column names, relation
 
 ---
 
+### profile_entries
+
+**Purpose:** Generic structured profile data entries (experience, education, projects, certifications, skills, etc.). Each row represents one entry within a category, ordered by `sort_order`.
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| id | uuid | no | gen_random_uuid() |
+| user_id | uuid | no | - |
+| category | text | no | - |
+| title | text | no | - |
+| subtitle | text | yes | - |
+| start_date | date | yes | - |
+| end_date | date | yes | - |
+| location | text | yes | - |
+| text_items | text[] | yes | '{}' |
+| sort_order | int | no | 0 |
+| created_at | timestamptz | yes | now() |
+| updated_at | timestamptz | yes | now() |
+
+**Constraints:**
+- PK: `id`
+- FK: `user_id -> auth.users(id) ON DELETE CASCADE`
+
+**Indexes:**
+- `idx_profile_entries_user_category` on `(user_id, category)`
+
+**RLS:**
+- SELECT/INSERT/UPDATE/DELETE: `user_id = auth.uid()`
+
+**Notes:**
+- `category` values: 'education', 'certification', 'award', 'project', 'volunteer' (defined by `ProfileEntryCategorySchema` in `@odie/shared`)
+- `text_items` holds sub-items (e.g., bullet points, skill lists) as a text array
+- `sort_order` controls display ordering within a category
+- `updated_at` auto-updates via `update_updated_at_column` trigger
+- Can be mapped to `SubSectionData` for resume content via `toSubSectionData()` helper in `@odie/db`
+
+---
+
 ## Functions
 
 ### match_bullets
@@ -302,11 +340,11 @@ match_bullets(
 
 **Purpose:** Wipe all user data for account reset (testing/dev)
 
-Deletes from: `bullets`, `positions`, `resumes`, `job_drafts`, `uploaded_resumes`, `runs`, `candidate_profiles` (in order, respecting FK constraints).
+Deletes from: `profile_entries`, `bullets`, `positions`, `resumes`, `job_drafts`, `uploaded_resumes`, `runs`, `candidate_profiles` (in order, respecting FK constraints).
 
 **Security:** Only callable by the owning user (`auth.uid() = target_user_id`)
 
-**Updated:** Migration 024 added `uploaded_resumes` deletion. Migration 025 added storage bucket RLS policies for `resumes` bucket. Migration 028 removed `user_profiles` deletion (table dropped).
+**Updated:** Migration 024 added `uploaded_resumes` deletion. Migration 025 added storage bucket RLS policies for `resumes` bucket. Migration 028 removed `user_profiles` deletion (table dropped). Migration 030 added `profile_entries` deletion.
 
 ---
 

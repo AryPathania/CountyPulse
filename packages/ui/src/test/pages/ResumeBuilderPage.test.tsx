@@ -965,7 +965,7 @@ describe('ResumeBuilderPage', () => {
       await userEvent.type(titleInput, 'Staff Engineer')
 
       // Submit the form
-      const saveBtn = screen.getByTestId('subsection-save-sub-pos-1')
+      const saveBtn = screen.getByTestId('subsection-edit-save')
       await userEvent.click(saveBtn)
 
       await waitFor(() => {

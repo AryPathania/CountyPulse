@@ -4,6 +4,7 @@ import type {
   InterviewStepResponse,
   InterviewPosition,
   InterviewBullet,
+  ProfileEntryCategory,
 } from '@odie/shared'
 import { InterviewStepResponseSchema } from '@odie/shared'
 
@@ -12,11 +13,21 @@ export interface InterviewServiceConfig {
   context?: { mode: string; [key: string]: unknown }
 }
 
+export interface ExtractedEntry {
+  category: ProfileEntryCategory
+  title: string
+  subtitle?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  location?: string | null
+}
+
 export interface InterviewResult {
   response: string
   extractedPosition?: InterviewPosition
   extractedBullets?: InterviewBullet[]
   shouldContinue: boolean
+  extractedEntries?: ExtractedEntry[] | null
 }
 
 /**
@@ -132,6 +143,7 @@ export async function sendInterviewMessage(
     extractedPosition: parsed.data.extractedPosition,
     extractedBullets: parsed.data.extractedBullets,
     shouldContinue: parsed.data.shouldContinue,
+    extractedEntries: parsed.data.extractedEntries,
   }
 }
 

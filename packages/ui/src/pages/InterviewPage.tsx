@@ -10,6 +10,7 @@ import {
   createDraftBullet,
   finalizeDraftBullets,
   embedBullets,
+  createProfileEntry,
 } from '@odie/db'
 import type { ExtractedInterviewData, ChatMessage } from '@odie/shared'
 import { toPostgresDate } from '@odie/shared'
@@ -36,8 +37,9 @@ export function InterviewPage() {
   const [savedPositionMap, setSavedPositionMap] = useState<Map<string, string>>(new Map())
   const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false)
 
-  // Track previously saved bullets to avoid duplicates
+  // Track previously saved bullets and entries to avoid duplicates
   const previouslySavedBulletsRef = useRef<Set<string>>(new Set())
+  const savedEntryKeysRef = useRef<Set<string>>(new Set())
 
   // Refs to track current values for localStorage persistence without causing callback recreation
   const savedBulletIdsRef = useRef<string[]>([])
@@ -134,6 +136,28 @@ export function InterviewPage() {
             queryClient.invalidateQueries({ queryKey: ['bullets'] })
           } catch (err) {
             console.error('Failed to create draft bullet:', err)
+          }
+        }
+      }
+
+      // Persist extracted entries (education, certifications, etc.) to profile_entries table
+      if (extractedData.entries && extractedData.entries.length > 0) {
+        for (const entry of extractedData.entries) {
+          const entryKey = `${entry.category}|${entry.title}|${entry.subtitle ?? ''}`
+          if (savedEntryKeysRef.current.has(entryKey)) continue
+
+          try {
+            await createProfileEntry(user.id, {
+              category: entry.category,
+              title: entry.title,
+              subtitle: entry.subtitle ?? null,
+              start_date: toPostgresDate(entry.startDate),
+              end_date: toPostgresDate(entry.endDate),
+              location: entry.location ?? null,
+            })
+            savedEntryKeysRef.current.add(entryKey)
+          } catch (err) {
+            console.error('Failed to create profile entry:', err)
           }
         }
       }

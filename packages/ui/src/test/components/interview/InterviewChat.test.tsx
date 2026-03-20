@@ -507,4 +507,202 @@ describe('InterviewChat', () => {
       })
     })
   })
+
+  describe('extractedEntries', () => {
+    it('shows entry count in completion summary when entries exist', async () => {
+      const initialExtractedData = {
+        positions: [
+          {
+            position: { company: 'Acme Corp', title: 'Engineer' },
+            bullets: [],
+          },
+        ],
+        entries: [
+          { category: 'education' as const, title: 'B.S. CS', subtitle: 'MIT' },
+          { category: 'certification' as const, title: 'AWS Certified', subtitle: null },
+        ],
+      }
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+          initialExtractedData={initialExtractedData}
+        />
+      )
+
+      // End interview to trigger completion summary
+      await userEvent.click(screen.getByTestId('interview-end'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-complete')).toBeInTheDocument()
+      })
+
+      const summary = screen.getByTestId('interview-complete')
+      expect(summary).toHaveTextContent('2 profile entry(ies)')
+    })
+
+    it('does not show entry count in completion summary when no entries', async () => {
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+        />
+      )
+
+      await userEvent.click(screen.getByTestId('interview-end'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-complete')).toBeInTheDocument()
+      })
+
+      const summary = screen.getByTestId('interview-complete')
+      expect(summary).not.toHaveTextContent('profile entry')
+    })
+
+    it('includes entries in onComplete callback data', async () => {
+      const initialExtractedData = {
+        positions: [],
+        entries: [
+          { category: 'education' as const, title: 'B.S. CS', subtitle: 'MIT' },
+        ],
+      }
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+          initialExtractedData={initialExtractedData}
+        />
+      )
+
+      await userEvent.click(screen.getByTestId('interview-end'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-complete')).toBeInTheDocument()
+      })
+
+      await userEvent.click(screen.getByTestId('interview-finish'))
+
+      expect(mockOnComplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entries: [
+            { category: 'education', title: 'B.S. CS', subtitle: 'MIT' },
+          ],
+        })
+      )
+    })
+
+    it('deduplicates extractedEntries returned by sendInterviewMessage', async () => {
+      const educationEntry = {
+        category: 'education' as const,
+        title: 'B.S. CS',
+        subtitle: 'MIT',
+        startDate: null,
+        endDate: null,
+        location: null,
+      }
+
+      // First response returns an education entry
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'test-token' } },
+      })
+      mockFunctionsInvoke
+        .mockResolvedValueOnce({
+          data: {
+            response: 'Tell me more about your education.',
+            extractedPosition: null,
+            extractedBullets: null,
+            shouldContinue: true,
+            extractedEntries: [educationEntry],
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: {
+            response: 'Great, anything else?',
+            extractedPosition: null,
+            extractedBullets: null,
+            shouldContinue: true,
+            // Same entry returned again - should be deduped
+            extractedEntries: [educationEntry],
+          },
+          error: null,
+        })
+
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          // No useMock - uses live mode with mocked supabase
+        />
+      )
+
+      // Wait for initial greeting
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-input')).toBeInTheDocument()
+      })
+
+      // Send first message - triggers entry extraction
+      const input = screen.getByTestId('interview-input')
+      await userEvent.type(input, 'I studied CS at MIT')
+      await userEvent.click(screen.getByTestId('interview-send'))
+
+      await waitFor(() => {
+        const msgs = screen.getAllByTestId('message-assistant')
+        expect(msgs.length).toBeGreaterThan(1)
+      })
+
+      // Send second message - same entry returned again
+      await userEvent.type(screen.getByTestId('interview-input'), 'Yes that is correct')
+      await userEvent.click(screen.getByTestId('interview-send'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Great, anything else?')).toBeInTheDocument()
+      })
+
+      // End interview and check onComplete data
+      await userEvent.click(screen.getByTestId('interview-end'))
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-complete')).toBeInTheDocument()
+      })
+
+      await userEvent.click(screen.getByTestId('interview-finish'))
+
+      // Entry should appear only once (dedup worked)
+      expect(mockOnComplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entries: [educationEntry],
+        })
+      )
+      expect(mockOnComplete.mock.calls[0][0].entries).toHaveLength(1)
+    })
+
+    it('initializes with empty entries array by default', async () => {
+      render(
+        <InterviewChat
+          onComplete={mockOnComplete}
+          onCancel={mockOnCancel}
+          config={{ useMock: true }}
+        />
+      )
+
+      await userEvent.click(screen.getByTestId('interview-end'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('interview-complete')).toBeInTheDocument()
+      })
+
+      await userEvent.click(screen.getByTestId('interview-finish'))
+
+      expect(mockOnComplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entries: [],
+        })
+      )
+    })
+  })
 })

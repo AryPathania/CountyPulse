@@ -52,6 +52,7 @@ pnpm gen-types        # Generate Supabase types
 - **Custom Sections**: All resume sections (including defaults like Experience, Education, Skills) are editable and deletable. An "Add Section" dropdown offers missing defaults, suggested sections (Projects, Certifications, etc.), and a custom-name option. Deleted defaults reappear in the menu for re-addition. Section CRUD is handled in `ResumeBuilderPage`.
 - **Metric Preservation**: LLM prompts enforce an always-on rule to preserve original metrics/numbers in bullets. Applied across `bullet-quality.ts`, `resume-parse.ts` (`resume_parse_v2`), and `interview.ts` (`interview_v3`).
 - **Profile Links**: Flexible `links JSONB NOT NULL DEFAULT '[]'` on `candidate_profiles`. Each entry is `{label, url}`. Max 8 enforced at app layer. Common types (LinkedIn, GitHub, Twitter, Website) offered as quick-add presets; fully custom labels supported. No fixed URL columns.
+- **Profile Entries**: Generic `profile_entries` table for structured non-bullet profile data (education, certifications, awards, projects, volunteer). Category-based with `sort_order`. Extracted during interviews via `extractedEntries` in the interview response schema. Mapped to `SubSectionData` via `toSubSectionData()` in `@odie/db` for resume content injection. Managed in Settings via `ProfileEntriesEditor`.
 
 ## Security
 
@@ -80,6 +81,8 @@ See `docs/adr/006_security_model.md` for the full security model. Summary:
 - `PersonalInfoPanel` — collapsible panel in `ResumeBuilderPage` for inline profile editing with live preview sync
 - `StartInterviewButton` (`packages/ui/src/components/interview/StartInterviewButton.tsx`) — reusable button that navigates to `/interview` with the correct `interviewContext`; used by ResumeUploadPage and DraftResumePage
 - `buildSectionEntries()` / `buildEducationEntries()` / `buildSkillsEntries()` (`packages/db/src/queries/resumes.ts`) — pure helpers that construct resume content sections from parsed data (positions, education, skills)
+- `SubSectionEditForm` (`packages/ui/src/components/resume/SubSectionEditForm.tsx`) — extracted reusable form for editing subsection fields (title, subtitle, meta, textItems); used by SortableSubSection and ProfileEntriesEditor
+- `ProfileEntriesEditor` (`packages/ui/src/components/ProfileEntriesEditor.tsx`) — Settings page component for managing profile_entries (education, certifications, awards, projects, volunteer)
 
 ## Routes
 - `/` — Home (JD paste + quick actions)
@@ -108,6 +111,7 @@ See `docs/adr/006_security_model.md` for the full security model. Summary:
 - `resumes` — Curated bullet selections (content JSON has sections with `SubSectionData[]` and items of type `subsection` | `bullet`)
 - `job_drafts` — JD + retrieval + gap analysis (`parsed_requirements`, `gap_analysis`)
 - `uploaded_resumes` — PDF uploads with cached parse results
+- `profile_entries` — Generic structured profile data (education, certification, award, project, volunteer). Category-based with sort_order. Mapped to `SubSectionData` via `toSubSectionData()`.
 - `runs` — LLM telemetry
 
 ## Theme
@@ -162,6 +166,11 @@ Use `debug-agent` for all bug fixes and feedback implementation.
 - 4 phases: Understand → Plan → Execute → Validate
 - See `.claude/agents/debug-agent.md` for full workflow
 - See `docs/code-quality-rules.md` for quality standards
+
+## Plan Review
+Use `refute-agent` as a devil's advocate before implementing new features or schema changes.
+- Stress-tests plans for edge cases, over-engineering, security gaps, and missed alternatives
+- See `.claude/agents/refute-agent.md` for full workflow
 
 ## Environment Variables
 ```env

@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { formatDisplayDate } from '@odie/shared'
 import type { SubSectionData } from '@odie/db'
+import { SubSectionEditForm } from './SubSectionEditForm'
 
 interface SortableSubSectionProps {
   subsection: SubSectionData
@@ -12,14 +13,6 @@ interface SortableSubSectionProps {
 
 export function SortableSubSection({ subsection, onEdit, onDelete }: SortableSubSectionProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState({
-    title: subsection.title,
-    subtitle: subsection.subtitle ?? '',
-    startDate: subsection.startDate ?? '',
-    endDate: subsection.endDate ?? '',
-    location: subsection.location ?? '',
-    textItems: subsection.textItems?.join(', ') ?? '',
-  })
 
   const hasTextItems = !!(subsection.textItems && subsection.textItems.length > 0)
 
@@ -37,34 +30,6 @@ export function SortableSubSection({ subsection, onEdit, onDelete }: SortableSub
     transition,
   }
 
-  const handleSave = () => {
-    const textItemsArray = editForm.textItems
-      ? editForm.textItems.split(',').map(s => s.trim()).filter(Boolean)
-      : undefined
-    onEdit({
-      title: editForm.title,
-      subtitle: editForm.subtitle || undefined,
-      startDate: editForm.startDate || undefined,
-      endDate: editForm.endDate || undefined,
-      location: editForm.location || undefined,
-      textItems: textItemsArray,
-    })
-    setIsEditing(false)
-    console.debug('[SortableSubSection] sub-section edited: %s', subsection.id)
-  }
-
-  const handleCancel = () => {
-    setEditForm({
-      title: subsection.title,
-      subtitle: subsection.subtitle ?? '',
-      startDate: subsection.startDate ?? '',
-      endDate: subsection.endDate ?? '',
-      location: subsection.location ?? '',
-      textItems: subsection.textItems?.join(', ') ?? '',
-    })
-    setIsEditing(false)
-  }
-
   if (isEditing) {
     return (
       <div
@@ -73,69 +38,15 @@ export function SortableSubSection({ subsection, onEdit, onDelete }: SortableSub
         className="sortable-subsection sortable-subsection--editing"
         data-testid={`subsection-${subsection.id}`}
       >
-        <div className="sortable-subsection__edit-form">
-          <input
-            type="text"
-            value={editForm.title}
-            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-            placeholder="Title (e.g., Senior Engineer)"
-            className="sortable-subsection__input"
-            data-testid={`subsection-title-input-${subsection.id}`}
-          />
-          <input
-            type="text"
-            value={editForm.subtitle}
-            onChange={(e) => setEditForm({ ...editForm, subtitle: e.target.value })}
-            placeholder="Subtitle (e.g., Company Name)"
-            className="sortable-subsection__input"
-            data-testid={`subsection-subtitle-input-${subsection.id}`}
-          />
-          <div className="sortable-subsection__date-row">
-            <input
-              type="text"
-              value={editForm.startDate}
-              onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
-              placeholder="Start (YYYY-MM)"
-              className="sortable-subsection__input sortable-subsection__input--date"
-              data-testid={`subsection-start-input-${subsection.id}`}
-            />
-            <span>&ndash;</span>
-            <input
-              type="text"
-              value={editForm.endDate}
-              onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
-              placeholder="End (YYYY-MM or empty)"
-              className="sortable-subsection__input sortable-subsection__input--date"
-              data-testid={`subsection-end-input-${subsection.id}`}
-            />
-          </div>
-          <input
-            type="text"
-            value={editForm.location}
-            onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-            placeholder="Location"
-            className="sortable-subsection__input"
-            data-testid={`subsection-location-input-${subsection.id}`}
-          />
-          {(hasTextItems || editForm.textItems) && (
-            <input
-              type="text"
-              value={editForm.textItems}
-              onChange={(e) => setEditForm({ ...editForm, textItems: e.target.value })}
-              placeholder="Items (comma-separated, e.g., Python, TypeScript, AWS)"
-              className="sortable-subsection__input"
-              data-testid={`subsection-textitems-input-${subsection.id}`}
-            />
-          )}
-          <div className="sortable-subsection__edit-actions">
-            <button type="button" className="btn-primary" onClick={handleSave} data-testid={`subsection-save-${subsection.id}`}>
-              Save
-            </button>
-            <button type="button" className="btn-secondary" onClick={handleCancel} data-testid={`subsection-cancel-${subsection.id}`}>
-              Cancel
-            </button>
-          </div>
-        </div>
+        <SubSectionEditForm
+          initialData={subsection}
+          onSave={(updates) => {
+            onEdit(updates)
+            setIsEditing(false)
+            console.debug('[SortableSubSection] sub-section edited: %s', subsection.id)
+          }}
+          onCancel={() => setIsEditing(false)}
+        />
       </div>
     )
   }

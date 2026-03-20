@@ -1,3 +1,38 @@
+import { z } from 'zod'
+
+/**
+ * Profile entry categories for non-position resume sections.
+ */
+export const ProfileEntryCategorySchema = z.enum([
+  'education',
+  'certification',
+  'award',
+  'project',
+  'volunteer',
+])
+
+export type ProfileEntryCategory = z.infer<typeof ProfileEntryCategorySchema>
+
+export const CATEGORY_LABELS: Record<ProfileEntryCategory, string> = {
+  education: 'Education',
+  certification: 'Certifications',
+  award: 'Awards',
+  project: 'Projects',
+  volunteer: 'Volunteer',
+}
+
+export const ProfileEntrySchema = z.object({
+  category: ProfileEntryCategorySchema,
+  title: z.string().min(1).max(200),
+  subtitle: z.string().max(200).nullish(),
+  startDate: z.string().nullish(),
+  endDate: z.string().nullish(),
+  location: z.string().max(200).nullish(),
+  textItems: z.array(z.string()).optional(),
+})
+
+export type ProfileEntryData = z.infer<typeof ProfileEntrySchema>
+
 /**
  * Profile link contract — flexible link entry for candidate profiles.
  */

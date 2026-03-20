@@ -5,7 +5,7 @@ import './ResetAccountButton.css'
 
 /**
  * Button component with type-to-confirm safety for resetting all account data.
- * Clears resumes, bullets, positions, interviews, and telemetry while preserving auth.
+ * Clears resumes, bullets, positions, profile entries, interviews, and telemetry while preserving auth.
  */
 export function ResetAccountButton() {
   const { user } = useAuth()
@@ -60,6 +60,7 @@ export function ResetAccountButton() {
           <li>All uploaded resumes</li>
           <li>All bullets</li>
           <li>All positions</li>
+          <li>All profile entries</li>
           <li>All interview history</li>
           <li>All telemetry data</li>
         </ul>

@@ -247,7 +247,7 @@ describe('DraftResumePage', () => {
         'test-user-id',
         'Senior Software Engineer',
         ['bullet-1', 'bullet-2'],
-        undefined
+        { profileEntries: undefined }
       )
     })
 

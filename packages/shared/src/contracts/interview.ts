@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ResumeEducationSchema, SkillsSchema } from './resume-parse'
+import { ProfileEntryCategorySchema } from './profile'
 
 /**
  * Interview contract schemas for LLM output validation
@@ -78,6 +79,14 @@ export const InterviewStepResponseSchema = z.object({
   extractedPosition: PositionSchema.nullable(), // If position was just captured (null when none)
   extractedBullets: z.array(BulletSchema).nullable(), // If bullets were just captured (null when none)
   shouldContinue: z.boolean().default(true), // False when interview should end
+  extractedEntries: z.array(z.object({
+    category: ProfileEntryCategorySchema,
+    title: z.string(),
+    subtitle: z.string().nullish(),
+    startDate: z.string().nullish(),
+    endDate: z.string().nullish(),
+    location: z.string().nullish(),
+  })).nullable().default(null),
 })
 
 export type InterviewStepResponse = z.infer<typeof InterviewStepResponseSchema>
@@ -85,6 +94,14 @@ export type InterviewStepResponse = z.infer<typeof InterviewStepResponseSchema>
 // Extracted data from interview session
 export const ExtractedInterviewDataSchema = z.object({
   positions: z.array(PositionWithBulletsSchema),
+  entries: z.array(z.object({
+    category: ProfileEntryCategorySchema,
+    title: z.string(),
+    subtitle: z.string().nullish(),
+    startDate: z.string().nullish(),
+    endDate: z.string().nullish(),
+    location: z.string().nullish(),
+  })).default([]),
 })
 
 export type ExtractedInterviewData = z.infer<typeof ExtractedInterviewDataSchema>

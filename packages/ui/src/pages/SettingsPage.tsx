@@ -3,6 +3,7 @@ import { getProfile, mapProfileToFormData } from '@odie/db'
 import { Navigation } from '../components/layout'
 import { ResetAccountButton } from '../components/account'
 import { ProfileForm } from '../components/ProfileForm'
+import { ProfileEntriesEditor } from '../components/ProfileEntriesEditor'
 import { useAuth } from '../components/auth/AuthProvider'
 import { useProfileSave } from '../hooks/useProfileSave'
 import './SettingsPage.css'
@@ -57,6 +58,13 @@ export function SettingsPage() {
         </section>
 
         <section
+          className="settings-page__section"
+          data-testid="settings-entries-section"
+        >
+          <ProfileEntriesEditor userId={userId} />
+        </section>
+
+        <section
           className="settings-page__section settings-page__section--danger"
           data-testid="danger-zone"
         >
@@ -69,7 +77,7 @@ export function SettingsPage() {
               <div className="settings-page__item-info">
                 <h3 className="settings-page__item-title">Reset Account Data</h3>
                 <p className="settings-page__item-description">
-                  Delete all your resumes, bullets, positions, and interview history.
+                  Delete all your resumes, bullets, positions, profile entries, and interview history.
                   Your account will remain active.
                 </p>
               </div>

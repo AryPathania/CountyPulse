@@ -204,6 +204,51 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_entries: {
+        Row: {
+          category: string
+          created_at: string | null
+          end_date: string | null
+          id: string
+          location: string | null
+          sort_order: number
+          start_date: string | null
+          subtitle: string | null
+          text_items: string[] | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          sort_order?: number
+          start_date?: string | null
+          subtitle?: string | null
+          text_items?: string[] | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          sort_order?: number
+          start_date?: string | null
+          subtitle?: string | null
+          text_items?: string[] | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       resumes: {
         Row: {
           content: Json | null

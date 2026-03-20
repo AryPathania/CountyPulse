@@ -441,6 +441,7 @@ export function buildSkillsEntries(
 export interface ResumeFromDraftOptions {
   education?: ParsedEducation[]
   skills?: ParsedSkills
+  profileEntries?: Array<{ category: string; entries: SubSectionData[] }>
 }
 
 /**
@@ -568,28 +569,71 @@ export async function createResumeFromDraft(
     ? buildSkillsEntries(options.skills)
     : { items: [], subsections: [] }
 
-  const content: ResumeContent = {
-    sections: [
-      {
-        id: 'experience',
-        title: 'Experience',
-        items: experienceResult.items,
-        subsections: experienceResult.subsections,
-      },
-      {
-        id: 'skills',
-        title: 'Skills',
-        items: skillsResult.items,
-        subsections: skillsResult.subsections,
-      },
-      {
-        id: 'education',
-        title: 'Education',
-        items: educationResult.items,
-        subsections: educationResult.subsections,
-      },
-    ],
+  const sections: ResumeSection[] = [
+    {
+      id: 'experience',
+      title: 'Experience',
+      items: experienceResult.items,
+      subsections: experienceResult.subsections,
+    },
+    {
+      id: 'skills',
+      title: 'Skills',
+      items: skillsResult.items,
+      subsections: skillsResult.subsections,
+    },
+    {
+      id: 'education',
+      title: 'Education',
+      items: educationResult.items,
+      subsections: educationResult.subsections,
+    },
+  ]
+
+  // Add sections from profile entries (education, certifications, awards, etc.)
+  if (options?.profileEntries) {
+    for (const group of options.profileEntries) {
+      // If this category matches an existing section, merge entries instead of duplicating
+      const existingSection = sections.find(
+        (s) =>
+          s.title.toLowerCase() === group.category.toLowerCase() ||
+          (group.category === 'education' && s.title === 'Education')
+      )
+
+      if (existingSection) {
+        // Merge: add new subsections that don't already exist (dedup by title+subtitle)
+        const existingKeys = new Set(
+          (existingSection.subsections ?? []).map(
+            (s) => `${s.title}|${s.subtitle ?? ''}`
+          )
+        )
+        for (const entry of group.entries) {
+          const key = `${entry.title}|${entry.subtitle ?? ''}`
+          if (!existingKeys.has(key)) {
+            existingSection.subsections = [
+              ...(existingSection.subsections ?? []),
+              entry,
+            ]
+            existingSection.items.push({
+              type: 'subsection',
+              subsectionId: entry.id,
+            })
+          }
+        }
+      } else if (group.entries.length > 0) {
+        // Create new section
+        const sectionResult = buildSectionEntries(group.entries)
+        sections.push({
+          id: `section-${group.category}`,
+          title:
+            group.category.charAt(0).toUpperCase() + group.category.slice(1),
+          ...sectionResult,
+        })
+      }
+    }
   }
+
+  const content: ResumeContent = { sections }
 
   return createResume({
     user_id: userId,

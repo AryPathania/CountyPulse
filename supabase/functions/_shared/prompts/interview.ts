@@ -287,18 +287,22 @@ For each accomplishment shared, internally extract:
 2. Achievement bullets with concrete metrics when available
 3. Category (Leadership, Frontend, Backend, Data, Communication, etc.)
 4. Hard skills (Python, React, SQL, etc.) and soft skills (teamwork, communication, etc.)
+5. Structured profile entries (education with institution/degree/field, certifications, awards, projects, volunteer work) — extract with the appropriate category
 
 Never invent metrics — if you don't have them, that's what follow-up questions are for.
 - Preserve exact numbers the user states. '40%' stays '40%', not 'significant improvement'.`
 }
 
 function buildOutputFormatSection(): string {
+  // Extract structured profile entries when the candidate mentions education,
+  // certifications, awards, projects, or volunteer work.
   return `## Response Format
 Always respond with valid JSON:
 {
   "response": "Your conversational message to the user (MUST end with a question)",
   "extractedPosition": { "company": "...", "title": "...", "startDate": "YYYY-MM", "endDate": "YYYY-MM or null", "location": "..." } | null,
   "extractedBullets": [{ "text": "Professional achievement bullet", "category": "...", "hardSkills": [...], "softSkills": [...] }] | null,
+  "extractedEntries": [{ "category": "education|certification|award|project|volunteer", "title": "...", "subtitle": "...", "startDate": "YYYY-MM", "endDate": "YYYY-MM", "location": "..." }] | null,
   "shouldContinue": true/false
 }
 

@@ -10,8 +10,25 @@ import { useVoiceInput } from '../../hooks/useVoiceInput'
 import { useVoiceOutput } from '../../hooks/useVoiceOutput'
 import { useVoiceSettings } from '../../hooks/useVoiceSettings'
 import { VoiceControls } from './VoiceControls'
+import type { ExtractedEntry } from '../../services/interview'
 import './InterviewChat.css'
 import './VoiceControls.css'
+
+/** Merge new extracted entries into existing state, deduplicating by category+title+subtitle. */
+function mergeExtractedEntries(
+  prev: ExtractedInterviewData,
+  newEntries: ExtractedEntry[]
+): ExtractedInterviewData {
+  const existing = prev.entries ?? []
+  const existingKeys = new Set(
+    existing.map((e) => `${e.category}|${e.title}|${e.subtitle ?? ''}`)
+  )
+  const unique = newEntries.filter(
+    (e) => !existingKeys.has(`${e.category}|${e.title}|${e.subtitle ?? ''}`)
+  )
+  if (unique.length === 0) return prev
+  return { ...prev, entries: [...existing, ...unique] }
+}
 
 export interface InterviewChatProps {
   onComplete: (data: ExtractedInterviewData) => void
@@ -39,7 +56,7 @@ export function InterviewChat({
   const [error, setError] = useState<string | null>(null)
   const [isComplete, setIsComplete] = useState(false)
   const [extractedData, setExtractedData] = useState<ExtractedInterviewData>(
-    initialExtractedData ?? { positions: [] }
+    initialExtractedData ?? { positions: [], entries: [] }
   )
   const [hasInitialized, setHasInitialized] = useState(!!initialMessages?.length)
 
@@ -136,8 +153,13 @@ export function InterviewChat({
 
       if (result.extractedPosition) {
         setExtractedData((prev) => ({
+          ...prev,
           positions: [...prev.positions, { position: result.extractedPosition!, bullets: [] }],
         }))
+      }
+
+      if (result.extractedEntries && result.extractedEntries.length > 0) {
+        setExtractedData((prev) => mergeExtractedEntries(prev, result.extractedEntries!))
       }
 
       if (!result.shouldContinue) {
@@ -215,10 +237,11 @@ export function InterviewChat({
               ...updated[existingIndex],
               position: { ...updated[existingIndex].position, ...result.extractedPosition },
             }
-            return { positions: updated }
+            return { ...prev, positions: updated }
           } else {
             // Add new position
             return {
+              ...prev,
               positions: [
                 ...prev.positions,
                 { position: result.extractedPosition!, bullets: [] },
@@ -241,8 +264,13 @@ export function InterviewChat({
             ...updated[lastIndex],
             bullets: [...updated[lastIndex].bullets, ...newBullets],
           }
-          return { positions: updated }
+          return { ...prev, positions: updated }
         })
+      }
+
+      // Handle extracted entries (education, certifications, etc.)
+      if (result.extractedEntries && result.extractedEntries.length > 0) {
+        setExtractedData((prev) => mergeExtractedEntries(prev, result.extractedEntries!))
       }
 
       if (!result.shouldContinue) {
@@ -365,6 +393,9 @@ export function InterviewChat({
             <p>
               Collected {extractedData.positions.length} position(s) with{' '}
               {extractedData.positions.reduce((sum, p) => sum + p.bullets.length, 0)} bullet(s)
+              {(extractedData.entries?.length ?? 0) > 0 && (
+                <> and {extractedData.entries!.length} profile entry(ies)</>
+              )}
             </p>
           </div>
           <button

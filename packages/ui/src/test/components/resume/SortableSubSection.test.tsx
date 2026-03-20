@@ -58,11 +58,11 @@ describe('SortableSubSection', () => {
 
     fireEvent.click(screen.getByTestId('subsection-edit-sub-1'))
 
-    const titleInput = screen.getByTestId('subsection-title-input-sub-1') as HTMLInputElement
-    const subtitleInput = screen.getByTestId('subsection-subtitle-input-sub-1') as HTMLInputElement
-    const startInput = screen.getByTestId('subsection-start-input-sub-1') as HTMLInputElement
-    const endInput = screen.getByTestId('subsection-end-input-sub-1') as HTMLInputElement
-    const locationInput = screen.getByTestId('subsection-location-input-sub-1') as HTMLInputElement
+    const titleInput = screen.getByTestId('subsection-edit-title') as HTMLInputElement
+    const subtitleInput = screen.getByTestId('subsection-edit-subtitle') as HTMLInputElement
+    const startInput = screen.getByTestId('subsection-edit-start') as HTMLInputElement
+    const endInput = screen.getByTestId('subsection-edit-end') as HTMLInputElement
+    const locationInput = screen.getByTestId('subsection-edit-location') as HTMLInputElement
 
     expect(titleInput.value).toBe('Senior Engineer')
     expect(subtitleInput.value).toBe('Acme Corp')
@@ -77,13 +77,13 @@ describe('SortableSubSection', () => {
 
     fireEvent.click(screen.getByTestId('subsection-edit-sub-1'))
 
-    const titleInput = screen.getByTestId('subsection-title-input-sub-1')
+    const titleInput = screen.getByTestId('subsection-edit-title')
     fireEvent.change(titleInput, { target: { value: 'Staff Engineer' } })
 
-    const subtitleInput = screen.getByTestId('subsection-subtitle-input-sub-1')
+    const subtitleInput = screen.getByTestId('subsection-edit-subtitle')
     fireEvent.change(subtitleInput, { target: { value: 'BigCo' } })
 
-    fireEvent.click(screen.getByTestId('subsection-save-sub-1'))
+    fireEvent.click(screen.getByTestId('subsection-edit-save'))
 
     expect(onEdit).toHaveBeenCalledWith({
       title: 'Staff Engineer',
@@ -100,14 +100,14 @@ describe('SortableSubSection', () => {
     fireEvent.click(screen.getByTestId('subsection-edit-sub-1'))
 
     // Change title
-    const titleInput = screen.getByTestId('subsection-title-input-sub-1')
+    const titleInput = screen.getByTestId('subsection-edit-title')
     fireEvent.change(titleInput, { target: { value: 'Changed Title' } })
 
     // Cancel
-    fireEvent.click(screen.getByTestId('subsection-cancel-sub-1'))
+    fireEvent.click(screen.getByTestId('subsection-edit-cancel'))
 
     // Should be back in display mode with original title
-    expect(screen.queryByTestId('subsection-title-input-sub-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('subsection-edit-title')).not.toBeInTheDocument()
     expect(screen.getByTestId('subsection-sub-1')).toHaveTextContent('Senior Engineer')
   })
 
@@ -151,11 +151,11 @@ describe('SortableSubSection', () => {
     fireEvent.click(screen.getByTestId('subsection-edit-sub-1'))
 
     // Clear subtitle
-    fireEvent.change(screen.getByTestId('subsection-subtitle-input-sub-1'), { target: { value: '' } })
+    fireEvent.change(screen.getByTestId('subsection-edit-subtitle'), { target: { value: '' } })
     // Clear location
-    fireEvent.change(screen.getByTestId('subsection-location-input-sub-1'), { target: { value: '' } })
+    fireEvent.change(screen.getByTestId('subsection-edit-location'), { target: { value: '' } })
 
-    fireEvent.click(screen.getByTestId('subsection-save-sub-1'))
+    fireEvent.click(screen.getByTestId('subsection-edit-save'))
 
     expect(onEdit).toHaveBeenCalledWith({
       title: 'Senior Engineer',
