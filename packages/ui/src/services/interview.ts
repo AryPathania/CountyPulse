@@ -4,22 +4,15 @@ import type {
   InterviewStepResponse,
   InterviewPosition,
   InterviewBullet,
-  ProfileEntryCategory,
+  ExtractedEntry,
 } from '@odie/shared'
 import { InterviewStepResponseSchema } from '@odie/shared'
+
+export type { ExtractedEntry }
 
 export interface InterviewServiceConfig {
   useMock?: boolean
   context?: { mode: string; [key: string]: unknown }
-}
-
-export interface ExtractedEntry {
-  category: ProfileEntryCategory
-  title: string
-  subtitle?: string | null
-  startDate?: string | null
-  endDate?: string | null
-  location?: string | null
 }
 
 export interface InterviewResult {

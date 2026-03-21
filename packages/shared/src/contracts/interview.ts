@@ -73,20 +73,25 @@ export const InterviewStateSchema = z.object({
 
 export type InterviewState = z.infer<typeof InterviewStateSchema>
 
+// Shared schema for extracted profile entries (education, certs, awards, etc.)
+export const ExtractedEntrySchema = z.object({
+  category: ProfileEntryCategorySchema,
+  title: z.string(),
+  subtitle: z.string().nullish(),
+  startDate: z.string().nullish(),
+  endDate: z.string().nullish(),
+  location: z.string().nullish(),
+})
+
+export type ExtractedEntry = z.infer<typeof ExtractedEntrySchema>
+
 // LLM prompt for interview step
 export const InterviewStepResponseSchema = z.object({
   response: z.string(), // Message to show user
   extractedPosition: PositionSchema.nullable(), // If position was just captured (null when none)
   extractedBullets: z.array(BulletSchema).nullable(), // If bullets were just captured (null when none)
   shouldContinue: z.boolean().default(true), // False when interview should end
-  extractedEntries: z.array(z.object({
-    category: ProfileEntryCategorySchema,
-    title: z.string(),
-    subtitle: z.string().nullish(),
-    startDate: z.string().nullish(),
-    endDate: z.string().nullish(),
-    location: z.string().nullish(),
-  })).nullable().default(null),
+  extractedEntries: z.array(ExtractedEntrySchema).nullable().default(null),
 })
 
 export type InterviewStepResponse = z.infer<typeof InterviewStepResponseSchema>
@@ -94,14 +99,7 @@ export type InterviewStepResponse = z.infer<typeof InterviewStepResponseSchema>
 // Extracted data from interview session
 export const ExtractedInterviewDataSchema = z.object({
   positions: z.array(PositionWithBulletsSchema),
-  entries: z.array(z.object({
-    category: ProfileEntryCategorySchema,
-    title: z.string(),
-    subtitle: z.string().nullish(),
-    startDate: z.string().nullish(),
-    endDate: z.string().nullish(),
-    location: z.string().nullish(),
-  })).default([]),
+  entries: z.array(ExtractedEntrySchema).default([]),
 })
 
 export type ExtractedInterviewData = z.infer<typeof ExtractedInterviewDataSchema>
