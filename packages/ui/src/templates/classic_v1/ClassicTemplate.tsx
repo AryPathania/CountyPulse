@@ -1,4 +1,4 @@
-import { formatDisplayDate } from '@odie/shared'
+import { formatDateRange } from '@odie/shared'
 import type { TemplateProps } from '../types'
 import './ClassicTemplate.css'
 
@@ -122,9 +122,9 @@ export function ClassicTemplate({ resume }: TemplateProps) {
                     >
                       <div className="classic-template__position-header">
                         <span className="classic-template__company">{subsection.subtitle}</span>
-                        {(subsection.startDate || subsection.endDate) && (
+                        {formatDateRange(subsection.startDate, subsection.endDate) && (
                           <span className="classic-template__dates">
-                            {formatDisplayDate(subsection.startDate)} - {formatDisplayDate(subsection.endDate)}
+                            {formatDateRange(subsection.startDate, subsection.endDate)}
                           </span>
                         )}
                       </div>

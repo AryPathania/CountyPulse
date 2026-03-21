@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { resetAccountData } from '@odie/db'
 import { bulletKeys } from './bullets'
+import { jobDraftKeys } from './job-drafts'
 import { resumeKeys } from './resumes'
 import { runKeys } from './runs'
 
@@ -19,9 +20,10 @@ export function useResetAccountData() {
       queryClient.invalidateQueries({ queryKey: resumeKeys.all })
       queryClient.invalidateQueries({ queryKey: runKeys.all })
       // Also invalidate any job-drafts and positions if they exist
-      queryClient.invalidateQueries({ queryKey: ['job-drafts'] })
+      queryClient.invalidateQueries({ queryKey: jobDraftKeys.all })
       queryClient.invalidateQueries({ queryKey: ['positions'] })
-      queryClient.invalidateQueries({ queryKey: ['profiles'] })
+      queryClient.invalidateQueries({ queryKey: ['profile'] })
+      queryClient.invalidateQueries({ queryKey: ['profileEntries'] })
       // Clear interview localStorage to prevent stale conversation
       localStorage.removeItem(`odie_interview_state_${userId}`)
     },

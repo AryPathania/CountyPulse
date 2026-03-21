@@ -138,20 +138,22 @@ export async function deleteJobDraft(draftId: string): Promise<void> {
 }
 
 /**
- * Match bullets for a JD using vector similarity search
- * Uses the match_bullets SQL function
+ * Match items (bullets + profile entries) for a JD using vector similarity search.
+ * Uses the unified match_items SQL function.
  */
-export async function matchBulletsForJd(
+export async function matchItemsForJd(
   userId: string,
   jdEmbedding: number[],
   matchCount: number = 50,
-  matchThreshold: number = 0.5
-): Promise<Array<{ id: string; current_text: string; category: string | null; similarity: number }>> {
-  const { data, error } = await supabase.rpc('match_bullets', {
+  matchThreshold: number = 0.5,
+  sourceFilter: 'all' | 'bullets' | 'entries' = 'all'
+): Promise<Array<{ id: string; source_type: string; content_text: string; category: string | null; similarity: number }>> {
+  const { data, error } = await supabase.rpc('match_items', {
     query_embedding: toPgVector(jdEmbedding),
     match_user_id: userId,
     match_count: matchCount,
     match_threshold: matchThreshold,
+    source_filter: sourceFilter,
   })
 
   if (error) {
@@ -162,10 +164,10 @@ export async function matchBulletsForJd(
 }
 
 /**
- * Match bullets against individual JD requirements.
- * Calls match_bullets RPC for each requirement's embedding.
+ * Match items against individual JD requirements.
+ * Calls match_items RPC for each requirement's embedding.
  */
-export async function matchBulletsPerRequirement(
+export async function matchItemsPerRequirement(
   userId: string,
   requirements: Array<{
     description: string
@@ -180,7 +182,8 @@ export async function matchBulletsPerRequirement(
     requirement: { description: string; category: string; importance: 'must_have' | 'nice_to_have' }
     matches: Array<{
       id: string
-      current_text: string
+      source_type: string
+      content_text: string
       category: string | null
       similarity: number
     }>
@@ -189,7 +192,7 @@ export async function matchBulletsPerRequirement(
 > {
   const results = await Promise.all(
     requirements.map(async (req) => {
-      const matches = await matchBulletsForJd(userId, req.embedding, matchCount, matchThreshold)
+      const matches = await matchItemsForJd(userId, req.embedding, matchCount, matchThreshold)
       return {
         requirement: {
           description: req.description,

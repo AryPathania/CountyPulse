@@ -59,15 +59,16 @@ function setupGapAnalysisMocks(page: import('@playwright/test').Page) {
       })
     }),
 
-    // Mock match_bullets RPC — first requirement matches, others don't
-    page.route('**/rest/v1/rpc/match_bullets*', async (route) => {
+    // Mock match_items RPC — first requirement matches, others don't
+    page.route('**/rest/v1/rpc/match_items*', async (route) => {
       // Return one match for the first call, empty for subsequent
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([{
           id: 'bullet-3',
-          current_text: 'Built React frontend for analytics dashboard with real-time updates',
+          source_type: 'bullet',
+          content_text: 'Built React frontend for analytics dashboard with real-time updates',
           category: 'Technical',
           similarity: 0.89,
         }]),
@@ -106,8 +107,8 @@ test.describe('Gap Analysis on Draft Page', () => {
   })
 
   test('interview for gaps button navigates to interview', async ({ page }) => {
-    // Override match_bullets to return empty for all — creates gaps
-    await page.route('**/rest/v1/rpc/match_bullets*', async (route) => {
+    // Override match_items to return empty for all — creates gaps
+    await page.route('**/rest/v1/rpc/match_items*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -161,5 +162,49 @@ test.describe('Gap Analysis on Draft Page', () => {
     const skillMatch = page.getByTestId('skill-match')
     await expect(skillMatch).toBeVisible()
     await expect(skillMatch).toContainText('Skill match: Leadership')
+  })
+
+  test('uses match_items RPC and handles entry-type matches', async ({ page }) => {
+    // Track RPC calls to verify match_items is used
+    const rpcCalls: string[] = []
+
+    // Override match_items to return an entry-type match
+    await page.route('**/rest/v1/rpc/match_items*', async (route) => {
+      rpcCalls.push('match_items')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([{
+          id: 'entry-1',
+          source_type: 'entry',
+          content_text: 'B.S. Computer Science, Stanford University',
+          category: 'education',
+          similarity: 0.91,
+        }]),
+      })
+    })
+
+    // Also verify match_bullets is NOT called
+    await page.route('**/rest/v1/rpc/match_bullets*', async (route) => {
+      rpcCalls.push('match_bullets')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+    })
+
+    await page.goto('/resumes/draft-1')
+
+    // Wait for gap analysis to render
+    await expect(page.getByTestId('gap-analysis')).toBeVisible({ timeout: 10000 })
+
+    // Verify match_items was called and match_bullets was NOT
+    expect(rpcCalls).toContain('match_items')
+    expect(rpcCalls).not.toContain('match_bullets')
+
+    // The entry-based match should show as covered
+    const coveredItems = page.getByTestId('covered-item')
+    await expect(coveredItems.first()).toBeVisible()
   })
 })

@@ -8,6 +8,10 @@ const mockGetUploadedResumeByHash = vi.fn()
 const mockUploadResumeFile = vi.fn()
 const mockCreatePositionWithBullets = vi.fn()
 const mockEmbedBullets = vi.fn()
+const mockGetProfileEntriesByCategory = vi.fn()
+const mockCreateProfileEntries = vi.fn()
+const mockEmbedItems = vi.fn()
+const mockToEmbeddableText = vi.fn((entry: { title: string; subtitle?: string | null }) => entry.title)
 
 vi.mock('@odie/db', () => ({
   supabase: {
@@ -19,6 +23,10 @@ vi.mock('@odie/db', () => ({
   uploadResumeFile: (...args: unknown[]) => mockUploadResumeFile(...args),
   createPositionWithBullets: (...args: unknown[]) => mockCreatePositionWithBullets(...args),
   embedBullets: (...args: unknown[]) => mockEmbedBullets(...args),
+  getProfileEntriesByCategory: (...args: unknown[]) => mockGetProfileEntriesByCategory(...args),
+  createProfileEntries: (...args: unknown[]) => mockCreateProfileEntries(...args),
+  embedItems: (...args: unknown[]) => mockEmbedItems(...args),
+  toEmbeddableText: (...args: unknown[]) => mockToEmbeddableText(...args),
 }))
 
 // Mock pdf-extract module
@@ -53,6 +61,10 @@ describe('resume-upload service', () => {
     vi.clearAllMocks()
     // Default hash result
     mockDigest.mockResolvedValue(new Uint8Array([0xab, 0xcd, 0xef, 0x12]).buffer)
+    // Default profile entries mocks
+    mockGetProfileEntriesByCategory.mockResolvedValue([])
+    mockCreateProfileEntries.mockResolvedValue([])
+    mockEmbedItems.mockResolvedValue(undefined)
   })
 
   const validParsedData = {

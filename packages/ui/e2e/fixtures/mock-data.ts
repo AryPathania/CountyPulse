@@ -313,12 +313,34 @@ export async function setupApiMocks(page: Page) {
     })
   })
 
-  // Mock RPC calls (like match_bullets)
-  await page.route('**/rest/v1/rpc/match_bullets*', async (route) => {
+  // Mock profile entries
+  await page.route('**/rest/v1/profile_entries*', async (route) => {
+    const method = route.request().method()
+    if (method === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+    } else if (method === 'POST') {
+      await mockCreate(route, 'entry')
+    } else if (method === 'PATCH') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+    } else {
+      await route.continue()
+    }
+  })
+
+  // Mock RPC calls (unified match_items)
+  await page.route('**/rest/v1/rpc/match_items*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(MOCK_BULLETS.slice(0, 2).map((b) => b.id)),
+      body: JSON.stringify(MOCK_BULLETS.slice(0, 2).map((b) => ({ id: b.id, source_type: 'bullet', content_text: b.current_text, category: b.category, similarity: 0.85 }))),
     })
   })
 

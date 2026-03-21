@@ -447,4 +447,95 @@ test.describe('Resume Builder Editor', () => {
     // Add section button should still exist
     await expect(page.getByTestId('add-section-btn')).toBeVisible()
   })
+
+  test('displays only end date when start date is missing (Bug 3 regression)', async ({ page }) => {
+    // Override resume mock with a subsection that has no startDate
+    const resumeWithEndDateOnly = {
+      ...MOCK_RESUMES[0],
+      content: {
+        sections: [
+          {
+            id: 'section-experience',
+            title: 'Experience',
+            subsections: [
+              {
+                id: 'sub-pos-endonly',
+                title: 'Contract Developer',
+                subtitle: 'Freelance',
+                startDate: undefined,
+                endDate: '2021-12-01',
+                location: 'Remote',
+              },
+            ],
+            items: [
+              { type: 'subsection', subsectionId: 'sub-pos-endonly' },
+              { type: 'bullet', bulletId: 'bullet-1' },
+            ],
+          },
+        ],
+      },
+    }
+
+    await page.route('**/rest/v1/resumes*', async (route) => {
+      const method = route.request().method()
+      if (method === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...resumeWithEndDateOnly,
+            parsedContent: resumeWithEndDateOnly.content,
+            bullets: MOCK_BULLETS_WITH_POSITIONS.slice(0, 2).map((b) => ({
+              id: b.id,
+              current_text: b.current_text,
+              category: b.category,
+              position: b.position,
+            })),
+            positions: MOCK_POSITIONS.map((p) => ({
+              id: p.id,
+              company: p.company,
+              title: p.title,
+              start_date: p.start_date,
+              end_date: p.end_date,
+              location: p.location,
+            })),
+            candidateInfo: {
+              displayName: 'Test User',
+              email: 'test@example.com',
+              headline: null,
+              summary: null,
+              phone: '555-123-4567',
+              location: 'San Francisco, CA',
+              links: [],
+            },
+          }),
+        })
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([resumeWithEndDateOnly]),
+        })
+      }
+    })
+
+    await page.goto('/resumes/resume-1/edit')
+
+    // Wait for the builder to load
+    await expect(page.getByTestId('resume-builder')).toBeVisible()
+
+    // The preview should show "Dec 2021" for the end-date-only subsection
+    const preview = page.getByTestId('builder-preview')
+    await expect(preview).toBeVisible()
+
+    // Should show "Dec 2021" somewhere in the preview
+    await expect(preview.getByText('Dec 2021')).toBeVisible()
+
+    // Should NOT show "Present" anywhere for this subsection
+    // (The old bug showed "Present - Dec 2021")
+    const subsectionMeta = preview.locator('[data-testid="template-subsection-sub-pos-endonly"]')
+    if (await subsectionMeta.isVisible()) {
+      await expect(subsectionMeta).not.toContainText('Present')
+    }
+  })
 })

@@ -116,7 +116,9 @@ function buildCriticalRulesSection(config: InterviewConfig): string {
    - You have explicitly asked: "Is there anything else you'd like to share about your career, or shall we wrap up?"
    - The user has explicitly confirmed they are done
 
-5. **Before every response:** Review the full conversation to identify unexplored positions or experiences. If any exist, ask about them before considering wrapping up.`
+5. **Before every response:** Review the full conversation to identify unexplored positions or experiences. If any exist, ask about them before considering wrapping up.
+
+6. **Stay on topic.** You discuss career history, work experience, education, skills, accomplishments, side projects, hobbies, volunteer work, and anything else that could appear on a resume or inform a career narrative. If the user asks about something completely unrelated to their professional or personal development story, warmly redirect: "That's interesting! But I'm here to help capture your story. Let's get back to your experience — [ask relevant question]." Never provide non-career information or record non-career information.`
 }
 
 function buildResumeContextSection(context: ResumeContext): string {

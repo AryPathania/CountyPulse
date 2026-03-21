@@ -34,12 +34,12 @@ export const jobDraftsHandlers = [
     return HttpResponse.json({ embedding: mockEmbedding })
   }),
 
-  // Mock match_bullets RPC
-  http.post('*/rest/v1/rpc/match_bullets', () => {
+  // Mock match_items RPC (unified search)
+  http.post('*/rest/v1/rpc/match_items', () => {
     return HttpResponse.json([
-      { id: 'bullet-1', current_text: 'Led team of 5 engineers', category: 'Leadership', similarity: 0.92 },
-      { id: 'bullet-2', current_text: 'Reduced latency by 40%', category: 'Backend', similarity: 0.88 },
-      { id: 'bullet-3', current_text: 'Built React dashboard', category: 'Frontend', similarity: 0.85 },
+      { id: 'bullet-1', source_type: 'bullet', content_text: 'Led team of 5 engineers', category: 'Leadership', similarity: 0.92 },
+      { id: 'bullet-2', source_type: 'bullet', content_text: 'Reduced latency by 40%', category: 'Backend', similarity: 0.88 },
+      { id: 'bullet-3', source_type: 'bullet', content_text: 'Built React dashboard', category: 'Frontend', similarity: 0.85 },
     ])
   }),
 ]

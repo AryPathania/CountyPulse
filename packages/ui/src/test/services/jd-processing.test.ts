@@ -5,7 +5,7 @@ import { processJobDescription, analyzeJobDescriptionGaps, buildInterviewContext
 const mockGetSession = vi.fn()
 const mockFunctionsInvoke = vi.fn()
 const mockCreateJobDraft = vi.fn()
-const mockMatchBulletsPerRequirement = vi.fn()
+const mockMatchItemsPerRequirement = vi.fn()
 const mockUpdateJobDraftRequirements = vi.fn()
 const mockUpdateJobDraftBullets = vi.fn()
 const mockRunLoggerSuccess = vi.fn().mockResolvedValue({})
@@ -26,7 +26,7 @@ vi.mock('@odie/db', () => ({
   },
   createJobDraft: (...args: unknown[]) => mockCreateJobDraft(...args),
   createRunLogger: (...args: unknown[]) => mockCreateRunLogger(...args),
-  matchBulletsPerRequirement: (...args: unknown[]) => mockMatchBulletsPerRequirement(...args),
+  matchItemsPerRequirement: (...args: unknown[]) => mockMatchItemsPerRequirement(...args),
   updateJobDraftRequirements: (...args: unknown[]) => mockUpdateJobDraftRequirements(...args),
   updateJobDraftBullets: (...args: unknown[]) => mockUpdateJobDraftBullets(...args),
 }))
@@ -173,10 +173,10 @@ describe('jd-processing service', () => {
       setupAuthenticatedSession()
       setupParseJdResponse()
       setupEmbedResponse()
-      mockMatchBulletsPerRequirement.mockResolvedValue(
+      mockMatchItemsPerRequirement.mockResolvedValue(
         mockRequirements.map(r => ({
           requirement: { description: r.description, category: r.category, importance: r.importance },
-          matches: [{ id: 'b1', current_text: 'bullet text', category: 'Test', similarity: 0.8 }],
+          matches: [{ id: 'b1', content_text: 'bullet text', category: 'Test', similarity: 0.8 }],
           isCovered: true,
         }))
       )
@@ -194,7 +194,7 @@ describe('jd-processing service', () => {
       setupAuthenticatedSession()
       setupParseJdResponse()
       setupEmbedResponse()
-      mockMatchBulletsPerRequirement.mockResolvedValue(
+      mockMatchItemsPerRequirement.mockResolvedValue(
         mockRequirements.map(r => ({
           requirement: { description: r.description, category: r.category, importance: r.importance },
           matches: [],
@@ -214,11 +214,11 @@ describe('jd-processing service', () => {
       })
     })
 
-    it('uses threshold 0.4 and top-5 when calling matchBulletsPerRequirement', async () => {
+    it('uses threshold 0.4 and top-5 when calling matchItemsPerRequirement', async () => {
       setupAuthenticatedSession()
       setupParseJdResponse()
       setupEmbedResponse()
-      mockMatchBulletsPerRequirement.mockResolvedValue(
+      mockMatchItemsPerRequirement.mockResolvedValue(
         mockRequirements.map(r => ({
           requirement: { description: r.description, category: r.category, importance: r.importance },
           matches: [],
@@ -230,7 +230,7 @@ describe('jd-processing service', () => {
 
       await analyzeJobDescriptionGaps('user-1', 'Some JD', 'draft-1')
 
-      expect(mockMatchBulletsPerRequirement).toHaveBeenCalledWith(
+      expect(mockMatchItemsPerRequirement).toHaveBeenCalledWith(
         'user-1',
         expect.arrayContaining([
           expect.objectContaining({
@@ -248,10 +248,10 @@ describe('jd-processing service', () => {
       setupParseJdResponse()
       setupEmbedResponse()
 
-      mockMatchBulletsPerRequirement.mockResolvedValue([
+      mockMatchItemsPerRequirement.mockResolvedValue([
         {
           requirement: { description: 'Experience with React', category: 'Frontend', importance: 'must_have' },
-          matches: [{ id: 'b1', current_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
+          matches: [{ id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
           isCovered: true,
         },
         {
@@ -288,10 +288,10 @@ describe('jd-processing service', () => {
       setupParseJdResponse()
       setupEmbedResponse()
 
-      mockMatchBulletsPerRequirement.mockResolvedValue([
+      mockMatchItemsPerRequirement.mockResolvedValue([
         {
           requirement: { description: 'Experience with React', category: 'Frontend', importance: 'must_have' },
-          matches: [{ id: 'b1', current_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
+          matches: [{ id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
           isCovered: true,
         },
         {
@@ -340,18 +340,18 @@ describe('jd-processing service', () => {
       setupParseJdResponse()
       setupEmbedResponse()
 
-      mockMatchBulletsPerRequirement.mockResolvedValue([
+      mockMatchItemsPerRequirement.mockResolvedValue([
         {
           requirement: { description: 'Experience with React', category: 'Frontend', importance: 'must_have' },
           matches: [
-            { id: 'b1', current_text: 'Built React app', category: 'Frontend', similarity: 0.85 },
-            { id: 'b2', current_text: 'React hooks expert', category: 'Frontend', similarity: 0.75 },
+            { id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.85 },
+            { id: 'b2', content_text: 'React hooks expert', category: 'Frontend', similarity: 0.75 },
           ],
           isCovered: true,
         },
         {
           requirement: { description: 'Team leadership', category: 'Leadership', importance: 'must_have' },
-          matches: [{ id: 'b1', current_text: 'Built React app', category: 'Frontend', similarity: 0.45 }],
+          matches: [{ id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.45 }],
           isCovered: true,
         },
         {
@@ -389,12 +389,12 @@ describe('jd-processing service', () => {
 
       const twelveBullets = Array.from({ length: 12 }, (_, i) => ({
         id: `b${i}`,
-        current_text: `Bullet text ${i}`,
+        content_text: `Bullet text ${i}`,
         category: 'Frontend',
         similarity: 0.9 - i * 0.01,
       }))
 
-      mockMatchBulletsPerRequirement.mockResolvedValue([
+      mockMatchItemsPerRequirement.mockResolvedValue([
         {
           requirement: { description: 'React', category: 'Frontend', importance: 'must_have' },
           matches: twelveBullets,
@@ -415,7 +415,7 @@ describe('jd-processing service', () => {
       expect(result.interviewContext!.mode).toBe('gaps')
 
       // Should include exactly the first 10 bullet texts joined by '; '
-      const expectedSummary = twelveBullets.slice(0, 10).map(b => b.current_text).join('; ')
+      const expectedSummary = twelveBullets.slice(0, 10).map(b => b.content_text).join('; ')
       expect(result.interviewContext!.existingBulletSummary).toBe(expectedSummary)
 
       // gaps should contain the uncovered requirement
@@ -431,10 +431,10 @@ describe('jd-processing service', () => {
       setupParseJdResponse()
       setupEmbedResponse()
 
-      mockMatchBulletsPerRequirement.mockResolvedValue(
+      mockMatchItemsPerRequirement.mockResolvedValue(
         mockRequirements.map(r => ({
           requirement: { description: r.description, category: r.category, importance: r.importance },
-          matches: [{ id: 'b1', current_text: 'Some bullet', category: 'Test', similarity: 0.8 }],
+          matches: [{ id: 'b1', content_text: 'Some bullet', category: 'Test', similarity: 0.8 }],
           isCovered: true,
         }))
       )
@@ -486,10 +486,10 @@ describe('jd-processing service', () => {
       setupParseJdResponse()
       setupEmbedResponse()
 
-      mockMatchBulletsPerRequirement.mockResolvedValue([
+      mockMatchItemsPerRequirement.mockResolvedValue([
         {
           requirement: { description: 'Experience with React', category: 'Frontend', importance: 'must_have' },
-          matches: [{ id: 'b1', current_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
+          matches: [{ id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
           isCovered: true,
         },
         {
@@ -523,7 +523,7 @@ describe('jd-processing service', () => {
       setupParseJdResponse()
       setupEmbedResponse()
 
-      mockMatchBulletsPerRequirement.mockResolvedValue([
+      mockMatchItemsPerRequirement.mockResolvedValue([
         {
           requirement: { description: 'Experience with React', category: 'Frontend', importance: 'must_have' },
           matches: [],

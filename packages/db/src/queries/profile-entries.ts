@@ -63,11 +63,35 @@ export async function updateProfileEntry(
   return data as unknown as ProfileEntry
 }
 
+export async function createProfileEntries(
+  userId: string,
+  entries: Array<{ category: string; title: string; subtitle?: string | null; start_date?: string | null; end_date?: string | null; location?: string | null; text_items?: string[] }>
+): Promise<ProfileEntry[]> {
+  if (entries.length === 0) return []
+  const rows = entries.map((entry, i) => ({ ...entry, user_id: userId, sort_order: i }))
+  const { data, error } = await profileEntries()
+    .insert(rows)
+    .select()
+  if (error) throw error
+  return (data ?? []) as unknown as ProfileEntry[]
+}
+
 export async function deleteProfileEntry(id: string): Promise<void> {
   const { error } = await profileEntries()
     .delete()
     .eq('id', id)
   if (error) throw error
+}
+
+/**
+ * Convert a profile entry to embeddable text for vector search.
+ * Produces a readable sentence fragment comparable to bullet text.
+ */
+export function toEmbeddableText(entry: ProfileEntry): string {
+  const parts = [entry.title]
+  if (entry.subtitle) parts.push(entry.subtitle)
+  if (entry.location) parts.push(entry.location)
+  return parts.join(', ')
 }
 
 /**

@@ -1,4 +1,4 @@
-import { supabase, createJobDraft, createRunLogger, matchBulletsPerRequirement, updateJobDraftRequirements, updateJobDraftBullets } from '@odie/db'
+import { supabase, createJobDraft, createRunLogger, matchItemsPerRequirement, updateJobDraftRequirements, updateJobDraftBullets } from '@odie/db'
 import type { InterviewContext, JdRequirement } from '@odie/shared'
 
 export interface JdProcessingResult {
@@ -261,7 +261,7 @@ export async function analyzeJobDescriptionGaps(
     embedding: embeddings[i],
   }))
 
-  const matchResults = await matchBulletsPerRequirement(
+  const matchResults = await matchItemsPerRequirement(
     userId,
     requirementsWithEmbeddings,
     5, // top 5 matches per requirement
@@ -275,7 +275,7 @@ export async function analyzeJobDescriptionGaps(
       requirement: r.requirement,
       matchedBullets: r.matches.map(m => ({
         id: m.id,
-        text: m.current_text,
+        text: m.content_text,
         similarity: m.similarity,
       })),
     }))

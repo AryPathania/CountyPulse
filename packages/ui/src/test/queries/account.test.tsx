@@ -21,6 +21,10 @@ vi.mock('../../queries/runs', () => ({
   runKeys: { all: ['runs'] },
 }))
 
+vi.mock('../../queries/job-drafts', () => ({
+  jobDraftKeys: { all: ['jobDrafts'] },
+}))
+
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -82,9 +86,10 @@ describe('account queries', () => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['bullets'] })
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['resumes'] })
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['runs'] })
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['job-drafts'] })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['jobDrafts'] })
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['positions'] })
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profiles'] })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profile'] })
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profileEntries'] })
     })
 
     it('should handle reset error', async () => {

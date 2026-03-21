@@ -130,7 +130,7 @@ describe('ClassicTemplate', () => {
 
     expect(screen.getByText('Acme Corp')).toBeInTheDocument()
     expect(screen.getByText('Senior Developer')).toBeInTheDocument()
-    expect(screen.getByText('Jan 2020 - Jun 2023')).toBeInTheDocument()
+    expect(screen.getByText('Jan 2020 \u2013 Jun 2023')).toBeInTheDocument()
   })
 
   it('should show Present for current subsections', () => {
@@ -156,7 +156,7 @@ describe('ClassicTemplate', () => {
     })
     render(<ClassicTemplate resume={resume} />)
 
-    expect(screen.getByText('Mar 2022 - Present')).toBeInTheDocument()
+    expect(screen.getByText('Mar 2022 \u2013 Present')).toBeInTheDocument()
   })
 
   it('should handle missing bullet gracefully', () => {

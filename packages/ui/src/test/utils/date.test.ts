@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toPostgresDate } from '@odie/shared'
+import { toPostgresDate, formatDateRange } from '@odie/shared'
 
 describe('toPostgresDate', () => {
   it('should convert YYYY-MM format to YYYY-MM-01', () => {
@@ -29,5 +29,26 @@ describe('toPostgresDate', () => {
     // Let PostgreSQL handle validation for unexpected formats
     expect(toPostgresDate('March 2024')).toBe('March 2024')
     expect(toPostgresDate('2024')).toBe('2024')
+  })
+})
+
+describe('formatDateRange', () => {
+  it('should format both dates as "start \u2013 end"', () => {
+    expect(formatDateRange('2018-09', '2022-06')).toBe('Sep 2018 \u2013 Jun 2022')
+  })
+
+  it('should format start only as "start \u2013 Present"', () => {
+    expect(formatDateRange('2018-09', null)).toBe('Sep 2018 \u2013 Present')
+    expect(formatDateRange('2018-09', undefined)).toBe('Sep 2018 \u2013 Present')
+  })
+
+  it('should format end only as just the end date', () => {
+    expect(formatDateRange(null, '2022-06')).toBe('Jun 2022')
+    expect(formatDateRange(undefined, '2022-06')).toBe('Jun 2022')
+  })
+
+  it('should return null when neither date is provided', () => {
+    expect(formatDateRange(null, null)).toBe(null)
+    expect(formatDateRange(undefined, undefined)).toBe(null)
   })
 })

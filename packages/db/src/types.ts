@@ -208,6 +208,7 @@ export type Database = {
         Row: {
           category: string
           created_at: string | null
+          embedding: string | null
           end_date: string | null
           id: string
           location: string | null
@@ -222,6 +223,7 @@ export type Database = {
         Insert: {
           category: string
           created_at?: string | null
+          embedding?: string | null
           end_date?: string | null
           id?: string
           location?: string | null
@@ -236,6 +238,7 @@ export type Database = {
         Update: {
           category?: string
           created_at?: string | null
+          embedding?: string | null
           end_date?: string | null
           id?: string
           location?: string | null
@@ -362,19 +365,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      match_bullets: {
+      match_items: {
         Args: {
           match_count?: number
           match_threshold?: number
           match_user_id: string
           query_embedding: string
+          source_filter?: string
         }
         Returns: {
           category: string
-          current_text: string
+          content_text: string
           id: string
-          position_id: string
           similarity: number
+          source_type: string
         }[]
       }
       reset_account_data: {

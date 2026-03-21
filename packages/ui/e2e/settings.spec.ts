@@ -136,4 +136,78 @@ test.describe('Settings page — Profile & Settings', () => {
       fullPage: false,
     })
   })
+
+  test('reset account clears profile cache without page reload', async ({ page }) => {
+    let isReset = false
+
+    // Override candidate_profiles to return populated data initially, empty after reset
+    await page.route('**/rest/v1/candidate_profiles*', async (route) => {
+      const method = route.request().method()
+      if (method === 'GET') {
+        if (isReset) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([]),
+          })
+        } else {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([{ ...MOCK_CANDIDATE_PROFILE }]),
+          })
+        }
+      } else {
+        await route.continue()
+      }
+    })
+
+    // Mock reset_account_data RPC
+    await page.route('**/rest/v1/rpc/reset_account_data*', async (route) => {
+      isReset = true
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(null),
+      })
+    })
+
+    // Mock profile_entries to return empty after reset
+    await page.route('**/rest/v1/profile_entries*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+    })
+
+    await page.goto('/settings')
+
+    // Verify profile is loaded with data
+    await expect(page.getByTestId('profile-form')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId('input-display-name')).toHaveValue('Test User')
+
+    // Step 1: Click "Reset Account Data" to expand the confirmation panel
+    const dangerZone = page.getByTestId('danger-zone')
+    await expect(dangerZone).toBeVisible()
+    await page.getByTestId('reset-account-button').click()
+
+    // Step 2: Type RESET in the confirmation input
+    await expect(page.getByTestId('reset-account-panel')).toBeVisible()
+    await page.getByTestId('reset-confirm-input').fill('RESET')
+
+    // Step 3: Click Confirm Reset
+    await page.getByTestId('reset-confirm-button').click()
+
+    // After reset, TanStack Query re-fetches profile data (now returns empty).
+    // The display name input should clear WITHOUT a page reload, proving
+    // that cache invalidation with ['profile'] prefix-match is working.
+    await expect(page.getByTestId('input-display-name')).toHaveValue('', { timeout: 10000 })
+
+    // Take screenshot to verify cleared state
+    await page.screenshot({
+      path: 'test-results/settings-reset-cache-clear.png',
+      fullPage: false,
+    })
+  })
 })

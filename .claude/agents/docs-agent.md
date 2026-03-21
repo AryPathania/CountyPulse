@@ -47,7 +47,7 @@ Mission: keep documentation accurate and complete across all locations.
 
 3. **Spec alignment**: Read the relevant spec file and compare with implementation. Update the spec if the implementation diverged.
 
-4. **ADR creation**: For significant architectural decisions (new data model pattern, new shared hook, new package extraction), propose or write a new ADR in `docs/adr/`.
+4. **ADR creation**: For significant architectural decisions (new data model pattern, new shared hook, new package extraction), propose or write a new ADR in `docs/adr/`. Maintain ADRs whenever design decisions are made during planning. Each ADR should include context, decision, tradeoffs, and justification. Number sequentially (e.g., `007_*.md`, `008_*.md`).
 
 5. **Agent/skill docs**: When `.claude/agents/` files change, mirror the change in `docs/agents/` if that file exists.
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { formatDisplayDate } from '@odie/shared'
+import { formatDateRange } from '@odie/shared'
 import type { SubSectionData } from '@odie/db'
 import { SubSectionEditForm } from './SubSectionEditForm'
 
@@ -69,9 +69,9 @@ export function SortableSubSection({ subsection, onEdit, onDelete }: SortableSub
       <div className="sortable-subsection__content">
         <div className="sortable-subsection__top">
           <span className="sortable-subsection__title">{subsection.title}</span>
-          {(subsection.startDate || subsection.endDate) && (
+          {formatDateRange(subsection.startDate, subsection.endDate) && (
             <span className="sortable-subsection__dates">
-              {formatDisplayDate(subsection.startDate)} &ndash; {formatDisplayDate(subsection.endDate)}
+              {formatDateRange(subsection.startDate, subsection.endDate)}
             </span>
           )}
         </div>

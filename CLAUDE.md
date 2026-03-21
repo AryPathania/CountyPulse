@@ -63,6 +63,23 @@ See `docs/adr/006_security_model.md` for the full security model. Summary:
 - **LLM prompt injection**: Limited to single-user impact; system prompts reduce susceptibility
 - **Auth**: All tables have RLS; all edge functions require valid JWT
 
+## Development Process (Steering)
+
+Every feature or bug fix follows this workflow:
+
+1. **Plan** — Explore codebase, design approach, write plan file
+2. **Refute** — Run refute-agent to stress-test the plan
+3. **Align** — Present to user, incorporate feedback, iterate
+4. **Implement** — Assign agents (db/ui/pipeline/contract) with relevant skills
+5. **Test** — test-agent writes meaningful tests (use git stash trick to validate usefulness)
+6. **Validate** — validation-agent checks duplication (must be 0%), naming, patch-on-patch, linting
+7. **Document** — docs-agent updates db_schema.md, CLAUDE.md, and records design decisions
+8. **E2E** — Write Playwright E2E tests for all verifiable behavior (using `playwright-e2e` skill)
+9. **CI** — `pnpm typecheck` + `pnpm test` + `pnpm lint` + `pnpm dup:check` must all pass (0% duplication threshold)
+
+### Design Decisions
+Significant architectural decisions are recorded in `docs/adr/` as Architecture Decision Records. Each ADR includes: context, decision, tradeoffs, and justification. The docs-agent is responsible for creating ADRs when design decisions are made during planning.
+
 ## Conventions
 - UI components: `packages/ui/src/components/`
 - UI hooks: `packages/ui/src/hooks/`
@@ -73,6 +90,7 @@ See `docs/adr/006_security_model.md` for the full security model. Summary:
 - Shared prompts: `supabase/functions/_shared/prompts/`
 - UI services: `packages/ui/src/services/`
 - DnD block registry: `packages/ui/src/components/dnd/README.md`
+- Query key invalidation: Always import from canonical key factories (e.g., `bulletKeys.all`). Never hardcode query key strings in invalidation calls.
 
 ## Key Shared Components
 - `ProfileForm` (`packages/ui/src/components/ProfileForm.tsx`) — shared form for editing name, contact, links; used by CompleteProfile, SettingsPage, PersonalInfoPanel

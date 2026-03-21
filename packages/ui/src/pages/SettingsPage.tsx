@@ -49,6 +49,7 @@ export function SettingsPage() {
             </div>
           ) : (
             <ProfileForm
+              key={profile?.updated_at ?? 'empty'}
               initialData={initialData}
               email={user?.email ?? ''}
               isSaving={isSaving}

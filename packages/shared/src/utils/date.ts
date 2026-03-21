@@ -46,3 +46,22 @@ export function formatDisplayDate(dateString: string | null | undefined): string
   if (isNaN(d.getTime())) return dateString
   return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
+
+/**
+ * Format a date range for display. Handles missing start/end gracefully.
+ * - Both dates: "Sep 2018 \u2013 Jun 2022"
+ * - Start only: "Sep 2018 \u2013 Present"
+ * - End only: "Jun 2022"
+ * - Neither: null
+ */
+export function formatDateRange(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined
+): string | null {
+  const start = startDate ? formatDisplayDate(startDate) : null
+  const end = endDate ? formatDisplayDate(endDate) : null
+  if (start && end) return `${start} \u2013 ${end}`
+  if (start && !end) return `${start} \u2013 Present`
+  if (!start && end) return end
+  return null
+}
