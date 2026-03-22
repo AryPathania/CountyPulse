@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 /** Prompt version identifier logged in the `runs` table for telemetry. */
-export const JD_PARSE_PROMPT_ID = 'jd_parse_v1'
+export const JD_PARSE_PROMPT_ID = 'jd_parse_v2'
 
 // ---------------------------------------------------------------------------
 // Section builders
@@ -46,7 +46,13 @@ function buildExtractionRulesSection(): string {
 
 5. **When importance is ambiguous, default to \`must_have\`.** If the posting simply lists a skill or qualification without qualifying language, treat it as required.
 
-6. **Do not invent requirements.** Only extract what is explicitly stated or clearly implied by the job description. Never add requirements based on what you think the role would need.`
+6. **Extract implied requirements from responsibilities.** If the JD lists responsibilities, "What You'll Do", "Key Responsibilities", or similar sections, infer the skills and experience required to perform those responsibilities. For example:
+   - "Design and build server-side APIs" implies API design experience and server-side development skills
+   - "Troubleshoot and root-cause issues across distributed systems" implies distributed systems debugging experience
+   - "Mentor junior engineers through design reviews" implies mentoring/leadership ability and design review experience
+   Mark responsibility-derived requirements as \`must_have\` since they describe the core job duties.
+
+7. **Do not fabricate ungrounded requirements.** Every requirement you extract must be traceable to specific text in the JD — either a stated qualification or a listed responsibility. Do not add requirements based on general industry expectations or assumptions about the role.`
 }
 
 function buildOutputFormatSection(): string {
@@ -109,7 +115,45 @@ Note how "5+ years of experience with React and TypeScript" was split into two s
   ]
 }
 
-Note how the bare list "Python, PostgreSQL, Docker" has no qualifying language, so each defaults to must_have. "Preferred" signals nice_to_have for the Kubernetes certification. The company name is not mentioned so it is null.`
+Note how the bare list "Python, PostgreSQL, Docker" has no qualifying language, so each defaults to must_have. "Preferred" signals nice_to_have for the Kubernetes certification. The company name is not mentioned so it is null.
+
+### Example 3: Extracting requirements from responsibilities
+
+**Input JD text:**
+"Staff Software Engineer at DataFlow Inc.
+
+Key Responsibilities:
+- Design and implement scalable data pipelines processing 10M+ events per day
+- Lead architectural decisions for the platform team and document trade-offs in RFCs
+- Mentor junior and mid-level engineers through code reviews and pair programming
+- Collaborate with product managers to translate business requirements into technical specs
+
+Requirements:
+- 8+ years of software engineering experience
+- Proficiency in Java or Scala
+- Experience with Apache Kafka
+- MS in Computer Science preferred"
+
+**Output:**
+{
+  "jobTitle": "Staff Software Engineer",
+  "company": "DataFlow Inc",
+  "requirements": [
+    { "description": "8+ years of software engineering experience", "category": "experience_type", "importance": "must_have" },
+    { "description": "Proficiency in Java or Scala", "category": "technical_skill", "importance": "must_have" },
+    { "description": "Experience with Apache Kafka", "category": "technical_skill", "importance": "must_have" },
+    { "description": "MS in Computer Science", "category": "education", "importance": "nice_to_have" },
+    { "description": "Experience designing scalable data pipelines", "category": "technical_skill", "importance": "must_have" },
+    { "description": "High-throughput event processing experience (10M+ events/day scale)", "category": "experience_type", "importance": "must_have" },
+    { "description": "Technical leadership and architectural decision-making ability", "category": "soft_skill", "importance": "must_have" },
+    { "description": "Experience writing RFCs or technical design documents", "category": "soft_skill", "importance": "must_have" },
+    { "description": "Mentoring and coaching engineers", "category": "soft_skill", "importance": "must_have" },
+    { "description": "Code review experience", "category": "soft_skill", "importance": "must_have" },
+    { "description": "Ability to collaborate with product managers on technical scoping", "category": "soft_skill", "importance": "must_have" }
+  ]
+}
+
+Note how the "Key Responsibilities" section yielded additional requirements beyond the explicit "Requirements" section. Each responsibility was decomposed into the skills needed to perform it: "Design and implement scalable data pipelines processing 10M+ events per day" produced both a technical skill (data pipelines) and an experience type (high-throughput scale). Responsibility-derived requirements are marked must_have because they describe core job duties. Every extracted requirement traces back to specific JD text.`
 }
 
 // ---------------------------------------------------------------------------
