@@ -305,6 +305,8 @@ This file is the human-readable source of truth for table/column names, relation
 - `sort_order` controls display ordering within a category
 - `updated_at` auto-updates via `update_updated_at_column` trigger
 - Can be mapped to `SubSectionData` for resume content via `toSubSectionData()` helper in `@odie/db`
+- Education titles formatted via `formatEducationTitle()` in `@odie/db` for consistent display
+- Managed on `/profile` page via `ProfileEntriesEditor`; also available as draggable entries in resume edit BulletPalette
 
 ---
 

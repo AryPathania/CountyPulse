@@ -9,6 +9,7 @@ import {
   createProfileEntries,
   toEmbeddableText,
   embedItems,
+  formatEducationTitle,
 } from '@odie/db'
 import type { Json } from '@odie/db'
 import type { InterviewContext, ResumeParseOutput } from '@odie/shared'
@@ -180,12 +181,15 @@ export async function uploadAndParseResume(
     const existingKeys = new Set(existingEntries.map(e => `${e.title}|${e.subtitle ?? ''}`))
 
     const newEducation = parsedData.education
-      .map(edu => ({
-        category: 'education' as const,
-        title: edu.degree ? `${edu.degree}${edu.field ? `, ${edu.field}` : ''}` : edu.institution,
-        subtitle: edu.degree ? edu.institution : null,
-        end_date: toPostgresDate(edu.graduationDate),
-      }))
+      .map(edu => {
+        const { title, subtitle } = formatEducationTitle(edu)
+        return {
+          category: 'education' as const,
+          title,
+          subtitle,
+          end_date: toPostgresDate(edu.graduationDate),
+        }
+      })
       .filter(e => !existingKeys.has(`${e.title}|${e.subtitle ?? ''}`))
 
     if (newEducation.length > 0) {

@@ -27,6 +27,11 @@ vi.mock('@odie/db', () => ({
   createProfileEntries: (...args: unknown[]) => mockCreateProfileEntries(...args),
   embedItems: (...args: unknown[]) => mockEmbedItems(...args),
   toEmbeddableText: (...args: unknown[]) => mockToEmbeddableText(...args),
+  formatEducationTitle: (edu: { degree?: string | null; field?: string | null; institution: string }) => {
+    const title = [edu.degree, edu.field].filter(Boolean).join(' in ') || edu.institution
+    const subtitle = edu.degree ? edu.institution : null
+    return { title, subtitle }
+  },
 }))
 
 // Mock pdf-extract module

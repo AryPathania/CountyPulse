@@ -2,6 +2,14 @@ import { useState, useMemo, useEffect } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import './BulletPalette.css'
 
+export interface ProfileEntryPaletteItem {
+  id: string
+  category: string
+  title: string
+  subtitle?: string | null
+  textItems?: string[]
+}
+
 export interface BulletPaletteProps {
   allBullets: Array<{
     id: string
@@ -10,6 +18,8 @@ export interface BulletPaletteProps {
     position: { company: string; title: string } | null
   }>
   usedBulletIds: Set<string>
+  profileEntries?: ProfileEntryPaletteItem[]
+  usedEntryIds?: Set<string>
 }
 
 interface PaletteGroup {
@@ -18,37 +28,68 @@ interface PaletteGroup {
   bullets: BulletPaletteProps['allBullets']
 }
 
-function DraggableBulletItem({ bullet }: { bullet: BulletPaletteProps['allBullets'][number] }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `palette-${bullet.id}`,
-  })
+function DraggablePaletteItem({
+  id,
+  data,
+  testId,
+  children,
+}: {
+  id: string
+  data: Record<string, unknown>
+  testId: string
+  children: React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id, data })
 
   return (
     <div
       ref={setNodeRef}
       className={`bullet-palette__item ${isDragging ? 'bullet-palette__item--dragging' : ''}`}
-      data-testid={`palette-bullet-${bullet.id}`}
+      data-testid={testId}
       {...attributes}
       {...listeners}
     >
       <span className="bullet-palette__item-handle">&#8942;</span>
-      <div className="bullet-palette__item-content">
-        <p className="bullet-palette__item-text">
-          {bullet.current_text.length > 80
-            ? bullet.current_text.slice(0, 80) + '...'
-            : bullet.current_text}
-        </p>
-        <div className="bullet-palette__item-meta">
-          {bullet.category && (
-            <span className="bullet-palette__item-category">{bullet.category}</span>
-          )}
-        </div>
-      </div>
+      <div className="bullet-palette__item-content">{children}</div>
     </div>
   )
 }
 
-export function BulletPalette({ allBullets, usedBulletIds }: BulletPaletteProps) {
+function DraggableBulletItem({ bullet }: { bullet: BulletPaletteProps['allBullets'][number] }) {
+  return (
+    <DraggablePaletteItem
+      id={`palette-${bullet.id}`}
+      data={{ type: 'palette-bullet' as const, bulletId: bullet.id }}
+      testId={`palette-bullet-${bullet.id}`}
+    >
+      <p className="bullet-palette__item-text">
+        {bullet.current_text.length > 80
+          ? bullet.current_text.slice(0, 80) + '...'
+          : bullet.current_text}
+      </p>
+      <div className="bullet-palette__item-meta">
+        {bullet.category && (
+          <span className="bullet-palette__item-category">{bullet.category}</span>
+        )}
+      </div>
+    </DraggablePaletteItem>
+  )
+}
+
+function DraggableEntryItem({ entry }: { entry: ProfileEntryPaletteItem }) {
+  return (
+    <DraggablePaletteItem
+      id={`palette-entry-${entry.id}`}
+      data={{ type: 'palette-entry' as const, entryId: entry.id }}
+      testId={`palette-entry-${entry.id}`}
+    >
+      <span className="bullet-palette__item-text">{entry.title}</span>
+      {entry.subtitle && <span className="bullet-palette__item-meta">{entry.subtitle}</span>}
+    </DraggablePaletteItem>
+  )
+}
+
+export function BulletPalette({ allBullets, usedBulletIds, profileEntries, usedEntryIds }: BulletPaletteProps) {
   const [isOpen, setIsOpen] = useState(true)
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
 
@@ -75,6 +116,21 @@ export function BulletPalette({ allBullets, usedBulletIds }: BulletPaletteProps)
       bullets,
     }))
   }, [availableBullets])
+
+  const availableEntries = useMemo(() => {
+    if (!profileEntries) return []
+    return profileEntries.filter((e) => !usedEntryIds?.has(e.id))
+  }, [profileEntries, usedEntryIds])
+
+  const groupedEntries = useMemo(() => {
+    const grouped: Record<string, ProfileEntryPaletteItem[]> = {}
+    for (const entry of availableEntries) {
+      const cat = entry.category
+      if (!grouped[cat]) grouped[cat] = []
+      grouped[cat].push(entry)
+    }
+    return grouped
+  }, [availableEntries])
 
   // Initialize all groups as open on first render
   useEffect(() => {
@@ -143,6 +199,33 @@ export function BulletPalette({ allBullets, usedBulletIds }: BulletPaletteProps)
                   ))}
               </div>
             ))
+          )}
+
+          {availableEntries.length > 0 && (
+            <div className="bullet-palette__section" data-testid="palette-entries-section">
+              <h4 className="bullet-palette__section-title">Profile Entries</h4>
+              {Object.entries(groupedEntries).map(([category, entries]) => (
+                <div key={category} className="bullet-palette__group" data-testid={`palette-entry-group-${category}`}>
+                  <div
+                    className="bullet-palette__group-header"
+                    onClick={() => toggleGroup(`entry-${category}`)}
+                  >
+                    <span
+                      className={`bullet-palette__group-toggle ${openGroups.has(`entry-${category}`) ? 'bullet-palette__group-toggle--open' : ''}`}
+                    >
+                      &#9654;
+                    </span>
+                    <span>{category.charAt(0).toUpperCase() + category.slice(1)}</span>
+                    <span className="bullet-palette__group-count">({entries.length})</span>
+                  </div>
+
+                  {openGroups.has(`entry-${category}`) &&
+                    entries.map((entry) => (
+                      <DraggableEntryItem key={entry.id} entry={entry} />
+                    ))}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

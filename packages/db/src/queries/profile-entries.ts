@@ -95,6 +95,20 @@ export function toEmbeddableText(entry: ProfileEntry): string {
 }
 
 /**
+ * Format education title/subtitle from degree, field, and institution.
+ * Shared across buildEducationEntries (resume creation) and resume-upload (profile_entries dedup).
+ */
+export function formatEducationTitle(edu: {
+  degree?: string | null
+  field?: string | null
+  institution: string
+}): { title: string; subtitle: string | null } {
+  const title = [edu.degree, edu.field].filter(Boolean).join(' in ') || edu.institution
+  const subtitle = edu.degree ? edu.institution : null
+  return { title, subtitle }
+}
+
+/**
  * Maps a ProfileEntry to the SubSectionData shape used in resume content JSON.
  */
 export function toSubSectionData(entry: ProfileEntry): SubSectionData {

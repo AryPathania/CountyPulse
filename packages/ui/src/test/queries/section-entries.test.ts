@@ -70,7 +70,7 @@ describe('buildEducationEntries', () => {
       { institution: 'Stanford' },
     ])
     expect(result.subsections[0].title).toBe('Stanford')
-    expect(result.subsections[0].subtitle).toBe('Stanford')
+    expect(result.subsections[0].subtitle).toBeUndefined()
   })
 
   it('handles multiple entries with sequential IDs', () => {

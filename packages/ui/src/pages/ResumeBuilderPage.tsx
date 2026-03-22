@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
-  closestCenter,
+  closestCorners,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -32,6 +32,8 @@ import {
   updateResumeContent,
   updateResume,
   getBullets,
+  getProfileEntries,
+  toSubSectionData,
   logRun,
   DEFAULT_SECTIONS,
   SUGGESTED_SECTIONS,
@@ -40,6 +42,7 @@ import {
   type ResumeSection,
   type SubSectionData,
   type BulletWithPosition,
+  type ProfileEntry,
 } from '@odie/db'
 import type { ProfileFormData } from '@odie/shared'
 import './ResumeBuilderPage.css'
@@ -55,6 +58,7 @@ export function ResumeBuilderPage() {
 
   const [resume, setResume] = useState<ResumeWithBullets | null>(null)
   const [allBullets, setAllBullets] = useState<BulletWithPosition[]>([])
+  const [profileEntries, setProfileEntries] = useState<ProfileEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -96,7 +100,9 @@ export function ResumeBuilderPage() {
 
   // DnD sensors
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -118,10 +124,14 @@ export function ResumeBuilderPage() {
         } else {
           setResume(data)
         }
-        // Fetch all user bullets for the palette
+        // Fetch all user bullets and profile entries for the palette
         if (user?.id) {
-          const bullets = await getBullets(user.id)
+          const [bullets, entries] = await Promise.all([
+            getBullets(user.id),
+            getProfileEntries(user.id),
+          ])
           setAllBullets(bullets)
+          setProfileEntries(entries)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load resume')
@@ -157,6 +167,20 @@ export function ResumeBuilderPage() {
     for (const section of resume.parsedContent.sections) {
       for (const item of section.items) {
         if (item.bulletId) ids.add(item.bulletId)
+      }
+    }
+    return ids
+  }, [resume])
+
+  // Compute which profile entries are already used in the resume
+  const usedEntryIds = useMemo(() => {
+    if (!resume) return new Set<string>()
+    const ids = new Set<string>()
+    for (const section of resume.parsedContent.sections) {
+      for (const item of section.items) {
+        if (item.subsectionId?.startsWith('entry-')) {
+          ids.add(item.subsectionId.replace('entry-', ''))
+        }
       }
     }
     return ids
@@ -315,7 +339,38 @@ export function ResumeBuilderPage() {
       const newSections = sections.map((section) => ({
         ...section,
         items: [...section.items],
+        subsections: [...(section.subsections ?? [])],
       }))
+
+      // Subsection group drag: move subsection + its trailing bullets as a unit
+      const sourceItem = newSections[sourceSectionIndex].items[sourceItemIndex]
+      const isSubsection = sourceItem.type === 'subsection'
+
+      if (isSubsection && sourceSectionIndex === targetSectionIndex) {
+        const sectionItems = newSections[sourceSectionIndex].items
+        // Find group end: subsection + all consecutive non-subsection items after it
+        let groupEnd = sourceItemIndex + 1
+        while (groupEnd < sectionItems.length && sectionItems[groupEnd].type !== 'subsection') {
+          groupEnd++
+        }
+        const groupSize = groupEnd - sourceItemIndex
+
+        // Remove the group from its current position
+        const group = sectionItems.splice(sourceItemIndex, groupSize)
+
+        // Adjust target index since we removed items before splicing back in
+        let adjustedTarget = targetItemIndex
+        if (targetItemIndex > sourceItemIndex) {
+          adjustedTarget -= groupSize
+        }
+
+        // Insert the group at the adjusted target position
+        sectionItems.splice(adjustedTarget, 0, ...group)
+
+        const newContent: ResumeContent = { sections: newSections }
+        applyContent(newContent)
+        return
+      }
 
       if (sourceSectionIndex === targetSectionIndex) {
         // Same section: use arrayMove for correct index handling
@@ -328,6 +383,17 @@ export function ResumeBuilderPage() {
         // Cross-section: remove from source, insert into target
         const [movedItem] = newSections[sourceSectionIndex].items.splice(sourceItemIndex, 1)
         newSections[targetSectionIndex].items.splice(targetItemIndex, 0, movedItem)
+
+        // Also move subsection data if this is a subsection item
+        if (movedItem.subsectionId) {
+          const subIdx = newSections[sourceSectionIndex].subsections.findIndex(
+            (s) => s.id === movedItem.subsectionId
+          )
+          if (subIdx !== -1) {
+            const [movedSub] = newSections[sourceSectionIndex].subsections.splice(subIdx, 1)
+            newSections[targetSectionIndex].subsections.push(movedSub)
+          }
+        }
       }
 
       const newContent: ResumeContent = { sections: newSections }
@@ -364,6 +430,28 @@ export function ResumeBuilderPage() {
       console.debug('[ResumeBuilder] bullet added from palette to section %s', sectionId)
     },
     [resume, allBullets, updateSection]
+  )
+
+  // Handle adding a profile entry from the palette to a section
+  const handleAddEntryToSection = useCallback(
+    (entryId: string, sectionId: string) => {
+      if (!resume) return
+      const entry = profileEntries.find((e) => e.id === entryId)
+      if (!entry) return
+
+      const subsectionData = toSubSectionData(entry)
+      const newSections = resume.parsedContent.sections.map((section) => {
+        if (section.id !== sectionId) return section
+        return {
+          ...section,
+          items: [...section.items, { type: 'subsection' as const, subsectionId: subsectionData.id }],
+          subsections: [...(section.subsections ?? []), subsectionData],
+        }
+      })
+      applyContent({ sections: newSections })
+      console.debug('[ResumeBuilder] entry added from palette to section %s', sectionId)
+    },
+    [resume, profileEntries, applyContent]
   )
 
   // Handle removing a bullet from a section
@@ -501,25 +589,32 @@ export function ResumeBuilderPage() {
 
       if (activeIdStr === overIdStr) return
 
-      // If dragging from palette
-      if (activeIdStr.startsWith('palette-')) {
-        const bulletId = activeIdStr.replace('palette-', '')
-        let targetSectionId: string | undefined
-        // Check if dropped on a section
-        const targetSection = resume.parsedContent.sections.find((s) => s.id === overIdStr)
-        if (targetSection) {
-          targetSectionId = targetSection.id
-        } else {
-          // Dropped on a bullet - find which section contains it
-          for (const section of resume.parsedContent.sections) {
-            if (section.items.some((item) => item.bulletId === overIdStr || item.subsectionId === overIdStr)) {
-              targetSectionId = section.id
-              break
-            }
+      // If dragging from palette, use data type discrimination
+      const dragData = active.data?.current as { type: string; bulletId?: string; entryId?: string } | undefined
+
+      const findTargetSectionId = (overId: string): string | undefined => {
+        const direct = resume.parsedContent.sections.find((s) => s.id === overId)
+        if (direct) return direct.id
+        for (const section of resume.parsedContent.sections) {
+          if (section.items.some((item) => item.bulletId === overId || item.subsectionId === overId)) {
+            return section.id
           }
         }
+        return undefined
+      }
+
+      if (dragData?.type === 'palette-bullet' && dragData.bulletId) {
+        const targetSectionId = findTargetSectionId(overIdStr)
         if (targetSectionId) {
-          handleAddBulletToSection(bulletId, targetSectionId)
+          handleAddBulletToSection(dragData.bulletId, targetSectionId)
+        }
+        return
+      }
+
+      if (dragData?.type === 'palette-entry' && dragData.entryId) {
+        const targetSectionId = findTargetSectionId(overIdStr)
+        if (targetSectionId) {
+          handleAddEntryToSection(dragData.entryId, targetSectionId)
         }
         return
       }
@@ -540,7 +635,7 @@ export function ResumeBuilderPage() {
         handleBulletMove(activeIdStr, overIdStr)
       }
     },
-    [resume, applyContent, handleBulletMove, handleAddBulletToSection]
+    [resume, applyContent, handleBulletMove, handleAddBulletToSection, handleAddEntryToSection]
   )
 
   // Get bullet data by ID
@@ -571,21 +666,39 @@ export function ResumeBuilderPage() {
   const getActiveItem = useCallback(() => {
     if (!activeId || !resume) return null
 
-    // Check if dragging from palette
+    // Check if dragging from palette (bullet or entry)
     if (activeId.startsWith('palette-')) {
-      const bulletId = activeId.replace('palette-', '')
-      const paletteBullet = allBullets.find((b) => b.id === bulletId)
-      if (paletteBullet) {
-        return {
-          type: 'bullet' as const,
-          bullet: {
-            id: paletteBullet.id,
-            current_text: paletteBullet.current_text,
-            category: paletteBullet.category,
-            position: paletteBullet.position
-              ? { id: '', company: paletteBullet.position.company, title: paletteBullet.position.title }
-              : null,
-          },
+      // Palette bullet
+      const paletteBulletId = activeId.startsWith('palette-entry-')
+        ? null
+        : activeId.replace('palette-', '')
+      if (paletteBulletId) {
+        const paletteBullet = allBullets.find((b) => b.id === paletteBulletId)
+        if (paletteBullet) {
+          return {
+            type: 'bullet' as const,
+            bullet: {
+              id: paletteBullet.id,
+              current_text: paletteBullet.current_text,
+              category: paletteBullet.category,
+              position: paletteBullet.position
+                ? { id: '', company: paletteBullet.position.company, title: paletteBullet.position.title }
+                : null,
+            },
+          }
+        }
+      }
+      // Palette entry
+      const entryId = activeId.startsWith('palette-entry-')
+        ? activeId.replace('palette-entry-', '')
+        : null
+      if (entryId) {
+        const entry = profileEntries.find((e) => e.id === entryId)
+        if (entry) {
+          return {
+            type: 'entry' as const,
+            entry: { id: entry.id, title: entry.title, category: entry.category },
+          }
         }
       }
       return null
@@ -607,7 +720,7 @@ export function ResumeBuilderPage() {
     }
 
     return null
-  }, [activeId, resume, getBulletById, allBullets])
+  }, [activeId, resume, getBulletById, allBullets, profileEntries])
 
   if (isLoading) {
     return (
@@ -719,7 +832,7 @@ export function ResumeBuilderPage() {
 
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCenter}
+              collisionDetection={closestCorners}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
@@ -842,9 +955,25 @@ export function ResumeBuilderPage() {
                     {activeItem.bullet.current_text.slice(0, 50)}...
                   </div>
                 )}
+                {activeItem?.type === 'entry' && 'entry' in activeItem && (
+                  <div className="drag-overlay drag-overlay--entry">
+                    {activeItem.entry.title}
+                  </div>
+                )}
               </DragOverlay>
 
-              <BulletPalette allBullets={allBullets} usedBulletIds={usedBulletIds} />
+              <BulletPalette
+                allBullets={allBullets}
+                usedBulletIds={usedBulletIds}
+                profileEntries={profileEntries.map((e) => ({
+                  id: e.id,
+                  category: e.category,
+                  title: e.title,
+                  subtitle: e.subtitle,
+                  textItems: e.text_items.length > 0 ? e.text_items : undefined,
+                }))}
+                usedEntryIds={usedEntryIds}
+              />
             </DndContext>
 
             {/* Inline bullet editor */}

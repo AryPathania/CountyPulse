@@ -2,6 +2,7 @@ import { supabase } from '../client'
 import type { Database, Json } from '../types'
 import type { ProfileLink } from '@odie/shared'
 import { mapProfileToFormData } from './candidate-profiles'
+import { formatEducationTitle } from './profile-entries'
 
 type Resume = Database['public']['Tables']['resumes']['Row']
 type NewResume = Database['public']['Tables']['resumes']['Insert']
@@ -42,31 +43,26 @@ export interface ResumeContent {
   sections: ResumeSection[]
 }
 
+/** Default section IDs for the three built-in resume sections. */
+export const DEFAULT_SECTIONS = ['Education', 'Experience', 'Skills'] as const
+
+/** Suggested custom sections users can add. */
+export const SUGGESTED_SECTIONS = [
+  'Projects', 'Awards', 'Certifications', 'Publications',
+  'Volunteer', 'Hobbies', 'Languages', 'Summary',
+] as const
+
 /**
  * Create default resume content structure
  */
 export function createDefaultResumeContent(): ResumeContent {
   return {
-    sections: [
-      {
-        id: 'experience',
-        title: 'Experience',
-        items: [],
-        subsections: [],
-      },
-      {
-        id: 'skills',
-        title: 'Skills',
-        items: [],
-        subsections: [],
-      },
-      {
-        id: 'education',
-        title: 'Education',
-        items: [],
-        subsections: [],
-      },
-    ],
+    sections: DEFAULT_SECTIONS.map((title) => ({
+      id: title.toLowerCase(),
+      title,
+      items: [],
+      subsections: [],
+    })),
   }
 }
 
@@ -350,15 +346,6 @@ export async function deleteResume(resumeId: string): Promise<void> {
   if (error) throw error
 }
 
-/** Default section IDs for the three built-in resume sections. */
-export const DEFAULT_SECTIONS = ['Experience', 'Skills', 'Education'] as const
-
-/** Suggested custom sections users can add. */
-export const SUGGESTED_SECTIONS = [
-  'Projects', 'Awards', 'Certifications', 'Publications',
-  'Volunteer', 'Hobbies', 'Languages', 'Summary',
-] as const
-
 /**
  * Result of grouping bullets by position into sub-sections.
  */
@@ -403,12 +390,15 @@ export function buildEducationEntries(
   education: ParsedEducation[]
 ): GroupedBulletsResult {
   return buildSectionEntries(
-    education.map((e, i) => ({
-      id: `edu-${i}`,
-      title: [e.degree, e.field].filter(Boolean).join(' in ') || e.institution,
-      subtitle: e.institution,
-      endDate: e.graduationDate ?? undefined,
-    }))
+    education.map((e, i) => {
+      const { title, subtitle } = formatEducationTitle(e)
+      return {
+        id: `edu-${i}`,
+        title,
+        subtitle: subtitle ?? undefined,
+        endDate: e.graduationDate ?? undefined,
+      }
+    })
   )
 }
 
@@ -569,26 +559,16 @@ export async function createResumeFromDraft(
     ? buildSkillsEntries(options.skills)
     : { items: [], subsections: [] }
 
-  const sections: ResumeSection[] = [
-    {
-      id: 'experience',
-      title: 'Experience',
-      items: experienceResult.items,
-      subsections: experienceResult.subsections,
-    },
-    {
-      id: 'skills',
-      title: 'Skills',
-      items: skillsResult.items,
-      subsections: skillsResult.subsections,
-    },
-    {
-      id: 'education',
-      title: 'Education',
-      items: educationResult.items,
-      subsections: educationResult.subsections,
-    },
-  ]
+  const sectionData: Record<string, { items: ResumeContentItem[]; subsections: SubSectionData[] }> = {
+    Education: educationResult,
+    Experience: experienceResult,
+    Skills: skillsResult,
+  }
+  const sections: ResumeSection[] = DEFAULT_SECTIONS.map((title) => ({
+    id: title.toLowerCase(),
+    title,
+    ...(sectionData[title] ?? { items: [], subsections: [] }),
+  }))
 
   // Add sections from profile entries (education, certifications, awards, etc.)
   if (options?.profileEntries) {

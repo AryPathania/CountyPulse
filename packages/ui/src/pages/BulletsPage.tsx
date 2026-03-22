@@ -94,7 +94,7 @@ export function BulletsPage() {
     <div className="bullets-page" data-testid="bullets-page">
       <Navigation />
       <header className="bullets-page__header">
-        <h1 className="bullets-page__title">Bullets Library</h1>
+        <h1 className="bullets-page__title">Experience Bullets</h1>
         <p className="bullets-page__subtitle">
           Manage and edit your resume bullet points
         </p>

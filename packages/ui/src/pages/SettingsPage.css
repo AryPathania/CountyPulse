@@ -32,6 +32,18 @@
   max-width: 800px;
 }
 
+/* Profile link */
+.settings-page__profile-link {
+  margin: 0 0 var(--space-lg) 0;
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+}
+
+.settings-page__profile-link a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
 /* Sections */
 .settings-page__section {
   padding: var(--space-lg);

@@ -19,6 +19,7 @@ vi.mock('@dnd-kit/core', () => ({
   },
   DragOverlay: ({ children }: { children: ReactNode }) => children,
   closestCenter: vi.fn(),
+  closestCorners: vi.fn(),
   KeyboardSensor: vi.fn(),
   PointerSensor: vi.fn(),
   useSensor: vi.fn(),
@@ -190,6 +191,7 @@ const mockUpdateResumeContent = vi.fn()
 const mockLogRun = vi.fn()
 const mockGetBullets = vi.fn()
 const mockUpsertProfile = vi.fn()
+const mockGetProfileEntries = vi.fn()
 
 vi.mock('@odie/db', () => ({
   getResumeWithBullets: (...args: unknown[]) => mockGetResumeWithBullets(...args),
@@ -197,6 +199,16 @@ vi.mock('@odie/db', () => ({
   logRun: (...args: unknown[]) => mockLogRun(...args),
   getBullets: (...args: unknown[]) => mockGetBullets(...args),
   upsertProfile: (...args: unknown[]) => mockUpsertProfile(...args),
+  getProfileEntries: (...args: unknown[]) => mockGetProfileEntries(...args),
+  toSubSectionData: (entry: { id: string; title: string; subtitle?: string | null; start_date?: string | null; end_date?: string | null; location?: string | null; text_items?: string[] }) => ({
+    id: `entry-${entry.id}`,
+    title: entry.title,
+    subtitle: entry.subtitle ?? undefined,
+    startDate: entry.start_date ?? undefined,
+    endDate: entry.end_date ?? undefined,
+    location: entry.location ?? undefined,
+    textItems: entry.text_items && entry.text_items.length > 0 ? entry.text_items : undefined,
+  }),
 }))
 
 function renderResumeBuilder(resumeId = 'resume-123') {
@@ -219,6 +231,7 @@ describe('ResumeBuilderPage', () => {
     mockUpdateResumeContent.mockResolvedValue(mockResume)
     mockLogRun.mockResolvedValue({})
     mockUpsertProfile.mockResolvedValue({})
+    mockGetProfileEntries.mockResolvedValue([])
     mockGetBullets.mockResolvedValue([
       {
         id: 'bullet-1',
@@ -727,6 +740,7 @@ describe('ResumeBuilderPage', () => {
               id: 'skills',
               title: 'Skills',
               items: [],
+              subsections: [],
             },
           ],
         })
@@ -776,7 +790,7 @@ describe('ResumeBuilderPage', () => {
       expect(capturedOnDragEnd).not.toBeNull()
       act(() => {
         capturedOnDragEnd!({
-          active: { id: 'palette-bullet-3' },
+          active: { id: 'palette-bullet-3', data: { current: { type: 'palette-bullet', bulletId: 'bullet-3' } } },
           over: { id: 'experience' },
         })
       })
@@ -846,6 +860,7 @@ describe('ResumeBuilderPage', () => {
               id: 'skills',
               title: 'Skills',
               items: [],
+              subsections: [],
             },
           ],
         })
@@ -1318,6 +1333,384 @@ describe('ResumeBuilderPage', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('input-display-name')).toHaveValue('John Updated')
+      })
+    })
+  })
+
+  describe('cross-section subsection move transfers subsection data', () => {
+    it('should move subsection item and its SubSectionData to the target section', async () => {
+      const twoSectionResume = {
+        ...mockResume,
+        parsedContent: {
+          sections: [
+            {
+              id: 'experience',
+              title: 'Experience',
+              items: [
+                { type: 'subsection' as const, subsectionId: 'sub-pos-1' },
+                { type: 'bullet' as const, bulletId: 'bullet-1' },
+              ],
+              subsections: [
+                {
+                  id: 'sub-pos-1',
+                  title: 'Lead Engineer',
+                  subtitle: 'Tech Corp',
+                  startDate: '2022-06-01',
+                  endDate: '2024-01-15',
+                  location: 'San Francisco, CA',
+                  positionId: 'pos-1',
+                },
+              ],
+            },
+            {
+              id: 'projects',
+              title: 'Projects',
+              items: [
+                { type: 'bullet' as const, bulletId: 'bullet-2' },
+              ],
+              subsections: [],
+            },
+          ],
+        },
+      }
+      mockGetResumeWithBullets.mockResolvedValue(twoSectionResume)
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Drag subsection from experience to projects (drop on bullet-2 in projects)
+      expect(capturedOnDragEnd).not.toBeNull()
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'sub-pos-1' },
+          over: { id: 'bullet-2' },
+        })
+      })
+
+      // SubSectionData should be moved to the projects section
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                // subsection item removed from source
+                items: expect.not.arrayContaining([
+                  expect.objectContaining({ subsectionId: 'sub-pos-1' }),
+                ]),
+                // SubSectionData removed from source
+                subsections: [],
+              }),
+              expect.objectContaining({
+                id: 'projects',
+                // subsection item added to target
+                items: expect.arrayContaining([
+                  expect.objectContaining({ subsectionId: 'sub-pos-1' }),
+                ]),
+                // SubSectionData transferred to target
+                subsections: expect.arrayContaining([
+                  expect.objectContaining({
+                    id: 'sub-pos-1',
+                    title: 'Lead Engineer',
+                    subtitle: 'Tech Corp',
+                  }),
+                ]),
+              }),
+            ]),
+          })
+        )
+      })
+    })
+  })
+
+  describe('cross-section bullet move without subsection transfer', () => {
+    it('should move a regular bullet between sections without touching subsections', async () => {
+      const twoSectionResume = {
+        ...mockResume,
+        parsedContent: {
+          sections: [
+            {
+              id: 'experience',
+              title: 'Experience',
+              items: [
+                { type: 'subsection' as const, subsectionId: 'sub-pos-1' },
+                { type: 'bullet' as const, bulletId: 'bullet-1' },
+                { type: 'bullet' as const, bulletId: 'bullet-2' },
+              ],
+              subsections: [
+                {
+                  id: 'sub-pos-1',
+                  title: 'Lead Engineer',
+                  subtitle: 'Tech Corp',
+                  startDate: '2022-06-01',
+                  endDate: '2024-01-15',
+                  location: 'San Francisco, CA',
+                  positionId: 'pos-1',
+                },
+              ],
+            },
+            {
+              id: 'projects',
+              title: 'Projects',
+              items: [],
+              subsections: [],
+            },
+          ],
+        },
+      }
+      mockGetResumeWithBullets.mockResolvedValue(twoSectionResume)
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Drag bullet-1 from experience to projects section (drop on the section itself)
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'bullet-1' },
+          over: { id: 'projects' },
+        })
+      })
+
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                // bullet-1 removed, bullet-2 still there
+                items: [
+                  { type: 'subsection', subsectionId: 'sub-pos-1' },
+                  { type: 'bullet', bulletId: 'bullet-2' },
+                ],
+                // subsections untouched
+                subsections: [
+                  expect.objectContaining({
+                    id: 'sub-pos-1',
+                    title: 'Lead Engineer',
+                  }),
+                ],
+              }),
+              expect.objectContaining({
+                id: 'projects',
+                // bullet-1 added at end
+                items: [
+                  { type: 'bullet', bulletId: 'bullet-1' },
+                ],
+                // no subsections transferred
+                subsections: [],
+              }),
+            ]),
+          })
+        )
+      })
+    })
+  })
+
+  describe('intra-section subsection group move includes trailing bullets', () => {
+    it('should move subsection-B and its trailing bullet as a group before subsection-A', async () => {
+      const groupMoveResume = {
+        ...mockResume,
+        parsedContent: {
+          sections: [
+            {
+              id: 'experience',
+              title: 'Experience',
+              items: [
+                { type: 'subsection' as const, subsectionId: 'sub-A' },
+                { type: 'bullet' as const, bulletId: 'bullet-1' },
+                { type: 'bullet' as const, bulletId: 'bullet-2' },
+                { type: 'subsection' as const, subsectionId: 'sub-B' },
+                { type: 'bullet' as const, bulletId: 'bullet-4' },
+              ],
+              subsections: [
+                { id: 'sub-A', title: 'Position A', subtitle: 'Company A' },
+                { id: 'sub-B', title: 'Position B', subtitle: 'Company B' },
+              ],
+            },
+            {
+              id: 'skills',
+              title: 'Skills',
+              items: [],
+              subsections: [],
+            },
+          ],
+        },
+      }
+      mockGetResumeWithBullets.mockResolvedValue(groupMoveResume)
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Drag sub-B to sub-A's position (move sub-B group before sub-A)
+      // sub-B group = [sub-B, bullet-4] (size 2), source index 3, target index 0
+      // target < source so no adjustment; group inserts at index 0
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'sub-B' },
+          over: { id: 'sub-A' },
+        })
+      })
+
+      // Expected result: [sub-B, bullet-4, sub-A, bullet-1, bullet-2]
+      // The entire group (sub-B + bullet-4) moves together
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                items: [
+                  { type: 'subsection', subsectionId: 'sub-B' },
+                  { type: 'bullet', bulletId: 'bullet-4' },
+                  { type: 'subsection', subsectionId: 'sub-A' },
+                  { type: 'bullet', bulletId: 'bullet-1' },
+                  { type: 'bullet', bulletId: 'bullet-2' },
+                ],
+              }),
+            ]),
+          })
+        )
+      })
+    })
+  })
+
+  describe('subsection at end of section moves cleanly', () => {
+    it('should move subsection-B (no trailing bullets) before subsection-A', async () => {
+      const endSubResume = {
+        ...mockResume,
+        parsedContent: {
+          sections: [
+            {
+              id: 'experience',
+              title: 'Experience',
+              items: [
+                { type: 'subsection' as const, subsectionId: 'sub-A' },
+                { type: 'bullet' as const, bulletId: 'bullet-1' },
+                { type: 'subsection' as const, subsectionId: 'sub-B' },
+              ],
+              subsections: [
+                { id: 'sub-A', title: 'Position A', subtitle: 'Company A' },
+                { id: 'sub-B', title: 'Position B', subtitle: 'Company B' },
+              ],
+            },
+            {
+              id: 'skills',
+              title: 'Skills',
+              items: [],
+              subsections: [],
+            },
+          ],
+        },
+      }
+      mockGetResumeWithBullets.mockResolvedValue(endSubResume)
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Drag sub-B to sub-A's position (move sub-B before sub-A)
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'sub-B' },
+          over: { id: 'sub-A' },
+        })
+      })
+
+      // Expected: [sub-B, sub-A, bullet-1]
+      // sub-B has no trailing bullets so only itself moves
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                items: [
+                  { type: 'subsection', subsectionId: 'sub-B' },
+                  { type: 'subsection', subsectionId: 'sub-A' },
+                  { type: 'bullet', bulletId: 'bullet-1' },
+                ],
+              }),
+            ]),
+          })
+        )
+      })
+    })
+  })
+
+  describe('profile entry palette drop creates subsection', () => {
+    it('should create a subsection from a palette entry drop', async () => {
+      const mockEntry = {
+        id: 'entry-1',
+        user_id: 'test-user-id',
+        category: 'education',
+        title: 'BS Computer Science',
+        subtitle: 'MIT',
+        start_date: '2016-09-01',
+        end_date: '2020-06-01',
+        location: 'Cambridge, MA',
+        text_items: ['Dean\'s List', 'GPA 3.9'],
+        sort_order: 0,
+        created_at: '',
+        updated_at: '',
+      }
+      mockGetProfileEntries.mockResolvedValue([mockEntry])
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Simulate dropping a palette entry onto the experience section
+      act(() => {
+        capturedOnDragEnd!({
+          active: {
+            id: 'palette-entry-entry-1',
+            data: { current: { type: 'palette-entry', entryId: 'entry-1' } },
+          },
+          over: { id: 'experience' },
+        })
+      })
+
+      // A new subsection should be created with the entry's data
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                // New subsection item added
+                items: expect.arrayContaining([
+                  expect.objectContaining({ type: 'subsection', subsectionId: 'entry-entry-1' }),
+                ]),
+                // SubSectionData includes entry title/subtitle
+                subsections: expect.arrayContaining([
+                  expect.objectContaining({
+                    id: 'entry-entry-1',
+                    title: 'BS Computer Science',
+                    subtitle: 'MIT',
+                  }),
+                ]),
+              }),
+            ]),
+          })
+        )
       })
     })
   })

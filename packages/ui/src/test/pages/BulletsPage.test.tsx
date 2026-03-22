@@ -92,7 +92,7 @@ describe('BulletsPage', () => {
     renderBulletsPage()
 
     expect(screen.getByTestId('bullets-page')).toBeInTheDocument()
-    expect(screen.getByText('Bullets Library')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Experience Bullets' })).toBeInTheDocument()
     expect(screen.getByText('Manage and edit your resume bullet points')).toBeInTheDocument()
   })
 

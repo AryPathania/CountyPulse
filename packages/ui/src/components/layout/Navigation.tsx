@@ -23,10 +23,11 @@ export function Navigation() {
   const navItems = [
     { path: '/', label: 'Home', testId: 'nav-link-home' },
     { path: '/resumes', label: 'Resumes', testId: 'nav-link-resumes' },
+    { path: '/profile', label: 'Profile', testId: 'nav-link-profile' },
     ...(lastEdited
       ? [{ path: `/resumes/${lastEdited.id}/edit`, label: 'Edit Resume', testId: 'nav-continue-editing' }]
       : []),
-    { path: '/bullets', label: 'Bullets', testId: 'nav-link-bullets' },
+    { path: '/bullets', label: 'Experience Bullets', testId: 'nav-link-bullets' },
     { path: '/interview', label: 'Interview', testId: 'nav-link-interview' },
     { path: '/telemetry', label: 'Telemetry', testId: 'nav-link-telemetry' },
     { path: '/settings', label: 'Settings', testId: 'nav-link-settings' },

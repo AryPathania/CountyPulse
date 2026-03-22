@@ -52,7 +52,9 @@ pnpm gen-types        # Generate Supabase types
 - **Custom Sections**: All resume sections (including defaults like Experience, Education, Skills) are editable and deletable. An "Add Section" dropdown offers missing defaults, suggested sections (Projects, Certifications, etc.), and a custom-name option. Deleted defaults reappear in the menu for re-addition. Section CRUD is handled in `ResumeBuilderPage`.
 - **Metric Preservation**: LLM prompts enforce an always-on rule to preserve original metrics/numbers in bullets. Applied across `bullet-quality.ts`, `resume-parse.ts` (`resume_parse_v2`), and `interview.ts` (`interview_v3`).
 - **Profile Links**: Flexible `links JSONB NOT NULL DEFAULT '[]'` on `candidate_profiles`. Each entry is `{label, url}`. Max 8 enforced at app layer. Common types (LinkedIn, GitHub, Twitter, Website) offered as quick-add presets; fully custom labels supported. No fixed URL columns.
-- **Profile Entries**: Generic `profile_entries` table for structured non-bullet profile data (education, certifications, awards, projects, volunteer). Category-based with `sort_order`. Extracted during interviews via `extractedEntries` in the interview response schema. Mapped to `SubSectionData` via `toSubSectionData()` in `@odie/db` for resume content injection. Managed in Settings via `ProfileEntriesEditor`.
+- **Profile Entries**: Generic `profile_entries` table for structured non-bullet profile data (education, certifications, awards, projects, volunteer). Category-based with `sort_order`. Extracted during interviews via `extractedEntries` in the interview response schema. Mapped to `SubSectionData` via `toSubSectionData()` in `@odie/db` for resume content injection. Managed on `/profile` page via `ProfileEntriesEditor`. Also available as a draggable bank in BulletPalette on the resume edit page.
+- **Default Section Order**: `DEFAULT_SECTIONS` constant defines section order as `['Education', 'Experience', 'Skills']`. Both `createDefaultResumeContent()` and `createResumeFromDraft()` derive from this.
+- **DnD Type System**: Drag items use `@dnd-kit` `data` prop with type discrimination (not string prefix parsing). Collision detection uses `closestCorners` with a distance activation constraint of 5px. Cross-section moves transfer subsection data; subsection drags move child bullets as a group.
 
 ## Security
 
@@ -90,28 +92,32 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - Shared prompts: `supabase/functions/_shared/prompts/`
 - UI services: `packages/ui/src/services/`
 - DnD block registry: `packages/ui/src/components/dnd/README.md`
+- DnD drag types: Use `@dnd-kit` `data` prop with type discrimination, never string prefix parsing
+- Education title formatting: Always use `formatEducationTitle()` from `@odie/db` for consistent education titles from parsed data
 - Query key invalidation: Always import from canonical key factories (e.g., `bulletKeys.all`). Never hardcode query key strings in invalidation calls.
 
 ## Key Shared Components
-- `ProfileForm` (`packages/ui/src/components/ProfileForm.tsx`) — shared form for editing name, contact, links; used by CompleteProfile, SettingsPage, PersonalInfoPanel
+- `ProfileForm` (`packages/ui/src/components/ProfileForm.tsx`) — shared form for editing name, contact, links; used by CompleteProfile, ProfilePage, PersonalInfoPanel
 - `useProfileSave` (`packages/ui/src/hooks/useProfileSave.ts`) — shared hook wrapping `upsertCandidateProfile` (single table since migration 028)
 - `mapProfileToFormData` (`packages/ui/src/services/profile.ts`) — maps a `candidate_profiles` row to ProfileForm initial values
 - `PersonalInfoPanel` — collapsible panel in `ResumeBuilderPage` for inline profile editing with live preview sync
 - `StartInterviewButton` (`packages/ui/src/components/interview/StartInterviewButton.tsx`) — reusable button that navigates to `/interview` with the correct `interviewContext`; used by ResumeUploadPage and DraftResumePage
 - `buildSectionEntries()` / `buildEducationEntries()` / `buildSkillsEntries()` (`packages/db/src/queries/resumes.ts`) — pure helpers that construct resume content sections from parsed data (positions, education, skills)
 - `SubSectionEditForm` (`packages/ui/src/components/resume/SubSectionEditForm.tsx`) — extracted reusable form for editing subsection fields (title, subtitle, meta, textItems); used by SortableSubSection and ProfileEntriesEditor
-- `ProfileEntriesEditor` (`packages/ui/src/components/ProfileEntriesEditor.tsx`) — Settings page component for managing profile_entries (education, certifications, awards, projects, volunteer)
+- `formatEducationTitle` (`packages/db/src/queries/profile-entries.ts`) — formats education titles consistently from parsed degree/field/institution data; used by `buildEducationEntries` and resume upload
+- `ProfileEntriesEditor` (`packages/ui/src/components/ProfileEntriesEditor.tsx`) — Profile page component for managing profile_entries (education, certifications, awards, projects, volunteer)
 
 ## Routes
 - `/` — Home (JD paste + quick actions)
 - `/interview` — Interview chat (accepts `interviewContext` in route state)
-- `/bullets` — Bullets library
+- `/bullets` — Experience Bullets library
 - `/resumes` — Resumes list (drafts + uploaded)
 - `/resumes/:id` — Draft resume page (gap analysis, matched bullets)
 - `/resumes/:id/edit` — Resume builder (drag-and-drop sections, bullet palette, live preview)
 - `/upload-resume` — PDF resume upload
 - `/telemetry` — Runs dashboard
-- `/settings` — Profile & Settings (edit name, contact info, links; danger zone)
+- `/profile` — Profile management (ProfileForm + ProfileEntriesEditor for education, certifications, etc.)
+- `/settings` — Account settings (danger zone only)
 
 ## Edge Functions
 - `interview` — Conversational interview (context-aware: blank/resume/gaps; auto-start supported via `StartInterviewButton`)
