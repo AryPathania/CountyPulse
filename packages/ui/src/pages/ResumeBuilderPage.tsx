@@ -358,14 +358,9 @@ export function ResumeBuilderPage() {
         // Remove the group from its current position
         const group = sectionItems.splice(sourceItemIndex, groupSize)
 
-        // Adjust target index since we removed items before splicing back in
-        let adjustedTarget = targetItemIndex
-        if (targetItemIndex > sourceItemIndex) {
-          adjustedTarget -= groupSize
-        }
-
-        // Insert the group at the adjusted target position
-        sectionItems.splice(adjustedTarget, 0, ...group)
+        // Insert at the original target index — matches arrayMove semantics
+        // (splice on the shortened array naturally handles the index shift)
+        sectionItems.splice(targetItemIndex, 0, ...group)
 
         const newContent: ResumeContent = { sections: newSections }
         applyContent(newContent)

@@ -1586,6 +1586,78 @@ describe('ResumeBuilderPage', () => {
     })
   })
 
+  describe('intra-section subsection group move DOWN includes trailing bullets', () => {
+    it('should move subsection-A and its trailing bullets as a group after subsection-C', async () => {
+      const groupMoveDownResume = {
+        ...mockResume,
+        parsedContent: {
+          sections: [
+            {
+              id: 'experience',
+              title: 'Experience',
+              items: [
+                { type: 'subsection' as const, subsectionId: 'sub-A' },
+                { type: 'bullet' as const, bulletId: 'bullet-1' },
+                { type: 'bullet' as const, bulletId: 'bullet-2' },
+                { type: 'subsection' as const, subsectionId: 'sub-C' },
+                { type: 'bullet' as const, bulletId: 'bullet-C1' },
+              ],
+              subsections: [
+                { id: 'sub-A', title: 'Position A', subtitle: 'Company A' },
+                { id: 'sub-C', title: 'Position C', subtitle: 'Company C' },
+              ],
+            },
+            {
+              id: 'skills',
+              title: 'Skills',
+              items: [],
+              subsections: [],
+            },
+          ],
+        },
+      }
+      mockGetResumeWithBullets.mockResolvedValue(groupMoveDownResume)
+
+      renderResumeBuilder()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('builder-preview')).toBeInTheDocument()
+      })
+
+      // Drag sub-A DOWN to sub-C's position (move sub-A group after sub-C group)
+      // sub-A group = [sub-A, bullet-1, bullet-2] (size 3), source index 0, target index 3
+      // target > source so this tests the downward move fix
+      act(() => {
+        capturedOnDragEnd!({
+          active: { id: 'sub-A' },
+          over: { id: 'sub-C' },
+        })
+      })
+
+      // Expected result: [sub-C, bullet-C1, sub-A, bullet-1, bullet-2]
+      // The entire group (sub-A + bullet-1 + bullet-2) moves after sub-C's group
+      await waitFor(() => {
+        expect(mockUpdateResumeContent).toHaveBeenCalledWith(
+          'resume-123',
+          expect.objectContaining({
+            sections: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'experience',
+                items: [
+                  { type: 'subsection', subsectionId: 'sub-C' },
+                  { type: 'bullet', bulletId: 'bullet-C1' },
+                  { type: 'subsection', subsectionId: 'sub-A' },
+                  { type: 'bullet', bulletId: 'bullet-1' },
+                  { type: 'bullet', bulletId: 'bullet-2' },
+                ],
+              }),
+            ]),
+          })
+        )
+      })
+    })
+  })
+
   describe('subsection at end of section moves cleanly', () => {
     it('should move subsection-B (no trailing bullets) before subsection-A', async () => {
       const endSubResume = {

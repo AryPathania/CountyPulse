@@ -60,6 +60,12 @@
 .nav__email {
   color: var(--color-text-muted, #888);
   font-size: 0.875rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.nav__email:hover {
+  text-decoration: underline;
 }
 
 .nav__signout {

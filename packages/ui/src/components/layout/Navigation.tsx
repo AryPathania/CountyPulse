@@ -22,15 +22,14 @@ export function Navigation() {
 
   const navItems = [
     { path: '/', label: 'Home', testId: 'nav-link-home' },
+    { path: '/interview', label: 'Interview', testId: 'nav-link-interview' },
     { path: '/resumes', label: 'Resumes', testId: 'nav-link-resumes' },
-    { path: '/profile', label: 'Profile', testId: 'nav-link-profile' },
     ...(lastEdited
       ? [{ path: `/resumes/${lastEdited.id}/edit`, label: 'Edit Resume', testId: 'nav-continue-editing' }]
       : []),
     { path: '/bullets', label: 'Experience Bullets', testId: 'nav-link-bullets' },
-    { path: '/interview', label: 'Interview', testId: 'nav-link-interview' },
+    { path: '/profile', label: 'Profile Bullets', testId: 'nav-link-profile' },
     { path: '/telemetry', label: 'Telemetry', testId: 'nav-link-telemetry' },
-    { path: '/settings', label: 'Settings', testId: 'nav-link-settings' },
   ]
 
   const handleSignOut = async () => {
@@ -66,9 +65,9 @@ export function Navigation() {
       <div className="nav__account">
         {user && (
           <>
-            <span className="nav__email" data-testid="nav-email">
+            <Link to="/settings" className="nav__email" data-testid="nav-email" aria-label="Settings">
               {user.email}
-            </span>
+            </Link>
             <button
               onClick={handleSignOut}
               className="nav__signout"
