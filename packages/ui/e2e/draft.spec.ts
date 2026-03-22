@@ -261,10 +261,10 @@ test.describe('Navigation', () => {
     await expect(emailDisplay).toContainText('test@example.com')
   })
 
-  test('navigation has sign out button', async ({ page }) => {
+  test('navigation has settings link', async ({ page }) => {
     await page.goto('/')
 
-    const signOutBtn = page.getByTestId('nav-signout')
-    await expect(signOutBtn).toBeVisible()
+    const settingsLink = page.getByTestId('nav-settings')
+    await expect(settingsLink).toBeVisible()
   })
 })

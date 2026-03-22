@@ -119,6 +119,24 @@
   font-size: var(--font-size-md);
 }
 
+/* Sign out button */
+.settings-page__signout {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  background: transparent;
+  border: 1px solid var(--color-border, #333);
+  color: var(--color-text, #fff);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background 0.15s;
+}
+
+.settings-page__signout:hover {
+  background: var(--color-surface-elevated, #2a2a2a);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .settings-page__content {

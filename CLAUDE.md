@@ -116,8 +116,8 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - `/resumes/:id/edit` — Resume builder (drag-and-drop sections, bullet palette, live preview)
 - `/upload-resume` — PDF resume upload
 - `/telemetry` — Runs dashboard
-- `/profile` — Profile Bullets (ProfileForm + ProfileEntriesEditor for education, certifications, etc.)
-- `/settings` — Account settings (danger zone only; accessed via user email link in nav bar)
+- `/profile` — Profile Info (ProfileForm + ProfileEntriesEditor for education, certifications, etc.)
+- `/settings` — Account settings (danger zone, sign out; accessed via Settings button in nav bar)
 
 ## Edge Functions
 - `interview` — Conversational interview (context-aware: blank/resume/gaps; auto-start supported via `StartInterviewButton`)
@@ -175,7 +175,7 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - Phase 12: Gap Analysis ("What's Missing" — JD requirement parsing, per-requirement matching, gap interview)
 
 ## UI/UX Conventions
-- **Navigation**: Transparent background, bottom border only, full width. Nav order: Home, Interview, Resumes, [Edit Resume (conditional)], Experience Bullets, Profile Bullets, Telemetry. Settings is not a nav item; the user email in the nav links to `/settings`.
+- **Navigation**: Transparent background, bottom border only, full width. Nav order: Home, Interview, Resumes, [Edit Resume (conditional)], Experience Bullets, Profile Info, Telemetry. Account area: email (plain text) + Settings button (links to `/settings`).
 - **Login**: Vertically + horizontally centered, minimal design (no container box)
 - **Buttons**: Global `.btn-primary` and `.btn-secondary` classes in App.css
 - **Add actions**: Circular "+" buttons next to filter inputs (e.g., BulletsPage)

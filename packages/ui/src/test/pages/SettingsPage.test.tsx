@@ -20,6 +20,13 @@ vi.mock('../../components/account', () => ({
   ),
 }))
 
+// Mock SignOutButton
+vi.mock('../../components/auth/SignOutButton', () => ({
+  SignOutButton: ({ className }: { className?: string }) => (
+    <button data-testid="signout-button" className={className}>Sign out</button>
+  ),
+}))
+
 function renderSettingsPage() {
   return render(
     <QueryClientProvider client={queryClient}>
@@ -68,5 +75,10 @@ describe('SettingsPage', () => {
     renderSettingsPage()
     expect(screen.queryByTestId('profile-form')).not.toBeInTheDocument()
     expect(screen.queryByTestId('settings-profile-section')).not.toBeInTheDocument()
+  })
+
+  it('renders sign out button', () => {
+    renderSettingsPage()
+    expect(screen.getByTestId('signout-button')).toBeInTheDocument()
   })
 })

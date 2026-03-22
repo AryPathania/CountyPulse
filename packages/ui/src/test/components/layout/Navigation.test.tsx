@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { Navigation } from '../../../components/layout/Navigation'
 
@@ -9,8 +8,6 @@ vi.mock('../../../components/auth/AuthProvider', () => ({
   useAuth: () => ({
     user: { id: 'test-user-id', email: 'test@example.com' },
     loading: false,
-    signIn: vi.fn(),
-    signOut: vi.fn().mockResolvedValue(undefined),
   }),
 }))
 
@@ -51,10 +48,12 @@ describe('Navigation', () => {
     expect(screen.getByTestId('nav-email')).toHaveTextContent('test@example.com')
   })
 
-  it('should have sign out button', () => {
+  it('should have settings link', () => {
     renderWithRouter(<Navigation />)
 
-    expect(screen.getByTestId('nav-signout')).toBeInTheDocument()
+    const settingsLink = screen.getByTestId('nav-settings')
+    expect(settingsLink).toBeInTheDocument()
+    expect(settingsLink).toHaveTextContent('Settings')
   })
 
   it('should highlight active link', () => {
@@ -92,19 +91,10 @@ describe('Navigation', () => {
     expect(screen.queryByTestId('nav-continue-editing')).not.toBeInTheDocument()
   })
 
-  it('should call signOut when sign out button is clicked', async () => {
-    const mockSignOut = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(await import('../../../components/auth/AuthProvider')).useAuth = () => ({
-      user: { id: 'test-user-id', email: 'test@example.com' },
-      loading: false,
-      signIn: vi.fn(),
-      signOut: mockSignOut,
-    })
-
+  it('should not have sign out button in navigation', () => {
     renderWithRouter(<Navigation />)
 
-    await userEvent.click(screen.getByTestId('nav-signout'))
-
-    expect(mockSignOut).toHaveBeenCalled()
+    expect(screen.queryByTestId('nav-signout')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('signout-button')).not.toBeInTheDocument()
   })
 })

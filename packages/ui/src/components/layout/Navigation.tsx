@@ -5,7 +5,7 @@ import './Navigation.css'
 
 export function Navigation() {
   const location = useLocation()
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
 
   const [lastEdited, setLastEdited] = useState<{ id: string; name: string } | null>(null)
 
@@ -28,17 +28,9 @@ export function Navigation() {
       ? [{ path: `/resumes/${lastEdited.id}/edit`, label: 'Edit Resume', testId: 'nav-continue-editing' }]
       : []),
     { path: '/bullets', label: 'Experience Bullets', testId: 'nav-link-bullets' },
-    { path: '/profile', label: 'Profile Bullets', testId: 'nav-link-profile' },
+    { path: '/profile', label: 'Profile Info', testId: 'nav-link-profile' },
     { path: '/telemetry', label: 'Telemetry', testId: 'nav-link-telemetry' },
   ]
-
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error('Sign out failed:', error)
-    }
-  }
 
   return (
     <nav className="nav" data-testid="navigation">
@@ -65,16 +57,16 @@ export function Navigation() {
       <div className="nav__account">
         {user && (
           <>
-            <Link to="/settings" className="nav__email" data-testid="nav-email" aria-label="Settings">
+            <span className="nav__email" data-testid="nav-email">
               {user.email}
-            </Link>
-            <button
-              onClick={handleSignOut}
-              className="nav__signout"
-              data-testid="nav-signout"
+            </span>
+            <Link
+              to="/settings"
+              className="nav__settings-btn"
+              data-testid="nav-settings"
             >
-              Sign out
-            </button>
+              Settings
+            </Link>
           </>
         )}
       </div>

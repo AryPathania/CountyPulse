@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Navigation } from '../components/layout'
 import { ResetAccountButton } from '../components/account'
+import { SignOutButton } from '../components/auth/SignOutButton'
 import './SettingsPage.css'
 
 /**
@@ -47,6 +48,8 @@ export function SettingsPage() {
             </div>
           </div>
         </section>
+
+        <SignOutButton className="settings-page__signout" />
       </div>
     </div>
   )
