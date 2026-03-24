@@ -38,6 +38,8 @@ const storedGapAnalysis = {
   totalRequirements: 2,
   coveredCount: 1,
   analyzedAt: new Date().toISOString(),
+  triageDecisions: { 'ybb2hh': 'interview' as const },
+  ignoredRequirements: [],
 }
 
 // Mock draft data — includes gap_analysis so bullets render immediately
@@ -71,9 +73,11 @@ const mockDraft = {
 // Mock @odie/db
 const mockGetJobDraftWithBullets = vi.fn()
 const mockCreateResumeFromDraft = vi.fn()
+const mockUpdateJobDraftTriageDecisions = vi.fn().mockResolvedValue({})
 vi.mock('@odie/db', () => ({
   getJobDraftWithBullets: (...args: unknown[]) => mockGetJobDraftWithBullets(...args),
   createResumeFromDraft: (...args: unknown[]) => mockCreateResumeFromDraft(...args),
+  updateJobDraftTriageDecisions: (...args: unknown[]) => mockUpdateJobDraftTriageDecisions(...args),
 }))
 
 // Mock jd-processing service (keep buildGapDataFromStored + buildInterviewContextFromGaps real)
@@ -301,7 +305,7 @@ describe('DraftResumePage', () => {
       expect(screen.getByTestId('gap-loading')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Analyzing requirements...')).toBeInTheDocument()
+    expect(screen.getByText('Parsing job description...')).toBeInTheDocument()
   })
 
 
@@ -318,7 +322,8 @@ describe('DraftResumePage', () => {
         'test-user-id',
         mockDraft.jd_text,
         mockDraft.id,
-        undefined
+        undefined,
+        expect.any(Function)
       )
     })
   })
@@ -354,7 +359,8 @@ describe('DraftResumePage', () => {
         'test-user-id',
         mockDraft.jd_text,
         mockDraft.id,
-        undefined
+        undefined,
+        expect.any(Function)
       )
     })
   })
@@ -384,7 +390,8 @@ describe('DraftResumePage', () => {
       'test-user-id',
       mockDraft.jd_text,
       mockDraft.id,
-      undefined
+      undefined,
+      expect.any(Function)
     )
   })
 

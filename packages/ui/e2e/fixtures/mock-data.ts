@@ -100,9 +100,17 @@ export const MOCK_GAP_ANALYSIS = {
     { description: 'GraphQL experience', category: 'Backend', importance: 'nice_to_have' },
     { description: 'Team leadership skills', category: 'Soft Skills', importance: 'must_have', skillMatch: 'Leadership' },
   ],
+  partiallyCovered: [] as Array<{
+    requirement: { description: string; category: string; importance: string }
+    reasoning: string
+    evidenceBullets: Array<{ id: string; text: string; similarity: number }>
+  }>,
   totalRequirements: 3,
   coveredCount: 1,
   analyzedAt: '2024-01-15T00:00:00Z',
+  triageDecisions: {} as Record<string, string>,
+  ignoredRequirements: [] as string[],
+  refineFailed: false,
 }
 
 export const MOCK_JOB_DRAFTS = [

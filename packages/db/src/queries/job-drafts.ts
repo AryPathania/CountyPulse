@@ -235,3 +235,35 @@ export async function updateJobDraftRequirements(
   if (error) throw error
   return data
 }
+
+/**
+ * Update triage decisions and ignored requirements within the gap_analysis JSONB.
+ * Reads current gap_analysis, patches the triage fields, and writes back.
+ */
+export async function updateJobDraftTriageDecisions(
+  draftId: string,
+  triageDecisions: Record<string, string>,
+  ignoredRequirements: string[]
+): Promise<JobDraft> {
+  // Read current gap_analysis
+  const { data: current, error: readError } = await supabase
+    .from('job_drafts')
+    .select('gap_analysis')
+    .eq('id', draftId)
+    .single()
+
+  if (readError) throw readError
+
+  const gapAnalysis = (current.gap_analysis as Record<string, Json>) ?? {}
+  const updated = { ...gapAnalysis, triageDecisions, ignoredRequirements }
+
+  const { data, error } = await supabase
+    .from('job_drafts')
+    .update({ gap_analysis: updated as Json })
+    .eq('id', draftId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}

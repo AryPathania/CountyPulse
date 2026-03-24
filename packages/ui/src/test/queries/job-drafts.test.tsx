@@ -192,6 +192,7 @@ describe('job-drafts queries', () => {
         'user-123',
         'Looking for a senior engineer...',
         'draft-1',
+        undefined,
         undefined
       )
     })

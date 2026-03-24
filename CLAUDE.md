@@ -55,6 +55,8 @@ pnpm gen-types        # Generate Supabase types
 - **Profile Entries**: Generic `profile_entries` table for structured non-bullet profile data (education, certifications, awards, projects, volunteer). Category-based with `sort_order`. Extracted during interviews via `extractedEntries` in the interview response schema. Mapped to `SubSectionData` via `toSubSectionData()` in `@odie/db` for resume content injection. Managed on `/profile` page via `ProfileEntriesEditor`. Also available as a draggable bank in BulletPalette on the resume edit page.
 - **Default Section Order**: `DEFAULT_SECTIONS` constant defines section order as `['Education', 'Experience', 'Skills']`. Both `createDefaultResumeContent()` and `createResumeFromDraft()` derive from this.
 - **DnD Type System**: Drag items use `@dnd-kit` `data` prop with type discrimination (not string prefix parsing). Collision detection uses `closestCorners` with a distance activation constraint of 5px. Cross-section moves transfer subsection data; subsection drags move child bullets as a group.
+- **Separation of Concerns (SRP)**: Edge functions are single-purpose. Parsing, matching, and refinement are separate concerns with independent testing and deployment.
+- **Credibility Guardrail**: All resume content must come from the user. LLMs classify and select but never generate qualification text.
 
 ## Security
 
@@ -126,6 +128,7 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - `parse-jd` — JD requirement extraction (structured requirements with importance)
 - `extract-pdf` — Server-side PDF text extraction (fallback)
 - `speak` — OpenAI TTS for voice interview
+- `refine-analysis` — Intelligence layer: reviews vector match results via o4-mini reasoning model, reclassifies covered/partial/gap, recommends additional bullets
 - `transcribe` — OpenAI Whisper STT for voice interview
 
 ## DB Tables (Odie)
@@ -154,7 +157,7 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 **MVP Feature Complete** - All phases implemented + UI polish + resume upload + gap analysis
 
 ### Test Coverage
-- **794+ unit/integration tests** (Vitest + Testing Library)
+- **918+ unit/integration tests** (Vitest + Testing Library)
 - **95+ E2E tests** (Playwright)
 - **96%+ code coverage** (>95% quality gate)
 

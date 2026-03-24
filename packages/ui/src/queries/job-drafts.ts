@@ -4,7 +4,7 @@ import {
   getJobDrafts,
   deleteJobDraft,
 } from '@odie/db'
-import { analyzeJobDescriptionGaps } from '../services/jd-processing'
+import { analyzeJobDescriptionGaps, type GapAnalysisStage } from '../services/jd-processing'
 
 // Query keys for cache management
 export const jobDraftKeys = {
@@ -59,8 +59,8 @@ export function useRunGapAnalysis() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ userId, jdText, draftId, skills }: { userId: string; jdText: string; draftId: string; skills?: { hard: string[]; soft: string[] } }) => {
-      return analyzeJobDescriptionGaps(userId, jdText, draftId, skills)
+    mutationFn: async ({ userId, jdText, draftId, skills, onProgress }: { userId: string; jdText: string; draftId: string; skills?: { hard: string[]; soft: string[] }; onProgress?: (stage: GapAnalysisStage) => void }) => {
+      return analyzeJobDescriptionGaps(userId, jdText, draftId, skills, onProgress)
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: jobDraftKeys.withBullets(variables.draftId) })

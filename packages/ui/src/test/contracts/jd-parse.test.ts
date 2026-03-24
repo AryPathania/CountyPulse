@@ -6,6 +6,11 @@ import {
   CoveredRequirementSchema,
   GapRequirementSchema,
   GapAnalysisResultSchema,
+  RefinedRequirementSchema,
+  RefineAnalysisOutputSchema,
+  TriageDecisionSchema,
+  GapAnalysisStoredSchema,
+  JD_CATEGORY_LABELS,
 } from '@odie/shared'
 
 describe('jd-parse contracts', () => {
@@ -239,6 +244,262 @@ describe('jd-parse contracts', () => {
         totalRequirements: 0,
       })
       expect(result.success).toBe(false)
+    })
+  })
+
+  describe('RefinedRequirementSchema', () => {
+    it('accepts valid refined requirement with all fields', () => {
+      const result = RefinedRequirementSchema.parse({
+        requirementIndex: 0,
+        status: 'covered',
+        reasoning: 'Candidate has extensive React experience',
+        evidenceBulletIds: ['b-1', 'b-2'],
+        evidenceEntryIds: ['e-1'],
+      })
+      expect(result.status).toBe('covered')
+      expect(result.requirementIndex).toBe(0)
+      expect(result.evidenceBulletIds).toEqual(['b-1', 'b-2'])
+      expect(result.evidenceEntryIds).toEqual(['e-1'])
+    })
+
+    it('accepts partially_covered status', () => {
+      const result = RefinedRequirementSchema.parse({
+        requirementIndex: 1,
+        status: 'partially_covered',
+        reasoning: 'Some experience but not deep',
+        evidenceBulletIds: ['b-3'],
+        evidenceEntryIds: [],
+      })
+      expect(result.status).toBe('partially_covered')
+    })
+
+    it('accepts gap status', () => {
+      const result = RefinedRequirementSchema.parse({
+        requirementIndex: 2,
+        status: 'gap',
+        reasoning: 'No evidence found',
+      })
+      expect(result.status).toBe('gap')
+    })
+
+    it('rejects invalid status value', () => {
+      const result = RefinedRequirementSchema.safeParse({
+        requirementIndex: 0,
+        status: 'unknown',
+        reasoning: 'test',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('defaults evidenceBulletIds to empty array when omitted', () => {
+      const result = RefinedRequirementSchema.parse({
+        requirementIndex: 0,
+        status: 'gap',
+        reasoning: 'No match',
+      })
+      expect(result.evidenceBulletIds).toEqual([])
+    })
+
+    it('defaults evidenceEntryIds to empty array when omitted', () => {
+      const result = RefinedRequirementSchema.parse({
+        requirementIndex: 0,
+        status: 'covered',
+        reasoning: 'Matched',
+      })
+      expect(result.evidenceEntryIds).toEqual([])
+    })
+
+    it('rejects missing requirementIndex', () => {
+      const result = RefinedRequirementSchema.safeParse({
+        status: 'covered',
+        reasoning: 'test',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects missing reasoning', () => {
+      const result = RefinedRequirementSchema.safeParse({
+        requirementIndex: 0,
+        status: 'covered',
+      })
+      expect(result.success).toBe(false)
+    })
+  })
+
+  describe('RefineAnalysisOutputSchema', () => {
+    it('accepts valid full output', () => {
+      const result = RefineAnalysisOutputSchema.parse({
+        refinedRequirements: [
+          { requirementIndex: 0, status: 'covered', reasoning: 'Strong match', evidenceBulletIds: ['b-1'], evidenceEntryIds: [] },
+          { requirementIndex: 1, status: 'gap', reasoning: 'No evidence' },
+        ],
+        recommendedBulletIds: ['b-1', 'b-5'],
+        fitSummary: 'Good fit for the role overall.',
+      })
+      expect(result.refinedRequirements).toHaveLength(2)
+      expect(result.recommendedBulletIds).toEqual(['b-1', 'b-5'])
+      expect(result.fitSummary).toBe('Good fit for the role overall.')
+    })
+
+    it('rejects missing refinedRequirements', () => {
+      const result = RefineAnalysisOutputSchema.safeParse({
+        recommendedBulletIds: [],
+        fitSummary: 'ok',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects missing recommendedBulletIds', () => {
+      const result = RefineAnalysisOutputSchema.safeParse({
+        refinedRequirements: [],
+        fitSummary: 'ok',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects missing fitSummary', () => {
+      const result = RefineAnalysisOutputSchema.safeParse({
+        refinedRequirements: [],
+        recommendedBulletIds: [],
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('accepts empty arrays for requirements and bullet IDs', () => {
+      const result = RefineAnalysisOutputSchema.parse({
+        refinedRequirements: [],
+        recommendedBulletIds: [],
+        fitSummary: 'No data.',
+      })
+      expect(result.refinedRequirements).toEqual([])
+      expect(result.recommendedBulletIds).toEqual([])
+    })
+  })
+
+  describe('TriageDecisionSchema', () => {
+    it('accepts "included"', () => {
+      const result = TriageDecisionSchema.parse('included')
+      expect(result).toBe('included')
+    })
+
+    it('accepts "interview"', () => {
+      const result = TriageDecisionSchema.parse('interview')
+      expect(result).toBe('interview')
+    })
+
+    it('accepts "ignored"', () => {
+      const result = TriageDecisionSchema.parse('ignored')
+      expect(result).toBe('ignored')
+    })
+
+    it('rejects invalid value', () => {
+      const result = TriageDecisionSchema.safeParse('deferred')
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects non-string value', () => {
+      const result = TriageDecisionSchema.safeParse(42)
+      expect(result.success).toBe(false)
+    })
+  })
+
+  describe('GapAnalysisStoredSchema', () => {
+    const baseStored = {
+      jobTitle: 'Senior SWE',
+      company: 'Meta',
+      covered: [],
+      gaps: [],
+      totalRequirements: 5,
+      coveredCount: 3,
+      analyzedAt: '2024-06-01T12:00:00Z',
+    }
+
+    it('accepts a valid stored gap analysis with analyzedAt', () => {
+      const result = GapAnalysisStoredSchema.parse(baseStored)
+      expect(result.analyzedAt).toBe('2024-06-01T12:00:00Z')
+      expect(result.triageDecisions).toEqual({})
+      expect(result.ignoredRequirements).toEqual([])
+    })
+
+    it('defaults triageDecisions to empty object when omitted', () => {
+      const result = GapAnalysisStoredSchema.parse(baseStored)
+      expect(result.triageDecisions).toEqual({})
+    })
+
+    it('defaults ignoredRequirements to empty array when omitted', () => {
+      const result = GapAnalysisStoredSchema.parse(baseStored)
+      expect(result.ignoredRequirements).toEqual([])
+    })
+
+    it('accepts optional refined field', () => {
+      const result = GapAnalysisStoredSchema.parse({
+        ...baseStored,
+        refined: {
+          refinedRequirements: [
+            { requirementIndex: 0, status: 'covered', reasoning: 'Good match' },
+          ],
+          recommendedBulletIds: ['b-1'],
+          fitSummary: 'Strong candidate.',
+        },
+      })
+      expect(result.refined).toBeDefined()
+      expect(result.refined!.fitSummary).toBe('Strong candidate.')
+    })
+
+    it('accepts stored data without refined field', () => {
+      const result = GapAnalysisStoredSchema.parse(baseStored)
+      expect(result.refined).toBeUndefined()
+    })
+
+    it('accepts triageDecisions with valid values', () => {
+      const result = GapAnalysisStoredSchema.parse({
+        ...baseStored,
+        triageDecisions: {
+          'hash-1': 'included',
+          'hash-2': 'interview',
+          'hash-3': 'ignored',
+        },
+      })
+      expect(result.triageDecisions['hash-1']).toBe('included')
+      expect(result.triageDecisions['hash-2']).toBe('interview')
+    })
+
+    it('rejects triageDecisions with invalid decision value', () => {
+      const result = GapAnalysisStoredSchema.safeParse({
+        ...baseStored,
+        triageDecisions: { 'hash-1': 'deferred' },
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects missing analyzedAt', () => {
+      const { analyzedAt: _, ...withoutAnalyzedAt } = baseStored
+      const result = GapAnalysisStoredSchema.safeParse(withoutAnalyzedAt)
+      expect(result.success).toBe(false)
+    })
+
+    it('accepts ignoredRequirements with string array', () => {
+      const result = GapAnalysisStoredSchema.parse({
+        ...baseStored,
+        ignoredRequirements: ['hash-a', 'hash-b'],
+      })
+      expect(result.ignoredRequirements).toEqual(['hash-a', 'hash-b'])
+    })
+  })
+
+  describe('JD_CATEGORY_LABELS', () => {
+    it('maps known categories to human-readable labels', () => {
+      expect(JD_CATEGORY_LABELS['technical_skill']).toBe('Technical')
+      expect(JD_CATEGORY_LABELS['soft_skill']).toBe('Soft Skill')
+      expect(JD_CATEGORY_LABELS['experience_type']).toBe('Experience')
+      expect(JD_CATEGORY_LABELS['domain_knowledge']).toBe('Domain')
+      expect(JD_CATEGORY_LABELS['education']).toBe('Education')
+      expect(JD_CATEGORY_LABELS['certification']).toBe('Certification')
+      expect(JD_CATEGORY_LABELS['leadership']).toBe('Leadership')
+    })
+
+    it('returns undefined for unknown categories (fallback to raw string in UI)', () => {
+      expect(JD_CATEGORY_LABELS['unknown_category']).toBeUndefined()
     })
   })
 })

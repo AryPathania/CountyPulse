@@ -83,6 +83,41 @@ export async function callChatCompletion(options: ChatCompletionOptions): Promis
   return { parsed, usage: data.usage ?? null, latencyMs }
 }
 
+export interface ReasoningModelOptions {
+  openaiKey: string
+  model?: string
+  messages: Array<{ role: string; content: string }>
+  maxCompletionTokens?: number
+  jsonMode?: boolean
+}
+
+export async function callReasoningModel(options: ReasoningModelOptions): Promise<ChatCompletionResult> {
+  const { openaiKey, model = 'o4-mini', messages, maxCompletionTokens = 16000, jsonMode = true } = options
+
+  // Reasoning models use 'developer' role instead of 'system', no temperature param
+  const formattedMessages = messages.map(m => ({
+    role: m.role === 'system' ? 'developer' : m.role,
+    content: m.content,
+  }))
+
+  const { data, latencyMs } = await fetchOpenAI(
+    'https://api.openai.com/v1/chat/completions',
+    openaiKey,
+    { model, messages: formattedMessages, max_completion_tokens: maxCompletionTokens, ...(jsonMode ? { response_format: { type: 'json_object' } } : {}) },
+  )
+
+  const assistantMessage = data.choices[0].message.content
+
+  let parsed
+  try {
+    parsed = JSON.parse(assistantMessage)
+  } catch {
+    throw new Error('Failed to parse reasoning model response as JSON')
+  }
+
+  return { parsed, usage: data.usage ?? null, latencyMs }
+}
+
 export interface RunLogEntry {
   user_id: string
   type: string

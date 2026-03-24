@@ -1,5 +1,15 @@
 import { supabase, createJobDraft, createRunLogger, matchItemsPerRequirement, updateJobDraftRequirements, updateJobDraftBullets } from '@odie/db'
-import type { InterviewContext, JdRequirement } from '@odie/shared'
+import type { InterviewContext, JdRequirement, RefineAnalysisOutput, TriageDecision } from '@odie/shared'
+
+export type GapAnalysisStage = 'parsing' | 'embedding' | 'matching' | 'refining' | 'storing'
+
+export const STAGE_MESSAGES: Record<GapAnalysisStage, string> = {
+  parsing: 'Parsing job description...',
+  embedding: 'Extracting requirements...',
+  matching: 'Matching your experience...',
+  refining: 'Double-checking results...',
+  storing: 'Almost ready...',
+}
 
 export interface JdProcessingResult {
   draftId: string
@@ -106,15 +116,27 @@ export interface GapItem {
   skillMatch?: string
 }
 
+export interface PartialCoveredItem {
+  requirement: RequirementInfo
+  reasoning: string
+  evidenceBullets: MatchedBullet[]
+}
+
 export interface GapAnalysisServiceResult {
   draftId: string
   jobTitle: string
   company: string | null
   covered: CoveredRequirement[]
+  partiallyCovered: PartialCoveredItem[]
   gaps: GapItem[]
   totalRequirements: number
   coveredCount: number
   interviewContext: InterviewContext | null
+  refined?: RefineAnalysisOutput
+  triageDecisions: Record<string, TriageDecision>
+  ignoredRequirements: string[]
+  fitSummary?: string
+  refineFailed?: boolean
 }
 
 /**
@@ -140,14 +162,39 @@ export function findSkillMatch(
 /**
  * Build an interview context from gap analysis results.
  * Pure function — used both after fresh analysis and when loading cached results.
+ * When triageDecisions are provided, only includes items marked 'interview'.
  */
 export function buildInterviewContextFromGaps(
   gaps: GapAnalysisServiceResult['gaps'],
   covered: GapAnalysisServiceResult['covered'],
   jobTitle: string,
-  company: string | null
+  company: string | null,
+  triageDecisions?: Record<string, TriageDecision>,
+  partiallyCovered?: PartialCoveredItem[]
 ): InterviewContext | null {
-  if (gaps.length === 0) return null
+  // Collect all items that should go to interview
+  const interviewGaps: Array<{ requirement: RequirementInfo }> = []
+
+  if (triageDecisions && Object.keys(triageDecisions).length > 0) {
+    // Only include items explicitly marked for interview
+    for (const g of gaps) {
+      const key = hashRequirementDescription(g.requirement.description)
+      if (triageDecisions[key] === 'interview') {
+        interviewGaps.push(g)
+      }
+    }
+    for (const p of partiallyCovered ?? []) {
+      const key = hashRequirementDescription(p.requirement.description)
+      if (triageDecisions[key] === 'interview') {
+        interviewGaps.push(p)
+      }
+    }
+  } else {
+    // No triage decisions yet — include all gaps (backward compat)
+    interviewGaps.push(...gaps)
+  }
+
+  if (interviewGaps.length === 0) return null
 
   const existingBulletSummary = covered
     .flatMap(c => c.matchedBullets.map(b => b.text))
@@ -156,7 +203,7 @@ export function buildInterviewContextFromGaps(
 
   return {
     mode: 'gaps',
-    gaps: gaps.map(g => ({
+    gaps: interviewGaps.map(g => ({
       requirement: g.requirement.description,
       category: g.requirement.category,
       importance: g.requirement.importance,
@@ -165,6 +212,20 @@ export function buildInterviewContextFromGaps(
     jobTitle,
     company,
   }
+}
+
+/**
+ * Simple hash of a requirement description for keying triage decisions.
+ * Uses a basic string hash — stable across reruns for the same description.
+ */
+export function hashRequirementDescription(description: string): string {
+  let hash = 0
+  for (let i = 0; i < description.length; i++) {
+    const char = description.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash |= 0 // Convert to 32-bit integer
+  }
+  return hash.toString(36)
 }
 
 /**
@@ -181,17 +242,27 @@ export function buildGapDataFromStored(
     totalRequirements: number
     coveredCount: number
     analyzedAt: string
+    refined?: RefineAnalysisOutput
+    partiallyCovered?: PartialCoveredItem[]
+    triageDecisions?: Record<string, TriageDecision>
+    ignoredRequirements?: string[]
+    fitSummary?: string
+    refineFailed?: boolean
   }
 ): GapAnalysisServiceResult & { analyzedAt: string } {
   const gaps = storedGapAnalysis.gaps.map(g => {
     const { skillMatch, ...requirement } = g
     return { requirement, ...(skillMatch ? { skillMatch } : {}) }
   })
+  const triageDecisions = storedGapAnalysis.triageDecisions ?? {}
+  const partiallyCovered = storedGapAnalysis.partiallyCovered ?? []
   const interviewContext = buildInterviewContextFromGaps(
     gaps,
     storedGapAnalysis.covered,
     storedGapAnalysis.jobTitle,
-    storedGapAnalysis.company
+    storedGapAnalysis.company,
+    triageDecisions,
+    partiallyCovered
   )
 
   return {
@@ -199,10 +270,16 @@ export function buildGapDataFromStored(
     jobTitle: storedGapAnalysis.jobTitle,
     company: storedGapAnalysis.company,
     covered: storedGapAnalysis.covered,
+    partiallyCovered,
     gaps,
     totalRequirements: storedGapAnalysis.totalRequirements,
     coveredCount: storedGapAnalysis.coveredCount,
     interviewContext,
+    refined: storedGapAnalysis.refined,
+    triageDecisions,
+    ignoredRequirements: storedGapAnalysis.ignoredRequirements ?? [],
+    fitSummary: storedGapAnalysis.fitSummary,
+    refineFailed: storedGapAnalysis.refineFailed,
     analyzedAt: storedGapAnalysis.analyzedAt,
   }
 }
@@ -220,12 +297,14 @@ export async function analyzeJobDescriptionGaps(
   userId: string,
   jdText: string,
   draftId: string,
-  skills?: UserSkills
+  skills?: UserSkills,
+  onProgress?: (stage: GapAnalysisStage) => void
 ): Promise<GapAnalysisServiceResult> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not authenticated')
 
   // 1. Parse JD into requirements
+  onProgress?.('parsing')
   const parseResponse = await supabase.functions.invoke('parse-jd', {
     body: { text: jdText },
   })
@@ -241,6 +320,7 @@ export async function analyzeJobDescriptionGaps(
   }
 
   // 2. Batch embed all requirements
+  onProgress?.('embedding')
   const typedRequirements = requirements as JdRequirement[]
   const requirementTexts = typedRequirements.map(r => r.description)
   const embedResponse = await supabase.functions.invoke('embed', {
@@ -254,6 +334,7 @@ export async function analyzeJobDescriptionGaps(
   const embeddings: number[][] = embedResponse.data.embeddings
 
   // 3. Per-requirement matching
+  onProgress?.('matching')
   const requirementsWithEmbeddings = typedRequirements.map((req, i) => ({
     description: req.description,
     category: req.category,
@@ -268,8 +349,8 @@ export async function analyzeJobDescriptionGaps(
     0.4  // lower threshold for gap detection
   )
 
-  // 4. Classify covered vs gap
-  const covered = matchResults
+  // 4. Classify covered vs gap (mechanical / vector-based)
+  const mechanicalCovered = matchResults
     .filter(r => r.isCovered)
     .map(r => ({
       requirement: r.requirement,
@@ -280,17 +361,114 @@ export async function analyzeJobDescriptionGaps(
       })),
     }))
 
-  const gaps = matchResults
+  const mechanicalGaps = matchResults
     .filter(r => !r.isCovered)
-    .map(r => {
-      const skillMatch = findSkillMatch(r.requirement.description, skills)
-      return {
-        requirement: r.requirement,
-        ...(skillMatch ? { skillMatch } : {}),
-      }
+    .map(r => ({
+      requirement: r.requirement,
+    }))
+
+  // 5. Call refine-analysis LLM for smarter classification
+  onProgress?.('refining')
+  let covered = mechanicalCovered
+  let gaps: GapItem[] = mechanicalGaps
+  let partiallyCovered: PartialCoveredItem[] = []
+  let refined: RefineAnalysisOutput | undefined
+  let fitSummary: string | undefined
+  let refineFailed = false
+
+  try {
+    const refineResponse = await supabase.functions.invoke('refine-analysis', {
+      body: {
+        jobTitle,
+        company,
+        requirements: typedRequirements.map((req, i) => ({
+          description: req.description,
+          category: req.category,
+          importance: req.importance,
+          vectorStatus: matchResults[i].isCovered ? 'covered' : 'gap',
+          matchedBulletIds: matchResults[i].matches.map(m => m.id),
+        })),
+        skills: skills ?? { hard: [], soft: [] },
+      },
     })
 
-  // 5. Store results on job_drafts (with full bullet data, not just IDs)
+    if (refineResponse.error) {
+      throw new Error(refineResponse.error.message || 'Refine analysis failed')
+    }
+
+    const refineData = refineResponse.data
+
+    // Check for fallback signal (hallucination rate exceeded)
+    if (refineData.fallback) {
+      console.warn('[gap-analysis] Refine-analysis returned fallback:', refineData.reason)
+      refineFailed = true
+      // Use mechanical results with findSkillMatch for fallback
+      gaps = mechanicalGaps.map(g => {
+        const skillMatch = findSkillMatch(g.requirement.description, skills)
+        return { ...g, ...(skillMatch ? { skillMatch } : {}) }
+      })
+    } else {
+      refined = refineData as RefineAnalysisOutput
+      fitSummary = refined.fitSummary
+
+      // Rebuild covered/partial/gaps from refined results
+      const newCovered: CoveredRequirement[] = []
+      const newPartial: PartialCoveredItem[] = []
+      const newGaps: GapItem[] = []
+
+      for (const rr of refined.refinedRequirements) {
+        const req = typedRequirements[rr.requirementIndex]
+        if (!req) continue
+
+        if (rr.status === 'covered') {
+          // Find matched bullets from mechanical results + evidence bullets
+          const mechanicalMatch = matchResults[rr.requirementIndex]
+          const bulletIds = new Set([
+            ...(rr.evidenceBulletIds ?? []),
+            ...(mechanicalMatch?.matches.map(m => m.id) ?? []),
+          ])
+          const matchedBullets = mechanicalMatch?.matches
+            .filter(m => bulletIds.has(m.id))
+            .map(m => ({ id: m.id, text: m.content_text, similarity: m.similarity })) ?? []
+          // Add evidence bullets not in mechanical matches
+          for (const bid of rr.evidenceBulletIds ?? []) {
+            if (!matchedBullets.some(b => b.id === bid)) {
+              matchedBullets.push({ id: bid, text: '', similarity: 0 })
+            }
+          }
+          newCovered.push({ requirement: req, matchedBullets })
+        } else if (rr.status === 'partially_covered') {
+          const evidenceBullets = (rr.evidenceBulletIds ?? []).map(bid => {
+            const match = matchResults[rr.requirementIndex]?.matches.find(m => m.id === bid)
+            return { id: bid, text: match?.content_text ?? '', similarity: match?.similarity ?? 0 }
+          })
+          newPartial.push({ requirement: req, reasoning: rr.reasoning, evidenceBullets })
+        } else {
+          newGaps.push({ requirement: req })
+        }
+      }
+
+      covered = newCovered
+      partiallyCovered = newPartial
+      gaps = newGaps
+
+      // Expand matched bullet IDs with recommended ones
+      if (refined.recommendedBulletIds?.length) {
+        // These will be added to allMatchedBulletIds below
+      }
+    }
+  } catch (err) {
+    console.error('[gap-analysis] Refine-analysis failed, using mechanical results:', err)
+    refineFailed = true
+    // Fallback: use mechanical results with findSkillMatch
+    gaps = mechanicalGaps.map(g => {
+      const skillMatch = findSkillMatch(g.requirement.description, skills)
+      return { ...g, ...(skillMatch ? { skillMatch } : {}) }
+    })
+  }
+
+  // 6. Store results on job_drafts
+  onProgress?.('storing')
   const gapAnalysis = {
     jobTitle,
     company,
@@ -299,20 +477,31 @@ export async function analyzeJobDescriptionGaps(
       matchedBullets: c.matchedBullets,
     })),
     gaps: gaps.map(g => ({ ...g.requirement, ...(g.skillMatch ? { skillMatch: g.skillMatch } : {}) })),
+    partiallyCovered: partiallyCovered.map(p => ({
+      requirement: p.requirement,
+      reasoning: p.reasoning,
+      evidenceBullets: p.evidenceBullets,
+    })),
     totalRequirements: requirements.length,
     coveredCount: covered.length,
     analyzedAt: new Date().toISOString(),
+    ...(refined ? { refined } : {}),
+    ...(fitSummary ? { fitSummary } : {}),
+    ...(refineFailed ? { refineFailed } : {}),
+    triageDecisions: {},
+    ignoredRequirements: [],
   }
 
   await updateJobDraftRequirements(draftId, requirements, gapAnalysis, jobTitle, company)
 
-  // Update draft with all matched bullet IDs
-  const allMatchedBulletIds = [...new Set(
-    covered.flatMap(c => c.matchedBullets.map(b => b.id))
-  )]
+  // Update draft with all matched bullet IDs (including recommended)
+  const allMatchedBulletIds = [...new Set([
+    ...covered.flatMap(c => c.matchedBullets.map(b => b.id)),
+    ...(refined?.recommendedBulletIds ?? []),
+  ])]
   await updateJobDraftBullets(draftId, allMatchedBulletIds)
 
-  // 6. Build gap interview context
+  // 7. Build gap interview context
   const interviewContext = buildInterviewContextFromGaps(gaps, covered, jobTitle, company)
 
   return {
@@ -320,9 +509,15 @@ export async function analyzeJobDescriptionGaps(
     jobTitle,
     company,
     covered,
+    partiallyCovered,
     gaps,
     totalRequirements: requirements.length,
     coveredCount: covered.length,
     interviewContext,
+    refined,
+    triageDecisions: {},
+    ignoredRequirements: [],
+    fitSummary,
+    refineFailed,
   }
 }

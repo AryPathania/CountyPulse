@@ -1,16 +1,16 @@
-import { useEffect, useCallback, useMemo } from 'react'
+import { useEffect, useCallback, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getUploadedResumes, getProfileEntries, toSubSectionData } from '@odie/db'
+import { getUploadedResumes, getProfileEntries, toSubSectionData, updateJobDraftTriageDecisions } from '@odie/db'
 import { CATEGORY_LABELS } from '@odie/shared'
-import type { ProfileEntryCategory } from '@odie/shared'
+import type { ProfileEntryCategory, TriageDecision } from '@odie/shared'
 import type { ResumeParseOutput } from '@odie/shared'
 import { Navigation } from '../components/layout'
 import { useAuth } from '../components/auth/AuthProvider'
 import { useJobDraftWithBullets, useRunGapAnalysis } from '../queries/job-drafts'
 import { useCreateResumeFromDraft } from '../queries/resumes'
 import { bulletKeys, useBullets } from '../queries/bullets'
-import { buildGapDataFromStored, type GapAnalysisServiceResult, type UserSkills } from '../services/jd-processing'
+import { buildGapDataFromStored, buildInterviewContextFromGaps, hashRequirementDescription, STAGE_MESSAGES, type GapAnalysisStage, type GapAnalysisServiceResult, type UserSkills } from '../services/jd-processing'
 import { GapAnalysis } from '../components/draft/GapAnalysis'
 import './DraftResumePage.css'
 
@@ -96,10 +96,77 @@ export function DraftResumePage() {
       ? storedGapData
       : gapAnalysis.data ?? null
 
+  // Analysis progress stage
+  const [analysisStage, setAnalysisStage] = useState<GapAnalysisStage | null>(null)
+
+  // Triage decisions state — initialized from stored data
+  const [triageDecisions, setTriageDecisions] = useState<Record<string, TriageDecision>>({})
+
+  // Sync triage decisions from stored/fresh gap data
+  useEffect(() => {
+    if (gapData?.triageDecisions && Object.keys(gapData.triageDecisions).length > 0) {
+      setTriageDecisions(gapData.triageDecisions)
+    }
+  }, [gapData?.triageDecisions])
+
+  // Count items that need triage (gaps + partials without a decision)
+  const untriagedCount = useMemo(() => {
+    if (!gapData) return 0
+    let count = 0
+    for (const g of gapData.gaps) {
+      const key = hashRequirementDescription(g.requirement.description)
+      if (!triageDecisions[key]) count++
+    }
+    for (const p of gapData.partiallyCovered) {
+      const key = hashRequirementDescription(p.requirement.description)
+      if (!triageDecisions[key]) count++
+    }
+    return count
+  }, [gapData, triageDecisions])
+
+  const handleTriageDecision = useCallback((requirementDescription: string, decision: TriageDecision) => {
+    const key = hashRequirementDescription(requirementDescription)
+    setTriageDecisions(prev => {
+      const next = { ...prev, [key]: decision }
+
+      // Compute ignored requirements for training data
+      const ignoredRequirements: string[] = []
+      if (gapData) {
+        for (const g of [...gapData.gaps, ...gapData.partiallyCovered]) {
+          const k = hashRequirementDescription(g.requirement.description)
+          if (next[k] === 'ignored') {
+            ignoredRequirements.push(g.requirement.description)
+          }
+        }
+      }
+
+      // Persist to DB (fire-and-forget)
+      if (draft?.id) {
+        updateJobDraftTriageDecisions(draft.id, next, ignoredRequirements).catch(console.error)
+      }
+
+      return next
+    })
+  }, [gapData, draft?.id])
+
+  // Recompute interview context when triage decisions change
+  const interviewContext = useMemo(() => {
+    if (!gapData) return null
+    return buildInterviewContextFromGaps(
+      gapData.gaps,
+      gapData.covered,
+      gapData.jobTitle,
+      gapData.company,
+      triageDecisions,
+      gapData.partiallyCovered
+    )
+  }, [gapData, triageDecisions])
+
   // Auto-trigger gap analysis when needed
   useEffect(() => {
     if (needsAnalysis && !isAnalyzing && !gapAnalysis.data && draft?.jd_text && user?.id) {
-      gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id, skills: aggregatedSkills })
+      setAnalysisStage(null)
+      gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id, skills: aggregatedSkills, onProgress: setAnalysisStage })
     }
   }, [needsAnalysis, isAnalyzing, gapAnalysis, draft?.id, draft?.jd_text, user?.id, aggregatedSkills])
 
@@ -196,9 +263,9 @@ export function DraftResumePage() {
             onClick={handleCreateResume}
             className="btn-primary"
             data-testid="create-resume-btn"
-            disabled={createResume.isPending}
+            disabled={createResume.isPending || isAnalyzing || untriagedCount > 0}
           >
-            {createResume.isPending ? 'Creating...' : 'Create Resume'}
+            {createResume.isPending ? 'Creating...' : isAnalyzing ? 'Analyzing...' : untriagedCount > 0 ? `Create Resume (${untriagedCount} items need triage)` : 'Create Resume'}
           </button>
         </header>
 
@@ -206,7 +273,7 @@ export function DraftResumePage() {
           {isAnalyzing || needsAnalysis ? (
             <div className="draft-page__analyzing" data-testid="gap-loading">
               <div className="spinner" />
-              <p>Analyzing requirements...</p>
+              <p>{STAGE_MESSAGES[analysisStage ?? 'parsing']}</p>
             </div>
           ) : (
             <>
@@ -260,10 +327,16 @@ export function DraftResumePage() {
                   jobTitle={gapData.jobTitle}
                   company={gapData.company}
                   covered={gapData.covered}
+                  partiallyCovered={gapData.partiallyCovered}
                   gaps={gapData.gaps}
                   totalRequirements={gapData.totalRequirements}
                   coveredCount={gapData.coveredCount}
-                  interviewContext={gapData.interviewContext}
+                  interviewContext={interviewContext}
+                  triageDecisions={triageDecisions}
+                  onTriageDecision={handleTriageDecision}
+                  untriagedCount={untriagedCount}
+                  fitSummary={gapData.fitSummary}
+                  refineFailed={gapData.refineFailed}
                 />
               )}
             </>
@@ -275,7 +348,8 @@ export function DraftResumePage() {
               <button
                 onClick={() => {
                   if (draft?.jd_text && user?.id) {
-                    gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id, skills: aggregatedSkills })
+                    setAnalysisStage(null)
+                    gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id, skills: aggregatedSkills, onProgress: setAnalysisStage })
                   }
                 }}
                 className="btn-secondary"

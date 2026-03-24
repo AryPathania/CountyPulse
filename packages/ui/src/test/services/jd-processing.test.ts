@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { processJobDescription, analyzeJobDescriptionGaps, buildInterviewContextFromGaps, buildGapDataFromStored, findSkillMatch } from '../../services/jd-processing'
+import { processJobDescription, analyzeJobDescriptionGaps, buildInterviewContextFromGaps, buildGapDataFromStored, findSkillMatch, hashRequirementDescription } from '../../services/jd-processing'
 
 // Mock @odie/db
 const mockGetSession = vi.fn()
@@ -150,29 +150,31 @@ describe('jd-processing service', () => {
       })
     }
 
-    function setupParseJdResponse(overrides?: { jobTitle?: string; company?: string | null; requirements?: typeof mockRequirements }) {
+    function setupFunctionsInvoke(overrides?: {
+      parseJd?: { data: unknown; error: unknown } | null
+      embed?: { data: unknown; error: unknown } | null
+      refineAnalysis?: { data: unknown; error: unknown } | null
+    }) {
       const defaults = {
-        jobTitle: 'Senior Engineer',
-        company: 'Acme Corp',
-        requirements: mockRequirements,
+        parseJd: { data: { jobTitle: 'Senior Engineer', company: 'Acme Corp', requirements: mockRequirements }, error: null },
+        embed: { data: { embeddings: mockEmbeddings }, error: null },
+        // Default: refine-analysis returns error (same fallback behavior as before, but intentional)
+        refineAnalysis: { data: null, error: { message: 'not mocked' } },
       }
-      const data = { ...defaults, ...overrides }
-      // parse-jd is the first invoke call
-      mockFunctionsInvoke.mockResolvedValueOnce({ data, error: null })
-    }
 
-    function setupEmbedResponse(embeddings = mockEmbeddings) {
-      // embed is the second invoke call
-      mockFunctionsInvoke.mockResolvedValueOnce({
-        data: { embeddings },
-        error: null,
+      const responses = { ...defaults, ...overrides }
+
+      mockFunctionsInvoke.mockImplementation((name: string) => {
+        if (name === 'parse-jd') return responses.parseJd
+        if (name === 'embed') return responses.embed
+        if (name === 'refine-analysis') return responses.refineAnalysis
+        throw new Error(`Unexpected function invoke: ${name}`)
       })
     }
 
     it('calls parse-jd edge function with the JD text', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      setupEmbedResponse()
+      setupFunctionsInvoke()
       mockMatchItemsPerRequirement.mockResolvedValue(
         mockRequirements.map(r => ({
           requirement: { description: r.description, category: r.category, importance: r.importance },
@@ -192,8 +194,7 @@ describe('jd-processing service', () => {
 
     it('calls embed with requirement descriptions (not job title/company)', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      setupEmbedResponse()
+      setupFunctionsInvoke()
       mockMatchItemsPerRequirement.mockResolvedValue(
         mockRequirements.map(r => ({
           requirement: { description: r.description, category: r.category, importance: r.importance },
@@ -216,8 +217,7 @@ describe('jd-processing service', () => {
 
     it('uses threshold 0.4 and top-5 when calling matchItemsPerRequirement', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      setupEmbedResponse()
+      setupFunctionsInvoke()
       mockMatchItemsPerRequirement.mockResolvedValue(
         mockRequirements.map(r => ({
           requirement: { description: r.description, category: r.category, importance: r.importance },
@@ -245,8 +245,7 @@ describe('jd-processing service', () => {
 
     it('splits results into covered and gaps based on isCovered', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      setupEmbedResponse()
+      setupFunctionsInvoke()
 
       mockMatchItemsPerRequirement.mockResolvedValue([
         {
@@ -285,8 +284,7 @@ describe('jd-processing service', () => {
 
     it('persists to DB via updateJobDraftRequirements with full bullet data', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      setupEmbedResponse()
+      setupFunctionsInvoke()
 
       mockMatchItemsPerRequirement.mockResolvedValue([
         {
@@ -326,9 +324,13 @@ describe('jd-processing service', () => {
             { description: 'Team leadership', category: 'Leadership', importance: 'must_have' },
             { description: 'AWS experience', category: 'Cloud', importance: 'nice_to_have' },
           ],
+          partiallyCovered: [],
           totalRequirements: 3,
           coveredCount: 1,
           analyzedAt: expect.any(String),
+          refineFailed: true,
+          triageDecisions: {},
+          ignoredRequirements: [],
         },
         'Senior Engineer',
         'Acme Corp'
@@ -337,8 +339,7 @@ describe('jd-processing service', () => {
 
     it('updates draft bullets with all matched bullet IDs', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      setupEmbedResponse()
+      setupFunctionsInvoke()
 
       mockMatchItemsPerRequirement.mockResolvedValue([
         {
@@ -384,8 +385,10 @@ describe('jd-processing service', () => {
         { description: 'React', category: 'Frontend', importance: 'must_have' as const },
         { description: 'Go', category: 'Backend', importance: 'must_have' as const },
       ]
-      setupParseJdResponse({ requirements: twoReqs })
-      setupEmbedResponse([mockEmbeddings[0], mockEmbeddings[1]])
+      setupFunctionsInvoke({
+        parseJd: { data: { jobTitle: 'Senior Engineer', company: 'Acme Corp', requirements: twoReqs }, error: null },
+        embed: { data: { embeddings: [mockEmbeddings[0], mockEmbeddings[1]] }, error: null },
+      })
 
       const twelveBullets = Array.from({ length: 12 }, (_, i) => ({
         id: `b${i}`,
@@ -428,8 +431,7 @@ describe('jd-processing service', () => {
 
     it('returns null interviewContext when all requirements are covered', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      setupEmbedResponse()
+      setupFunctionsInvoke()
 
       mockMatchItemsPerRequirement.mockResolvedValue(
         mockRequirements.map(r => ({
@@ -460,7 +462,7 @@ describe('jd-processing service', () => {
 
     it('throws when parse-jd returns empty requirements array', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse({ requirements: [] })
+      setupFunctionsInvoke({ parseJd: { data: { jobTitle: 'Engineer', company: null, requirements: [] }, error: null } })
 
       await expect(
         analyzeJobDescriptionGaps('user-1', 'JD', 'draft-1')
@@ -469,12 +471,7 @@ describe('jd-processing service', () => {
 
     it('throws with error message when embed fails', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      // embed returns error
-      mockFunctionsInvoke.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'Embedding service unavailable' },
-      })
+      setupFunctionsInvoke({ embed: { data: null, error: { message: 'Embedding service unavailable' } } })
 
       await expect(
         analyzeJobDescriptionGaps('user-1', 'JD', 'draft-1')
@@ -483,8 +480,7 @@ describe('jd-processing service', () => {
 
     it('adds skillMatch to gaps when user skills match requirement text', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      setupEmbedResponse()
+      setupFunctionsInvoke()
 
       mockMatchItemsPerRequirement.mockResolvedValue([
         {
@@ -520,8 +516,7 @@ describe('jd-processing service', () => {
 
     it('does not add skillMatch when no skills provided', async () => {
       setupAuthenticatedSession()
-      setupParseJdResponse()
-      setupEmbedResponse()
+      setupFunctionsInvoke()
 
       mockMatchItemsPerRequirement.mockResolvedValue([
         {
@@ -536,6 +531,304 @@ describe('jd-processing service', () => {
       const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
 
       expect(result.gaps[0].skillMatch).toBeUndefined()
+    })
+
+    describe('refine-analysis integration', () => {
+      it('reclassifies requirements based on refine-analysis response', async () => {
+        setupAuthenticatedSession()
+        setupFunctionsInvoke({
+          refineAnalysis: {
+            data: {
+              refinedRequirements: [
+                { requirementIndex: 0, status: 'covered', reasoning: 'Has React experience', evidenceBulletIds: ['b1'], evidenceEntryIds: [] },
+                { requirementIndex: 1, status: 'partially_covered', reasoning: 'Led small team but not at scale', evidenceBulletIds: ['b2'], evidenceEntryIds: [] },
+                { requirementIndex: 2, status: 'gap', reasoning: 'No cloud experience found', evidenceBulletIds: [], evidenceEntryIds: [] },
+              ],
+              recommendedBulletIds: [],
+              fitSummary: 'Strong frontend candidate with leadership potential',
+            },
+            error: null,
+          },
+        })
+
+        mockMatchItemsPerRequirement.mockResolvedValue(
+          mockRequirements.map(() => ({
+            requirement: mockRequirements[0],
+            matches: [
+              { id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.85 },
+              { id: 'b2', content_text: 'Led team of 3', category: 'Leadership', similarity: 0.7 },
+            ],
+            isCovered: true,
+          }))
+        )
+        mockUpdateJobDraftRequirements.mockResolvedValue({})
+        mockUpdateJobDraftBullets.mockResolvedValue({})
+
+        const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+        expect(result.covered).toHaveLength(1)
+        expect(result.covered[0].requirement.description).toBe('Experience with React')
+        expect(result.partiallyCovered).toHaveLength(1)
+        expect(result.partiallyCovered[0].reasoning).toBe('Led small team but not at scale')
+        expect(result.gaps).toHaveLength(1)
+        expect(result.gaps[0].requirement.description).toBe('AWS experience')
+        expect(result.fitSummary).toBe('Strong frontend candidate with leadership potential')
+        expect(result.refined).toBeTruthy()
+        expect(result.refineFailed).toBeFalsy()
+      })
+
+      it('falls back to mechanical results on hallucination signal', async () => {
+        setupAuthenticatedSession()
+        setupFunctionsInvoke({
+          refineAnalysis: {
+            data: { fallback: true, reason: 'hallucination_rate_exceeded' },
+            error: null,
+          },
+        })
+
+        mockMatchItemsPerRequirement.mockResolvedValue([
+          {
+            requirement: mockRequirements[0],
+            matches: [{ id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
+            isCovered: true,
+          },
+          {
+            requirement: mockRequirements[1],
+            matches: [],
+            isCovered: false,
+          },
+          {
+            requirement: mockRequirements[2],
+            matches: [],
+            isCovered: false,
+          },
+        ])
+        mockUpdateJobDraftRequirements.mockResolvedValue({})
+        mockUpdateJobDraftBullets.mockResolvedValue({})
+
+        const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1', {
+          hard: ['Leadership'],
+          soft: [],
+        })
+
+        expect(result.refineFailed).toBe(true)
+        expect(result.covered).toHaveLength(1)
+        expect(result.gaps).toHaveLength(2)
+        expect(result.gaps[0].skillMatch).toBe('Leadership')
+        expect(result.partiallyCovered).toHaveLength(0)
+      })
+
+      it('falls back gracefully on refine-analysis network failure', async () => {
+        setupAuthenticatedSession()
+        setupFunctionsInvoke({
+          refineAnalysis: { data: null, error: { message: 'Function crashed' } },
+        })
+
+        mockMatchItemsPerRequirement.mockResolvedValue([
+          {
+            requirement: mockRequirements[0],
+            matches: [{ id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
+            isCovered: true,
+          },
+          {
+            requirement: mockRequirements[1],
+            matches: [],
+            isCovered: false,
+          },
+          {
+            requirement: mockRequirements[2],
+            matches: [],
+            isCovered: false,
+          },
+        ])
+        mockUpdateJobDraftRequirements.mockResolvedValue({})
+        mockUpdateJobDraftBullets.mockResolvedValue({})
+
+        const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+        expect(result.refineFailed).toBe(true)
+        expect(result.covered).toHaveLength(1)
+        expect(result.gaps).toHaveLength(2)
+        expect(result.partiallyCovered).toHaveLength(0)
+      })
+
+      it('expands allMatchedBulletIds with recommendedBulletIds', async () => {
+        setupAuthenticatedSession()
+        setupFunctionsInvoke({
+          refineAnalysis: {
+            data: {
+              refinedRequirements: [
+                { requirementIndex: 0, status: 'covered', reasoning: 'Has React', evidenceBulletIds: ['b1'], evidenceEntryIds: [] },
+                { requirementIndex: 1, status: 'covered', reasoning: 'Has leadership', evidenceBulletIds: ['b1'], evidenceEntryIds: [] },
+                { requirementIndex: 2, status: 'covered', reasoning: 'Has AWS', evidenceBulletIds: ['b1'], evidenceEntryIds: [] },
+              ],
+              recommendedBulletIds: ['extra-1', 'extra-2'],
+              fitSummary: 'Great fit',
+            },
+            error: null,
+          },
+        })
+
+        mockMatchItemsPerRequirement.mockResolvedValue(
+          mockRequirements.map(r => ({
+            requirement: r,
+            matches: [{ id: 'b1', content_text: 'text', category: 'Cat', similarity: 0.9 }],
+            isCovered: true,
+          }))
+        )
+        mockUpdateJobDraftRequirements.mockResolvedValue({})
+        mockUpdateJobDraftBullets.mockResolvedValue({})
+
+        await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+        const calledIds = mockUpdateJobDraftBullets.mock.calls[0][1] as string[]
+        expect(calledIds).toContain('b1')
+        expect(calledIds).toContain('extra-1')
+        expect(calledIds).toContain('extra-2')
+        expect(new Set(calledIds).size).toBe(calledIds.length)
+      })
+
+      it('maps evidence bullets correctly including unknown IDs', async () => {
+        setupAuthenticatedSession()
+        setupFunctionsInvoke({
+          refineAnalysis: {
+            data: {
+              refinedRequirements: [
+                { requirementIndex: 0, status: 'covered', reasoning: 'Has React', evidenceBulletIds: ['b1', 'unknown-id'], evidenceEntryIds: [] },
+                { requirementIndex: 1, status: 'gap', reasoning: 'No leadership', evidenceBulletIds: [], evidenceEntryIds: [] },
+                { requirementIndex: 2, status: 'gap', reasoning: 'No AWS', evidenceBulletIds: [], evidenceEntryIds: [] },
+              ],
+              recommendedBulletIds: [],
+              fitSummary: 'Partial fit',
+            },
+            error: null,
+          },
+        })
+
+        mockMatchItemsPerRequirement.mockResolvedValue([
+          {
+            requirement: mockRequirements[0],
+            matches: [{ id: 'b1', content_text: 'React work', category: 'Frontend', similarity: 0.9 }],
+            isCovered: true,
+          },
+          {
+            requirement: mockRequirements[1],
+            matches: [],
+            isCovered: false,
+          },
+          {
+            requirement: mockRequirements[2],
+            matches: [],
+            isCovered: false,
+          },
+        ])
+        mockUpdateJobDraftRequirements.mockResolvedValue({})
+        mockUpdateJobDraftBullets.mockResolvedValue({})
+
+        const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+        expect(result.covered[0].matchedBullets).toContainEqual({ id: 'b1', text: 'React work', similarity: 0.9 })
+        expect(result.covered[0].matchedBullets).toContainEqual({ id: 'unknown-id', text: '', similarity: 0 })
+      })
+
+      it('includes reasoning and evidence in partiallyCovered items', async () => {
+        setupAuthenticatedSession()
+        setupFunctionsInvoke({
+          refineAnalysis: {
+            data: {
+              refinedRequirements: [
+                { requirementIndex: 0, status: 'covered', reasoning: 'Has React', evidenceBulletIds: ['b1'], evidenceEntryIds: [] },
+                { requirementIndex: 1, status: 'partially_covered', reasoning: 'Has some team experience but not at senior level', evidenceBulletIds: ['b2'], evidenceEntryIds: [] },
+                { requirementIndex: 2, status: 'gap', reasoning: 'No AWS', evidenceBulletIds: [], evidenceEntryIds: [] },
+              ],
+              recommendedBulletIds: [],
+              fitSummary: 'Decent fit',
+            },
+            error: null,
+          },
+        })
+
+        mockMatchItemsPerRequirement.mockResolvedValue([
+          {
+            requirement: mockRequirements[0],
+            matches: [{ id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
+            isCovered: true,
+          },
+          {
+            requirement: mockRequirements[1],
+            matches: [{ id: 'b2', content_text: 'Mentored junior dev', category: 'Leadership', similarity: 0.65 }],
+            isCovered: false,
+          },
+          {
+            requirement: mockRequirements[2],
+            matches: [],
+            isCovered: false,
+          },
+        ])
+        mockUpdateJobDraftRequirements.mockResolvedValue({})
+        mockUpdateJobDraftBullets.mockResolvedValue({})
+
+        const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+        expect(result.partiallyCovered).toHaveLength(1)
+        expect(result.partiallyCovered[0].requirement.description).toBe('Team leadership')
+        expect(result.partiallyCovered[0].reasoning).toBe('Has some team experience but not at senior level')
+        expect(result.partiallyCovered[0].evidenceBullets).toContainEqual({ id: 'b2', text: 'Mentored junior dev', similarity: 0.65 })
+      })
+
+      it('silently skips out-of-bounds requirementIndex', async () => {
+        setupAuthenticatedSession()
+        setupFunctionsInvoke({
+          refineAnalysis: {
+            data: {
+              refinedRequirements: [
+                { requirementIndex: 0, status: 'covered', reasoning: 'Has React', evidenceBulletIds: ['b1'], evidenceEntryIds: [] },
+                { requirementIndex: 99, status: 'gap', reasoning: 'Invalid index', evidenceBulletIds: [], evidenceEntryIds: [] },
+                { requirementIndex: 2, status: 'gap', reasoning: 'No AWS', evidenceBulletIds: [], evidenceEntryIds: [] },
+              ],
+              recommendedBulletIds: [],
+              fitSummary: 'Assessment',
+            },
+            error: null,
+          },
+        })
+
+        mockMatchItemsPerRequirement.mockResolvedValue(
+          mockRequirements.map(r => ({
+            requirement: r,
+            matches: [{ id: 'b1', content_text: 'text', category: 'Cat', similarity: 0.9 }],
+            isCovered: true,
+          }))
+        )
+        mockUpdateJobDraftRequirements.mockResolvedValue({})
+        mockUpdateJobDraftBullets.mockResolvedValue({})
+
+        const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+        expect(result.covered).toHaveLength(1)
+        expect(result.gaps).toHaveLength(1)
+        expect(result.covered.length + result.gaps.length + result.partiallyCovered.length).toBe(2)
+      })
+    })
+
+    it('calls onProgress with each stage in order', async () => {
+      setupAuthenticatedSession()
+      setupFunctionsInvoke()
+      mockMatchItemsPerRequirement.mockResolvedValue(
+        mockRequirements.map(r => ({
+          requirement: { description: r.description, category: r.category, importance: r.importance },
+          matches: [{ id: 'b1', content_text: 'bullet text', category: 'Test', similarity: 0.8 }],
+          isCovered: true,
+        }))
+      )
+      mockUpdateJobDraftRequirements.mockResolvedValue({})
+      mockUpdateJobDraftBullets.mockResolvedValue({})
+
+      const onProgress = vi.fn()
+      await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1', undefined, onProgress)
+
+      const stages = onProgress.mock.calls.map((c: unknown[]) => c[0])
+      expect(stages).toEqual(['parsing', 'embedding', 'matching', 'refining', 'storing'])
     })
   })
 
@@ -597,6 +890,81 @@ describe('jd-processing service', () => {
 
       const texts = result!.existingBulletSummary.split('; ')
       expect(texts).toHaveLength(10)
+    })
+
+    it('only includes gaps marked "interview" when triageDecisions provided', () => {
+      const gaps = [
+        { requirement: { description: 'AWS', category: 'Cloud', importance: 'must_have' as const } },
+        { requirement: { description: 'Docker', category: 'DevOps', importance: 'nice_to_have' as const } },
+        { requirement: { description: 'Go', category: 'Backend', importance: 'must_have' as const } },
+      ]
+      const covered = [
+        {
+          requirement: { description: 'React', category: 'Frontend', importance: 'must_have' as const },
+          matchedBullets: [{ id: 'b1', text: 'Built React app', similarity: 0.9 }],
+        },
+      ]
+
+      const triageDecisions: Record<string, 'included' | 'interview' | 'ignored'> = {
+        [hashRequirementDescription('AWS')]: 'interview',
+        [hashRequirementDescription('Docker')]: 'ignored',
+        [hashRequirementDescription('Go')]: 'included',
+      }
+
+      const result = buildInterviewContextFromGaps(gaps, covered, 'Engineer', 'Acme', triageDecisions)
+
+      expect(result).not.toBeNull()
+      expect(result!.gaps).toHaveLength(1)
+      expect(result!.gaps[0].requirement).toBe('AWS')
+    })
+
+    it('returns null when all triaged items are ignored or included', () => {
+      const gaps = [
+        { requirement: { description: 'AWS', category: 'Cloud', importance: 'must_have' as const } },
+      ]
+
+      const triageDecisions: Record<string, 'included' | 'interview' | 'ignored'> = {
+        [hashRequirementDescription('AWS')]: 'ignored',
+      }
+
+      const result = buildInterviewContextFromGaps(gaps, [], 'Engineer', null, triageDecisions)
+      expect(result).toBeNull()
+    })
+
+    it('includes partiallyCovered items marked "interview"', () => {
+      const gaps = [
+        { requirement: { description: 'AWS', category: 'Cloud', importance: 'must_have' as const } },
+      ]
+      const partiallyCovered = [
+        {
+          requirement: { description: 'Docker', category: 'DevOps', importance: 'nice_to_have' as const },
+          reasoning: 'Some exposure',
+          evidenceBullets: [{ id: 'b2', text: 'Used Docker in CI', similarity: 0.6 }],
+        },
+      ]
+
+      const triageDecisions: Record<string, 'included' | 'interview' | 'ignored'> = {
+        [hashRequirementDescription('AWS')]: 'ignored',
+        [hashRequirementDescription('Docker')]: 'interview',
+      }
+
+      const result = buildInterviewContextFromGaps(gaps, [], 'Engineer', 'Acme', triageDecisions, partiallyCovered)
+
+      expect(result).not.toBeNull()
+      expect(result!.gaps).toHaveLength(1)
+      expect(result!.gaps[0].requirement).toBe('Docker')
+    })
+
+    it('falls back to all gaps when triageDecisions is empty object', () => {
+      const gaps = [
+        { requirement: { description: 'AWS', category: 'Cloud', importance: 'must_have' as const } },
+        { requirement: { description: 'Go', category: 'Backend', importance: 'must_have' as const } },
+      ]
+
+      const result = buildInterviewContextFromGaps(gaps, [], 'Engineer', null, {})
+
+      expect(result).not.toBeNull()
+      expect(result!.gaps).toHaveLength(2)
     })
   })
 
@@ -676,6 +1044,102 @@ describe('jd-processing service', () => {
       expect(result.gaps[0].skillMatch).toBe('AWS')
       expect(result.gaps[1].skillMatch).toBeUndefined()
     })
+
+    it('handles stored data with refined, partiallyCovered, triageDecisions, fitSummary', () => {
+      const stored = {
+        jobTitle: 'Staff Engineer',
+        company: 'Stripe' as string | null,
+        covered: [
+          {
+            requirement: { description: 'React', category: 'Frontend', importance: 'must_have' as const },
+            matchedBullets: [{ id: 'b1', text: 'Built React app', similarity: 0.9 }],
+          },
+        ],
+        gaps: [
+          { description: 'Go', category: 'Backend', importance: 'must_have' as const },
+        ],
+        partiallyCovered: [
+          {
+            requirement: { description: 'AWS', category: 'Cloud', importance: 'nice_to_have' as const },
+            reasoning: 'Some S3 usage',
+            evidenceBullets: [{ id: 'b2', text: 'Used S3 for storage', similarity: 0.55 }],
+          },
+        ],
+        totalRequirements: 3,
+        coveredCount: 1,
+        analyzedAt: '2024-06-01T00:00:00Z',
+        refined: {
+          refinedRequirements: [
+            { requirementIndex: 0, status: 'covered' as const, reasoning: 'Strong match', evidenceBulletIds: ['b1'], evidenceEntryIds: [] },
+          ],
+          recommendedBulletIds: ['b1'],
+          fitSummary: 'Good fit overall.',
+        },
+        triageDecisions: {
+          [hashRequirementDescription('Go')]: 'interview' as const,
+          [hashRequirementDescription('AWS')]: 'included' as const,
+        },
+        ignoredRequirements: [],
+        fitSummary: 'Good fit overall.',
+      }
+
+      const result = buildGapDataFromStored('draft-2', stored)
+
+      expect(result.draftId).toBe('draft-2')
+      expect(result.partiallyCovered).toHaveLength(1)
+      expect(result.partiallyCovered[0].reasoning).toBe('Some S3 usage')
+      expect(result.refined).toBeDefined()
+      expect(result.refined!.fitSummary).toBe('Good fit overall.')
+      expect(result.triageDecisions[hashRequirementDescription('Go')]).toBe('interview')
+      expect(result.fitSummary).toBe('Good fit overall.')
+      expect(result.ignoredRequirements).toEqual([])
+      // Interview context should only include 'Go' (marked interview)
+      expect(result.interviewContext).not.toBeNull()
+      expect(result.interviewContext!.gaps).toHaveLength(1)
+      expect(result.interviewContext!.gaps[0].requirement).toBe('Go')
+    })
+
+    it('handles stored data WITHOUT new fields (backward compatibility)', () => {
+      const stored = {
+        jobTitle: 'Engineer',
+        company: null as string | null,
+        covered: [],
+        gaps: [
+          { description: 'Kubernetes', category: 'DevOps', importance: 'must_have' as const },
+        ],
+        totalRequirements: 1,
+        coveredCount: 0,
+        analyzedAt: '2024-01-01T00:00:00Z',
+      }
+
+      const result = buildGapDataFromStored('draft-old', stored)
+
+      expect(result.partiallyCovered).toEqual([])
+      expect(result.triageDecisions).toEqual({})
+      expect(result.ignoredRequirements).toEqual([])
+      expect(result.fitSummary).toBeUndefined()
+      expect(result.refineFailed).toBeUndefined()
+      expect(result.refined).toBeUndefined()
+      // Without triage decisions, falls back to including all gaps
+      expect(result.interviewContext).not.toBeNull()
+      expect(result.interviewContext!.gaps).toHaveLength(1)
+    })
+
+    it('passes refineFailed through from stored data', () => {
+      const stored = {
+        jobTitle: 'Engineer',
+        company: null as string | null,
+        covered: [],
+        gaps: [],
+        totalRequirements: 0,
+        coveredCount: 0,
+        analyzedAt: '2024-01-01T00:00:00Z',
+        refineFailed: true,
+      }
+
+      const result = buildGapDataFromStored('draft-x', stored)
+      expect(result.refineFailed).toBe(true)
+    })
   })
 
   describe('findSkillMatch', () => {
@@ -731,6 +1195,37 @@ describe('jd-processing service', () => {
         soft: [],
       })
       expect(result).toBe('docker')
+    })
+  })
+
+  describe('hashRequirementDescription', () => {
+    it('returns a deterministic hash for the same input', () => {
+      const hash1 = hashRequirementDescription('Experience with React')
+      const hash2 = hashRequirementDescription('Experience with React')
+      expect(hash1).toBe(hash2)
+    })
+
+    it('returns different hashes for different inputs', () => {
+      const hash1 = hashRequirementDescription('Experience with React')
+      const hash2 = hashRequirementDescription('Experience with Angular')
+      expect(hash1).not.toBe(hash2)
+    })
+
+    it('returns a non-empty string', () => {
+      const hash = hashRequirementDescription('Test')
+      expect(hash).toBeTruthy()
+      expect(typeof hash).toBe('string')
+    })
+
+    it('handles empty string', () => {
+      const hash = hashRequirementDescription('')
+      expect(typeof hash).toBe('string')
+    })
+
+    it('returns base-36 encoded string', () => {
+      const hash = hashRequirementDescription('Kubernetes experience')
+      // base-36 uses digits 0-9 and letters a-z, possibly with a leading minus
+      expect(hash).toMatch(/^-?[0-9a-z]+$/)
     })
   })
 })

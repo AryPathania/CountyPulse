@@ -62,7 +62,7 @@ export function Navigation() {
             </span>
             <Link
               to="/settings"
-              className="nav__settings-btn"
+              className="btn-secondary btn-sm"
               data-testid="nav-settings"
             >
               Settings

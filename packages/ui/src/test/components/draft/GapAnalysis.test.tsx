@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { GapAnalysis, type GapAnalysisProps } from '../../../components/draft/GapAnalysis'
+import { hashRequirementDescription } from '../../../services/jd-processing'
 
 // Mock useNavigate
 const mockNavigate = vi.fn()
@@ -30,6 +31,7 @@ const defaultProps: GapAnalysisProps = {
       ],
     },
   ],
+  partiallyCovered: [],
   gaps: [
     {
       requirement: {
@@ -56,6 +58,9 @@ const defaultProps: GapAnalysisProps = {
     existingBulletSummary: 'Has frontend experience',
     jobTitle: 'Senior SWE',
   },
+  triageDecisions: {},
+  onTriageDecision: vi.fn(),
+  untriagedCount: 2,
 }
 
 function renderGapAnalysis(props: Partial<GapAnalysisProps> = {}) {
@@ -91,7 +96,7 @@ describe('GapAnalysis', () => {
     renderGapAnalysis()
     const summary = screen.getByTestId('gap-summary')
     expect(summary).toHaveTextContent('1/3 requirements covered')
-    expect(summary).toHaveTextContent('2 gaps')
+    expect(summary).toHaveTextContent('2 gap')
   })
 
   it('renders gap items', () => {
@@ -163,22 +168,23 @@ describe('GapAnalysis', () => {
   it('shows interview button when gaps exist and context is provided', () => {
     renderGapAnalysis()
     expect(screen.getByTestId('interview-for-gaps')).toBeInTheDocument()
-    expect(screen.getByText('Interview for Gaps')).toBeInTheDocument()
+    expect(screen.getByTestId('interview-for-gaps')).toHaveTextContent(/Begin Interview for Gaps/)
   })
 
-  it('navigates to interview with context on button click', async () => {
-    renderGapAnalysis()
+  it('disables interview button when untriaged items exist', () => {
+    renderGapAnalysis({ untriagedCount: 2 })
+    expect(screen.getByTestId('interview-for-gaps')).toBeDisabled()
+  })
 
-    await userEvent.click(screen.getByTestId('interview-for-gaps'))
+  it('enables interview button when all items triaged', async () => {
+    renderGapAnalysis({ untriagedCount: 0 })
+    const btn = screen.getByTestId('interview-for-gaps')
+    expect(btn).not.toBeDisabled()
 
+    await userEvent.click(btn)
     expect(mockNavigate).toHaveBeenCalledWith('/interview', {
       state: { interviewContext: defaultProps.interviewContext },
     })
-  })
-
-  it('hides interview button when no gaps exist', () => {
-    renderGapAnalysis({ gaps: [] })
-    expect(screen.queryByTestId('interview-for-gaps')).not.toBeInTheDocument()
   })
 
   it('hides interview button when no interview context', () => {
@@ -187,7 +193,7 @@ describe('GapAnalysis', () => {
   })
 
   it('does not render gaps section when no gaps', () => {
-    renderGapAnalysis({ gaps: [] })
+    renderGapAnalysis({ gaps: [], untriagedCount: 0 })
     expect(screen.queryByTestId('gap-item')).not.toBeInTheDocument()
   })
 
@@ -200,5 +206,234 @@ describe('GapAnalysis', () => {
     renderGapAnalysis()
     expect(screen.getByText('DevOps')).toBeInTheDocument()
     expect(screen.getByText('Backend')).toBeInTheDocument()
+  })
+
+  describe('partially covered items', () => {
+    const partialProps: Partial<GapAnalysisProps> = {
+      partiallyCovered: [
+        {
+          requirement: {
+            description: 'AWS cloud experience',
+            category: 'Cloud',
+            importance: 'must_have',
+          },
+          reasoning: 'Candidate has some S3 usage but lacks broader AWS experience',
+          evidenceBullets: [
+            { id: 'b-3', text: 'Used S3 for file storage', similarity: 0.55 },
+          ],
+        },
+      ],
+      untriagedCount: 3,
+    }
+
+    it('renders partially covered items with "Partial" badge', () => {
+      renderGapAnalysis(partialProps)
+      const partialItems = screen.getAllByTestId('partial-item')
+      expect(partialItems).toHaveLength(1)
+      expect(screen.getByText('Partial')).toBeInTheDocument()
+      expect(screen.getByText('AWS cloud experience')).toBeInTheDocument()
+    })
+
+    it('shows reasoning when partial item is expanded', async () => {
+      renderGapAnalysis(partialProps)
+      const description = screen.getByText('AWS cloud experience')
+      await userEvent.click(description)
+      expect(screen.getByText('Candidate has some S3 usage but lacks broader AWS experience')).toBeInTheDocument()
+    })
+
+    it('shows evidence bullets when partial item is expanded', async () => {
+      renderGapAnalysis(partialProps)
+      const description = screen.getByText('AWS cloud experience')
+      await userEvent.click(description)
+      expect(screen.getByText('Used S3 for file storage')).toBeInTheDocument()
+      expect(screen.getByText('55%')).toBeInTheDocument()
+    })
+
+    it('includes partial count in summary when partials exist', () => {
+      renderGapAnalysis(partialProps)
+      const summary = screen.getByTestId('gap-summary')
+      expect(summary).toHaveTextContent('1 partial')
+    })
+  })
+
+  describe('triage buttons', () => {
+    it('shows triage buttons on gap items', () => {
+      renderGapAnalysis()
+      const triageGroups = screen.getAllByTestId('triage-buttons')
+      expect(triageGroups.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('calls onTriageDecision with "included" when Include clicked', async () => {
+      const onTriageDecision = vi.fn()
+      renderGapAnalysis({ onTriageDecision })
+      const includeButtons = screen.getAllByTestId('triage-include')
+      await userEvent.click(includeButtons[0])
+      expect(onTriageDecision).toHaveBeenCalledWith('Kubernetes experience', 'included')
+    })
+
+    it('calls onTriageDecision with "interview" when Add to Interview clicked', async () => {
+      const onTriageDecision = vi.fn()
+      renderGapAnalysis({ onTriageDecision })
+      const interviewButtons = screen.getAllByTestId('triage-interview')
+      await userEvent.click(interviewButtons[0])
+      expect(onTriageDecision).toHaveBeenCalledWith('Kubernetes experience', 'interview')
+    })
+
+    it('calls onTriageDecision with "ignored" when Ignore clicked', async () => {
+      const onTriageDecision = vi.fn()
+      renderGapAnalysis({ onTriageDecision })
+      const ignoreButtons = screen.getAllByTestId('triage-ignore')
+      await userEvent.click(ignoreButtons[0])
+      expect(onTriageDecision).toHaveBeenCalledWith('Kubernetes experience', 'ignored')
+    })
+
+    it('shows triage buttons on partial items', () => {
+      renderGapAnalysis({
+        partiallyCovered: [
+          {
+            requirement: { description: 'Docker', category: 'DevOps', importance: 'nice_to_have' },
+            reasoning: 'Some exposure',
+            evidenceBullets: [],
+          },
+        ],
+        untriagedCount: 3,
+      })
+      const partialItem = screen.getByTestId('partial-item')
+      expect(partialItem.querySelector('[data-testid="triage-buttons"]')).toBeInTheDocument()
+    })
+  })
+
+  describe('triaged items section', () => {
+    it('shows triaged items with correct badge', () => {
+      const k8sHash = hashRequirementDescription('Kubernetes experience')
+      const gqlHash = hashRequirementDescription('GraphQL knowledge')
+
+      renderGapAnalysis({
+        triageDecisions: {
+          [k8sHash]: 'interview',
+          [gqlHash]: 'ignored',
+        },
+        untriagedCount: 0,
+      })
+
+      const triagedItems = screen.getAllByTestId('triaged-item')
+      expect(triagedItems).toHaveLength(2)
+      expect(screen.getByText('Interview')).toBeInTheDocument()
+      expect(screen.getByText('Ignored')).toBeInTheDocument()
+    })
+
+    it('shows "Included" badge for included triage decision', () => {
+      const k8sHash = hashRequirementDescription('Kubernetes experience')
+
+      renderGapAnalysis({
+        triageDecisions: { [k8sHash]: 'included' },
+        gaps: [defaultProps.gaps[0]],
+        untriagedCount: 1,
+      })
+
+      expect(screen.getByText('Included')).toBeInTheDocument()
+    })
+  })
+
+  describe('bulk interview button', () => {
+    it('appears when 8+ untriaged items exist', () => {
+      const manyGaps = Array.from({ length: 8 }, (_, i) => ({
+        requirement: {
+          description: `Requirement ${i}`,
+          category: 'General',
+          importance: 'must_have' as const,
+        },
+      }))
+
+      renderGapAnalysis({
+        gaps: manyGaps,
+        untriagedCount: 8,
+      })
+
+      expect(screen.getByTestId('bulk-interview-btn')).toBeInTheDocument()
+    })
+
+    it('does not appear when fewer than 8 untriaged items', () => {
+      renderGapAnalysis({ untriagedCount: 2 })
+      expect(screen.queryByTestId('bulk-interview-btn')).not.toBeInTheDocument()
+    })
+
+    it('calls onTriageDecision for all untriaged gaps and partials', async () => {
+      const onTriageDecision = vi.fn()
+      const manyGaps = Array.from({ length: 6 }, (_, i) => ({
+        requirement: {
+          description: `Gap ${i}`,
+          category: 'General',
+          importance: 'must_have' as const,
+        },
+      }))
+      const partials = Array.from({ length: 3 }, (_, i) => ({
+        requirement: {
+          description: `Partial ${i}`,
+          category: 'General',
+          importance: 'nice_to_have' as const,
+        },
+        reasoning: 'Some coverage',
+        evidenceBullets: [],
+      }))
+
+      renderGapAnalysis({
+        gaps: manyGaps,
+        partiallyCovered: partials,
+        onTriageDecision,
+        untriagedCount: 9,
+      })
+
+      const bulkBtn = screen.getByTestId('bulk-interview-btn')
+      await userEvent.click(bulkBtn)
+
+      // Should call for each gap + each partial
+      expect(onTriageDecision).toHaveBeenCalledTimes(9)
+      // All calls should be 'interview'
+      for (const call of onTriageDecision.mock.calls) {
+        expect(call[1]).toBe('interview')
+      }
+    })
+  })
+
+  describe('fitSummary and refineFailed', () => {
+    it('renders fitSummary when provided', () => {
+      renderGapAnalysis({ fitSummary: 'Strong candidate with relevant frontend experience.' })
+      expect(screen.getByTestId('fit-summary')).toHaveTextContent('Strong candidate with relevant frontend experience.')
+    })
+
+    it('does not render fitSummary when not provided', () => {
+      renderGapAnalysis({ fitSummary: undefined })
+      expect(screen.queryByTestId('fit-summary')).not.toBeInTheDocument()
+    })
+
+    it('renders refineFailed notice when true', () => {
+      renderGapAnalysis({ refineFailed: true })
+      expect(screen.getByTestId('refine-failed-notice')).toHaveTextContent('Enhanced analysis unavailable')
+    })
+
+    it('does not render refineFailed notice when false or undefined', () => {
+      renderGapAnalysis({ refineFailed: false })
+      expect(screen.queryByTestId('refine-failed-notice')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('interview button with triage', () => {
+    it('shows triage count in label when untriaged items exist', () => {
+      renderGapAnalysis({ untriagedCount: 3 })
+      expect(screen.getByTestId('interview-for-gaps')).toHaveTextContent('3 items need triage')
+    })
+
+    it('does not show triage count when all triaged', () => {
+      renderGapAnalysis({ untriagedCount: 0 })
+      const btn = screen.getByTestId('interview-for-gaps')
+      expect(btn).toHaveTextContent('Begin Interview for Gaps')
+      expect(btn).not.toHaveTextContent('items need triage')
+    })
+
+    it('is disabled when untriaged items exist', () => {
+      renderGapAnalysis({ untriagedCount: 5 })
+      expect(screen.getByTestId('interview-for-gaps')).toBeDisabled()
+    })
   })
 })

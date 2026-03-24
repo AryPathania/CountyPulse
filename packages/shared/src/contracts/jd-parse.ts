@@ -15,6 +15,17 @@ export const JdRequirementSchema = z.object({
 
 export type JdRequirement = z.infer<typeof JdRequirementSchema>
 
+/** Human-readable labels for JD requirement categories */
+export const JD_CATEGORY_LABELS: Record<string, string> = {
+  technical_skill: 'Technical',
+  soft_skill: 'Soft Skill',
+  experience_type: 'Experience',
+  domain_knowledge: 'Domain',
+  education: 'Education',
+  certification: 'Certification',
+  leadership: 'Leadership',
+}
+
 // Structured output from parsing a raw job description
 export const JdParseOutputSchema = z.object({
   jobTitle: z.string(),
@@ -61,3 +72,50 @@ export const GapAnalysisResultSchema = z.object({
 })
 
 export type GapAnalysisResult = z.infer<typeof GapAnalysisResultSchema>
+
+// ---------------------------------------------------------------------------
+// Refine-analysis intelligence layer
+// ---------------------------------------------------------------------------
+
+// Per-requirement verdict from the refine-analysis LLM
+export const RefinedRequirementSchema = z.object({
+  requirementIndex: z.number(),
+  status: z.enum(['covered', 'partially_covered', 'gap']),
+  reasoning: z.string(),
+  evidenceBulletIds: z.array(z.string()).default([]),
+  evidenceEntryIds: z.array(z.string()).default([]),
+})
+
+export type RefinedRequirement = z.infer<typeof RefinedRequirementSchema>
+
+// Full output from the refine-analysis edge function
+export const RefineAnalysisOutputSchema = z.object({
+  refinedRequirements: z.array(RefinedRequirementSchema),
+  recommendedBulletIds: z.array(z.string()),
+  fitSummary: z.string(),
+})
+
+export type RefineAnalysisOutput = z.infer<typeof RefineAnalysisOutputSchema>
+
+// ---------------------------------------------------------------------------
+// User triage decisions
+// ---------------------------------------------------------------------------
+
+// User's decision on a gap or partially-covered requirement
+export const TriageDecisionSchema = z.enum(['included', 'interview', 'ignored'])
+
+export type TriageDecision = z.infer<typeof TriageDecisionSchema>
+
+// ---------------------------------------------------------------------------
+// Stored gap analysis (JSONB in job_drafts.gap_analysis)
+// ---------------------------------------------------------------------------
+
+// Extends GapAnalysisResultSchema with optional refined fields for persistence
+export const GapAnalysisStoredSchema = GapAnalysisResultSchema.extend({
+  analyzedAt: z.string(),
+  refined: RefineAnalysisOutputSchema.optional(),
+  triageDecisions: z.record(z.string(), TriageDecisionSchema).default({}),
+  ignoredRequirements: z.array(z.string()).default([]),
+})
+
+export type GapAnalysisStored = z.infer<typeof GapAnalysisStoredSchema>

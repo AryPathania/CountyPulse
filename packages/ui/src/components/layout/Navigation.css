@@ -61,19 +61,3 @@
   color: var(--color-text-muted, #888);
   font-size: 0.875rem;
 }
-
-.nav__settings-btn {
-  padding: 0.5rem 1rem;
-  background: transparent;
-  border: 1px solid var(--color-border, #333);
-  color: var(--color-text, #fff);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  text-decoration: none;
-  transition: background 0.15s;
-}
-
-.nav__settings-btn:hover {
-  background: var(--color-surface-elevated, #2a2a2a);
-}
