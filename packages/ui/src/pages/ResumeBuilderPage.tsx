@@ -276,7 +276,10 @@ export function ResumeBuilderPage() {
       })
     }
 
+    const originalTitle = document.title
+    document.title = resume?.name ?? 'Resume'
     window.print()
+    document.title = originalTitle
   }, [user?.id, resume])
 
   // Handle drag start

@@ -28,6 +28,13 @@
     padding: 0 !important;
   }
 
+  /* Reset root container */
+  #root {
+    min-height: auto !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
   /* Make resume preview take full page */
   .resume-builder,
   .resume-builder__content,
@@ -36,17 +43,22 @@
     display: block !important;
     width: 100% !important;
     height: auto !important;
+    max-height: none !important;
+    min-height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     position: static !important;
     overflow: visible !important;
     background: white !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
   }
 
-  /* Template styling for print */
+  /* Template styling for print — small padding as safety buffer alongside @page margin */
   .classic-template,
   [data-testid="template-classic"] {
-    padding: 0.5in !important;
+    padding: 0.25in !important;
+    min-height: auto !important;
     width: 100% !important;
     max-width: none !important;
     box-sizing: border-box !important;
@@ -55,7 +67,7 @@
   /* Page settings */
   @page {
     size: letter;
-    margin: 0.5in;
+    margin: 0.35in;
   }
 
   /* Ensure text is black for printing */
@@ -65,17 +77,16 @@
     print-color-adjust: exact !important;
   }
 
-  /* Prevent page breaks inside elements */
-  .classic-template__section,
+  /* Prevent page breaks inside positions and bullets */
   .classic-template__position,
   .classic-template__bullet {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
-  /* Allow page breaks between sections */
-  .classic-template__section {
-    break-after: auto;
-    page-break-after: auto;
+  /* Keep section titles with their content */
+  .classic-template__section-title {
+    break-after: avoid;
+    page-break-after: avoid;
   }
 }

@@ -545,6 +545,32 @@ describe('ResumeBuilderPage', () => {
     vi.restoreAllMocks()
   })
 
+  it('should set document.title to resume name during print and restore after', async () => {
+    const printMock = vi.fn()
+    vi.spyOn(window, 'print').mockImplementation(printMock)
+
+    const originalTitle = document.title
+
+    renderResumeBuilder()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('export-pdf')).toBeInTheDocument()
+    })
+
+    // Capture title during print call
+    let titleDuringPrint = ''
+    printMock.mockImplementation(() => {
+      titleDuringPrint = document.title
+    })
+
+    await userEvent.click(screen.getByTestId('export-pdf'))
+
+    expect(titleDuringPrint).toBe('Software Engineer Resume')
+    expect(document.title).toBe(originalTitle)
+
+    vi.restoreAllMocks()
+  })
+
   it('should not block export when telemetry logging fails', async () => {
     // Mock window.print
     const printMock = vi.fn()

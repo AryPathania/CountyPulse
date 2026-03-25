@@ -90,14 +90,14 @@ export const MOCK_GAP_ANALYSIS = {
   company: 'New Company',
   covered: [
     {
-      requirement: { description: 'React experience', category: 'Frontend', importance: 'must_have' },
+      requirement: { description: 'React experience required', category: 'Frontend', importance: 'must_have' },
       matchedBullets: [
         { id: 'bullet-1', text: 'Built interactive dashboards with React and TypeScript', similarity: 0.92 },
       ],
     },
   ],
   gaps: [
-    { description: 'GraphQL experience', category: 'Backend', importance: 'nice_to_have' },
+    { description: 'GraphQL knowledge', category: 'Backend', importance: 'nice_to_have' },
     { description: 'Team leadership skills', category: 'Soft Skills', importance: 'must_have', skillMatch: 'Leadership' },
   ],
   partiallyCovered: [] as Array<{
@@ -111,6 +111,62 @@ export const MOCK_GAP_ANALYSIS = {
   triageDecisions: {} as Record<string, string>,
   ignoredRequirements: [] as string[],
   refineFailed: false,
+}
+
+/** Rich gap analysis mock with partial items for visual verification screenshots.
+ * Uses the STORED shape (flat gaps, bulletId/bulletText in covered) matching GapAnalysisStored schema.
+ * buildGapDataFromStored() in jd-processing.ts wraps gaps into { requirement } at runtime. */
+export const MOCK_GAP_ANALYSIS_RICH = {
+  jobTitle: 'Senior Full Stack Engineer',
+  company: 'Acme Corp',
+  covered: [
+    {
+      requirement: { description: 'React experience with modern hooks and state management', category: 'technical_skill', importance: 'must_have' as const },
+      matchedBullets: [
+        { bulletId: 'bullet-1', bulletText: 'Built interactive dashboards with React and TypeScript', similarity: 0.92 },
+        { bulletId: 'bullet-2', bulletText: 'Migrated legacy jQuery app to React 18 with hooks and context', similarity: 0.87 },
+      ],
+    },
+    {
+      requirement: { description: 'TypeScript proficiency', category: 'technical_skill', importance: 'must_have' as const },
+      matchedBullets: [
+        { bulletId: 'bullet-1', bulletText: 'Built interactive dashboards with React and TypeScript', similarity: 0.88 },
+      ],
+    },
+  ],
+  // Gaps in stored format are FLAT: { description, category, importance, skillMatch? }
+  gaps: [
+    { description: 'Experience with Kubernetes and container orchestration in production', category: 'technical_skill', importance: 'must_have' as const },
+    { description: 'GraphQL API design and implementation', category: 'technical_skill', importance: 'nice_to_have' as const },
+    { description: 'AWS Solutions Architect certification or equivalent', category: 'certification', importance: 'nice_to_have' as const },
+  ],
+  partiallyCovered: [
+    {
+      requirement: { description: '3+ years working with a variety of programming languages such as Java, Python, C++, Rust, Go, JavaScript', category: 'experience_type', importance: 'must_have' as const },
+      reasoning: 'Strong JavaScript and TypeScript evidence, but no mention of Java, Python, C++, Rust, or Go.',
+      evidenceBullets: [
+        { id: 'bullet-1', text: 'Built interactive dashboards with React and TypeScript', similarity: 0.65 },
+      ],
+    },
+    {
+      requirement: { description: 'Cross-functional team leadership and mentoring junior engineers', category: 'leadership', importance: 'must_have' as const },
+      reasoning: 'Some collaboration evidence but no direct leadership or mentoring examples.',
+      evidenceBullets: [
+        { id: 'bullet-3', text: 'Collaborated with product and design teams on feature specs', similarity: 0.55 },
+      ],
+    },
+    {
+      requirement: { description: 'CI/CD pipeline setup and maintenance with GitHub Actions or Jenkins', category: 'technical_skill', importance: 'nice_to_have' as const },
+      reasoning: 'Mentions deployment but no specific CI/CD pipeline experience.',
+      evidenceBullets: [],
+    },
+  ],
+  totalRequirements: 10,
+  coveredCount: 2,
+  analyzedAt: '2024-01-15T00:00:00Z',
+  triageDecisions: {} as Record<string, string>,
+  ignoredRequirements: [] as string[],
+  fitSummary: 'Strong frontend skills with React and TypeScript. Gaps in infrastructure (Kubernetes, CI/CD) and no leadership evidence. Partial match on language breadth — only JavaScript/TypeScript demonstrated.',
 }
 
 export const MOCK_JOB_DRAFTS = [

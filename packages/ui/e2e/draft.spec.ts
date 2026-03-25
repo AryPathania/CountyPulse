@@ -197,11 +197,11 @@ test.describe('Draft Resume View', () => {
   test('shows gap analysis with coverage data', async ({ page }) => {
     await page.goto('/resumes/draft-1')
     await expect(page.getByTestId('gap-analysis')).toBeVisible()
-    await expect(page.getByTestId('gap-summary')).toContainText('1/2 requirements covered')
-    await expect(page.getByTestId('gap-item')).toBeVisible()
-    await expect(page.getByText('GraphQL experience')).toBeVisible()
+    await expect(page.getByTestId('gap-summary')).toContainText('1/3 requirements covered')
+    await expect(page.getByTestId('gap-item').first()).toBeVisible()
+    await expect(page.getByText('GraphQL knowledge')).toBeVisible()
     await expect(page.getByTestId('covered-item')).toBeVisible()
-    await expect(page.getByText('React experience')).toBeVisible()
+    await expect(page.getByText('React experience required')).toBeVisible()
   })
 
   test('shows Interview for Gaps button when gaps exist', async ({ page }) => {
