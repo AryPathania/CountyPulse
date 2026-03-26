@@ -73,7 +73,7 @@ See `docs/adr/006_security_model.md` for the full security model. Summary:
 Every feature or bug fix follows this workflow:
 
 1. **Plan** — Explore codebase, design approach, write plan file
-2. **Refute** — Run refute-agent to stress-test the plan
+2. **Refute** — Run refute-agent to stress-test the plan. **Always run refute-agent before presenting plans to the user.**
 3. **Align** — Present to user, incorporate feedback, iterate
 4. **Implement** — Assign agents (db/ui/pipeline/contract) with relevant skills
 5. **Test** — test-agent writes meaningful tests (use git stash trick to validate usefulness)
@@ -165,8 +165,8 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 **MVP Feature Complete** - All phases implemented + UI polish + resume upload + gap analysis
 
 ### Test Coverage
-- **918+ unit/integration tests** (Vitest + Testing Library)
-- **95+ E2E tests** (Playwright)
+- **957+ unit/integration tests** (Vitest + Testing Library)
+- **134+ E2E tests** (Playwright)
 - **96%+ code coverage** (>95% quality gate)
 
 ### Completed Phases
