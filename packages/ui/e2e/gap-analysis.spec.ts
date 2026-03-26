@@ -304,7 +304,7 @@ test.describe('Gap Analysis on Draft Page', () => {
     await expect(coveredItems.first()).toBeVisible()
   })
 
-  test('triage Include moves item to Triaged section with Included badge', async ({ page }) => {
+  test('triage "Not a Gap" moves gap item to Triaged section with Ignored badge', async ({ page }) => {
     await setupGapAnalysisMocks(page)
     await page.goto('/resumes/draft-1')
 
@@ -314,27 +314,7 @@ test.describe('Gap Analysis on Draft Page', () => {
     const gapItems = page.getByTestId('gap-item')
     await expect(gapItems.first()).toBeVisible()
 
-    // Click the "Include" button on the first gap item
-    const firstGapItem = gapItems.first()
-    await firstGapItem.getByTestId('triage-include').click()
-
-    // Verify the item appears in the Triaged section with "Included" badge
-    const triagedItems = page.getByTestId('triaged-item')
-    await expect(triagedItems.first()).toBeVisible()
-    await expect(triagedItems.first()).toContainText('Included')
-  })
-
-  test('triage Ignore moves item to Triaged section with Ignored badge', async ({ page }) => {
-    await setupGapAnalysisMocks(page)
-    await page.goto('/resumes/draft-1')
-
-    await expect(page.getByTestId('gap-analysis')).toBeVisible({ timeout: 10000 })
-
-    // There should be gap items in the "Needs Your Input" section
-    const gapItems = page.getByTestId('gap-item')
-    await expect(gapItems.first()).toBeVisible()
-
-    // Click the "Ignore" button on the first gap item
+    // Click the "Not a Gap" button on the first gap item
     const firstGapItem = gapItems.first()
     await firstGapItem.getByTestId('triage-ignore').click()
 
@@ -342,6 +322,26 @@ test.describe('Gap Analysis on Draft Page', () => {
     const triagedItems = page.getByTestId('triaged-item')
     await expect(triagedItems.first()).toBeVisible()
     await expect(triagedItems.first()).toContainText('Ignored')
+  })
+
+  test('triage Add to Interview moves item to Triaged section with Interview badge', async ({ page }) => {
+    await setupGapAnalysisMocks(page)
+    await page.goto('/resumes/draft-1')
+
+    await expect(page.getByTestId('gap-analysis')).toBeVisible({ timeout: 10000 })
+
+    // There should be gap items in the "Needs Your Input" section
+    const gapItems = page.getByTestId('gap-item')
+    await expect(gapItems.first()).toBeVisible()
+
+    // Click the "Add to Interview" button on the first gap item
+    const firstGapItem = gapItems.first()
+    await firstGapItem.getByTestId('triage-interview').click()
+
+    // Verify the item appears in the Triaged section with "Interview" badge
+    const triagedItems = page.getByTestId('triaged-item')
+    await expect(triagedItems.first()).toBeVisible()
+    await expect(triagedItems.first()).toContainText('Interview')
   })
 
   test('Create Resume button blocked until all items triaged, unblocks after', async ({ page }) => {
@@ -354,14 +354,14 @@ test.describe('Gap Analysis on Draft Page', () => {
     const createBtn = page.getByTestId('create-resume-btn')
     await expect(createBtn).toBeDisabled()
 
-    // Triage all gap items (there should be 2 gaps from REFINE_RESPONSE_DEFAULT)
+    // Triage all gap items — only "Not a Gap" and "Add to Interview" buttons available
     const gapItems = page.getByTestId('gap-item')
     const gapCount = await gapItems.count()
 
     for (let i = 0; i < gapCount; i++) {
       // Always click the first visible gap item since items move to Triaged after click
       const currentGapItem = page.getByTestId('gap-item').first()
-      await currentGapItem.getByTestId('triage-include').click()
+      await currentGapItem.getByTestId('triage-ignore').click()
     }
 
     // After all items are triaged, the button should be enabled

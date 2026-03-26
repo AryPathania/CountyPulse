@@ -776,6 +776,52 @@ describe('jd-processing service', () => {
         expect(result.partiallyCovered[0].evidenceBullets).toContainEqual({ id: 'b2', text: 'Mentored junior dev', similarity: 0.65 })
       })
 
+      it('includes partial evidence bullet IDs in allMatchedBulletIds', async () => {
+        setupAuthenticatedSession()
+        setupFunctionsInvoke({
+          refineAnalysis: {
+            data: {
+              refinedRequirements: [
+                { requirementIndex: 0, status: 'covered', reasoning: 'Has React', evidenceBulletIds: ['b1'], evidenceEntryIds: [] },
+                { requirementIndex: 1, status: 'partially_covered', reasoning: 'Some leadership', evidenceBulletIds: ['b2'], evidenceEntryIds: [] },
+                { requirementIndex: 2, status: 'gap', reasoning: 'No AWS', evidenceBulletIds: [], evidenceEntryIds: [] },
+              ],
+              recommendedBulletIds: ['extra-1'],
+              fitSummary: 'Decent fit',
+            },
+            error: null,
+          },
+        })
+
+        mockMatchItemsPerRequirement.mockResolvedValue([
+          {
+            requirement: mockRequirements[0],
+            matches: [{ id: 'b1', content_text: 'Built React app', category: 'Frontend', similarity: 0.85 }],
+            isCovered: true,
+          },
+          {
+            requirement: mockRequirements[1],
+            matches: [{ id: 'b2', content_text: 'Mentored junior dev', category: 'Leadership', similarity: 0.65 }],
+            isCovered: false,
+          },
+          {
+            requirement: mockRequirements[2],
+            matches: [],
+            isCovered: false,
+          },
+        ])
+        mockUpdateJobDraftRequirements.mockResolvedValue({})
+        mockUpdateJobDraftBullets.mockResolvedValue({})
+
+        await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+        const calledIds = mockUpdateJobDraftBullets.mock.calls[0][1] as string[]
+        expect(calledIds).toContain('b1')      // covered
+        expect(calledIds).toContain('b2')      // partial evidence
+        expect(calledIds).toContain('extra-1') // recommended
+        expect(new Set(calledIds).size).toBe(calledIds.length) // no duplicates
+      })
+
       it('silently skips out-of-bounds requirementIndex', async () => {
         setupAuthenticatedSession()
         setupFunctionsInvoke({

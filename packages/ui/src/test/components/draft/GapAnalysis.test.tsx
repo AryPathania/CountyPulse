@@ -146,7 +146,8 @@ describe('GapAnalysis', () => {
     renderGapAnalysis()
 
     const coveredItem = screen.getByTestId('covered-item')
-    await userEvent.click(coveredItem)
+    const header = coveredItem.querySelector('.gap-analysis__item-header')!
+    await userEvent.click(header)
 
     expect(screen.getByText('Built React dashboard')).toBeInTheDocument()
     expect(screen.getByText('92%')).toBeInTheDocument()
@@ -158,10 +159,11 @@ describe('GapAnalysis', () => {
     renderGapAnalysis()
 
     const coveredItem = screen.getByTestId('covered-item')
-    await userEvent.click(coveredItem) // expand
+    const header = coveredItem.querySelector('.gap-analysis__item-header')!
+    await userEvent.click(header) // expand
     expect(screen.getByText('Built React dashboard')).toBeInTheDocument()
 
-    await userEvent.click(coveredItem) // collapse
+    await userEvent.click(header) // collapse
     expect(screen.queryByText('Built React dashboard')).not.toBeInTheDocument()
   })
 
@@ -236,15 +238,17 @@ describe('GapAnalysis', () => {
 
     it('shows reasoning when partial item is expanded', async () => {
       renderGapAnalysis(partialProps)
-      const description = screen.getByText('AWS cloud experience')
-      await userEvent.click(description)
+      const partialItem = screen.getByTestId('partial-item')
+      const header = partialItem.querySelector('.gap-analysis__item-header')!
+      await userEvent.click(header)
       expect(screen.getByText('Candidate has some S3 usage but lacks broader AWS experience')).toBeInTheDocument()
     })
 
     it('shows evidence bullets when partial item is expanded', async () => {
       renderGapAnalysis(partialProps)
-      const description = screen.getByText('AWS cloud experience')
-      await userEvent.click(description)
+      const partialItem = screen.getByTestId('partial-item')
+      const header = partialItem.querySelector('.gap-analysis__item-header')!
+      await userEvent.click(header)
       expect(screen.getByText('Used S3 for file storage')).toBeInTheDocument()
       expect(screen.getByText('55%')).toBeInTheDocument()
     })
@@ -263,12 +267,12 @@ describe('GapAnalysis', () => {
       expect(triageGroups.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('calls onTriageDecision with "included" when Include clicked', async () => {
+    it('calls onTriageDecision with "ignored" when "Not a Gap" clicked on gap item', async () => {
       const onTriageDecision = vi.fn()
       renderGapAnalysis({ onTriageDecision })
-      const includeButtons = screen.getAllByTestId('triage-include')
-      await userEvent.click(includeButtons[0])
-      expect(onTriageDecision).toHaveBeenCalledWith('Kubernetes experience', 'included')
+      const ignoreButtons = screen.getAllByTestId('triage-ignore')
+      await userEvent.click(ignoreButtons[0])
+      expect(onTriageDecision).toHaveBeenCalledWith('Kubernetes experience', 'ignored')
     })
 
     it('calls onTriageDecision with "interview" when Add to Interview clicked', async () => {
@@ -279,12 +283,26 @@ describe('GapAnalysis', () => {
       expect(onTriageDecision).toHaveBeenCalledWith('Kubernetes experience', 'interview')
     })
 
-    it('calls onTriageDecision with "ignored" when Ignore clicked', async () => {
-      const onTriageDecision = vi.fn()
-      renderGapAnalysis({ onTriageDecision })
+    it('shows "Not a Gap" label on gap items and "Already Covered" on partial items', () => {
+      renderGapAnalysis({
+        partiallyCovered: [
+          {
+            requirement: { description: 'Docker', category: 'DevOps', importance: 'nice_to_have' },
+            reasoning: 'Some exposure',
+            evidenceBullets: [],
+          },
+        ],
+        untriagedCount: 3,
+      })
       const ignoreButtons = screen.getAllByTestId('triage-ignore')
-      await userEvent.click(ignoreButtons[0])
-      expect(onTriageDecision).toHaveBeenCalledWith('Kubernetes experience', 'ignored')
+      // First button is from partial item ("Already Covered"), rest from gaps ("Not a Gap")
+      expect(ignoreButtons[0]).toHaveTextContent('Already Covered')
+      expect(ignoreButtons[1]).toHaveTextContent('Not a Gap')
+    })
+
+    it('does not show Include button (removed from UX)', () => {
+      renderGapAnalysis()
+      expect(screen.queryByTestId('triage-include')).not.toBeInTheDocument()
     })
 
     it('shows triage buttons on partial items', () => {
@@ -322,7 +340,7 @@ describe('GapAnalysis', () => {
       expect(screen.getByText('Ignored')).toBeInTheDocument()
     })
 
-    it('shows "Included" badge for included triage decision', () => {
+    it('shows "Already Covered" badge for included triage decision (backward compat)', () => {
       const k8sHash = hashRequirementDescription('Kubernetes experience')
 
       renderGapAnalysis({
@@ -331,7 +349,7 @@ describe('GapAnalysis', () => {
         untriagedCount: 1,
       })
 
-      expect(screen.getByText('Included')).toBeInTheDocument()
+      expect(screen.getByText('Already Covered')).toBeInTheDocument()
     })
   })
 

@@ -59,13 +59,11 @@
 
 .gap-analysis__item {
   display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.25rem;
   padding: 0.5rem;
   border-radius: 4px;
   margin-bottom: 0.25rem;
-  flex-wrap: wrap;
-  cursor: pointer;
 }
 
 .gap-analysis__item--gap {
@@ -74,10 +72,12 @@
 
 .gap-analysis__item--covered {
   background: rgba(46, 204, 113, 0.05);
+  cursor: pointer;
 }
 
 .gap-analysis__item--partial {
   background: rgba(241, 196, 15, 0.05);
+  cursor: pointer;
 }
 
 .gap-analysis__item--triaged {
@@ -87,10 +87,15 @@
 
 .gap-analysis__item-header {
   display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.gap-analysis__item-badges {
+  display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex: 1;
-  min-width: 0;
 }
 
 .gap-analysis__badge {
@@ -132,8 +137,17 @@
   color: #95a5a6;
 }
 
+.gap-analysis__chevron {
+  color: #aaa;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  width: 1.1rem;
+  text-align: center;
+  margin-left: auto;
+}
+
 .gap-analysis__description {
-  flex: 1;
+  width: 100%;
 }
 
 .gap-analysis__category {
@@ -162,7 +176,7 @@
 
 .gap-analysis__detail {
   width: 100%;
-  padding: 0.5rem 0 0 2rem;
+  padding: 0.5rem 0 0 0.5rem;
 }
 
 .gap-analysis__reasoning {

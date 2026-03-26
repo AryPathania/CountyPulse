@@ -494,9 +494,10 @@ export async function analyzeJobDescriptionGaps(
 
   await updateJobDraftRequirements(draftId, requirements, gapAnalysis, jobTitle, company)
 
-  // Update draft with all matched bullet IDs (including recommended)
+  // Update draft with all matched bullet IDs (covered + partial evidence + recommended)
   const allMatchedBulletIds = [...new Set([
     ...covered.flatMap(c => c.matchedBullets.map(b => b.id)),
+    ...partiallyCovered.flatMap(p => p.evidenceBullets.map(b => b.id)),
     ...(refined?.recommendedBulletIds ?? []),
   ])]
   await updateJobDraftBullets(draftId, allMatchedBulletIds)

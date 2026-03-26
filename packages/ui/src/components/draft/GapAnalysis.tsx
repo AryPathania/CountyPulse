@@ -113,18 +113,21 @@ export function GapAnalysis({
               const isExpanded = expandedReq === key
               return (
                 <li key={key} className="gap-analysis__item gap-analysis__item--partial" data-testid="partial-item">
-                  <div className="gap-analysis__item-header">
-                    <span className="gap-analysis__badge gap-analysis__badge--partial">Partial</span>
-                    <span
-                      className="gap-analysis__description"
-                      onClick={() => setExpandedReq(isExpanded ? null : key)}
-                    >
+                  <div
+                    className="gap-analysis__item-header"
+                    onClick={() => setExpandedReq(isExpanded ? null : key)}
+                  >
+                    <div className="gap-analysis__item-badges">
+                      <span className="gap-analysis__badge gap-analysis__badge--partial">Partial</span>
+                      <span className="gap-analysis__category">{JD_CATEGORY_LABELS[p.requirement.category] ?? p.requirement.category}</span>
+                      {p.requirement.importance === 'must_have' && (
+                        <span className="gap-analysis__importance">Required</span>
+                      )}
+                      <span className="gap-analysis__chevron">{isExpanded ? '\u25BC' : '\u25B6'}</span>
+                    </div>
+                    <span className="gap-analysis__description">
                       {p.requirement.description}
                     </span>
-                    <span className="gap-analysis__category">{JD_CATEGORY_LABELS[p.requirement.category] ?? p.requirement.category}</span>
-                    {p.requirement.importance === 'must_have' && (
-                      <span className="gap-analysis__importance">Required</span>
-                    )}
                   </div>
                   {isExpanded && (
                     <div className="gap-analysis__detail">
@@ -137,6 +140,7 @@ export function GapAnalysis({
                   <TriageButtons
                     requirementDescription={p.requirement.description}
                     onDecision={onTriageDecision}
+                    variant="partial"
                   />
                 </li>
               )
@@ -145,16 +149,19 @@ export function GapAnalysis({
             {untriagedGaps.map((g, i) => (
               <li key={`gap-${i}`} className="gap-analysis__item gap-analysis__item--gap" data-testid="gap-item">
                 <div className="gap-analysis__item-header">
-                  <span className="gap-analysis__badge gap-analysis__badge--gap">Gap</span>
+                  <div className="gap-analysis__item-badges">
+                    <span className="gap-analysis__badge gap-analysis__badge--gap">Gap</span>
+                    <span className="gap-analysis__category">{g.requirement.category}</span>
+                    {g.requirement.importance === 'must_have' && (
+                      <span className="gap-analysis__importance">Required</span>
+                    )}
+                  </div>
                   <span className="gap-analysis__description">{g.requirement.description}</span>
-                  <span className="gap-analysis__category">{g.requirement.category}</span>
-                  {g.requirement.importance === 'must_have' && (
-                    <span className="gap-analysis__importance">Required</span>
-                  )}
                 </div>
                 <TriageButtons
                   requirementDescription={g.requirement.description}
                   onDecision={onTriageDecision}
+                  variant="gap"
                 />
               </li>
             ))}
@@ -176,14 +183,21 @@ export function GapAnalysis({
                 <li
                   key={key}
                   className="gap-analysis__item gap-analysis__item--covered"
-                  onClick={() => setExpandedReq(isExpanded ? null : key)}
                   data-testid="covered-item"
                 >
-                  <span className="gap-analysis__badge gap-analysis__badge--covered">Covered</span>
-                  <span className="gap-analysis__description">{c.requirement.description}</span>
-                  <span className="gap-analysis__match-count">
-                    {c.matchedBullets.length} match{c.matchedBullets.length !== 1 ? 'es' : ''}
-                  </span>
+                  <div
+                    className="gap-analysis__item-header"
+                    onClick={() => setExpandedReq(isExpanded ? null : key)}
+                  >
+                    <div className="gap-analysis__item-badges">
+                      <span className="gap-analysis__badge gap-analysis__badge--covered">Covered</span>
+                      <span className="gap-analysis__match-count">
+                        {c.matchedBullets.length} match{c.matchedBullets.length !== 1 ? 'es' : ''}
+                      </span>
+                      <span className="gap-analysis__chevron">{isExpanded ? '\u25BC' : '\u25B6'}</span>
+                    </div>
+                    <span className="gap-analysis__description">{c.requirement.description}</span>
+                  </div>
                   {isExpanded && (
                     <BulletMatchList bullets={c.matchedBullets} />
                   )}
@@ -206,9 +220,11 @@ export function GapAnalysis({
               const decision = triageDecisions[key]
               return (
                 <li key={`triaged-${i}`} className="gap-analysis__item gap-analysis__item--triaged" data-testid="triaged-item">
-                  <span className={`gap-analysis__badge gap-analysis__badge--${decision}`}>
-                    {decision === 'included' ? 'Included' : decision === 'interview' ? 'Interview' : 'Ignored'}
-                  </span>
+                  <div className="gap-analysis__item-badges">
+                    <span className={`gap-analysis__badge gap-analysis__badge--${decision}`}>
+                      {decision === 'included' ? 'Already Covered' : decision === 'interview' ? 'Interview' : 'Ignored'}
+                    </span>
+                  </div>
                   <span className="gap-analysis__description">{item.requirement.description}</span>
                 </li>
               )
@@ -252,18 +268,20 @@ function BulletMatchList({ bullets }: { bullets: Array<{ id: string; text: strin
 function TriageButtons({
   requirementDescription,
   onDecision,
+  variant,
 }: {
   requirementDescription: string
   onDecision: (desc: string, decision: TriageDecision) => void
+  variant: 'partial' | 'gap'
 }) {
   return (
     <div className="gap-analysis__triage-buttons" data-testid="triage-buttons">
       <button
         className="btn-secondary btn-sm"
-        onClick={() => onDecision(requirementDescription, 'included')}
-        data-testid="triage-include"
+        onClick={() => onDecision(requirementDescription, 'ignored')}
+        data-testid="triage-ignore"
       >
-        Include
+        {variant === 'partial' ? 'Already Covered' : 'Not a Gap'}
       </button>
       <button
         className="btn-secondary btn-sm"
@@ -271,13 +289,6 @@ function TriageButtons({
         data-testid="triage-interview"
       >
         Add to Interview
-      </button>
-      <button
-        className="btn-secondary btn-sm"
-        onClick={() => onDecision(requirementDescription, 'ignored')}
-        data-testid="triage-ignore"
-      >
-        Ignore
       </button>
     </div>
   )
