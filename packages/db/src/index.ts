@@ -13,6 +13,7 @@ export * from './queries/account'
 export * from './queries/candidate-profiles'
 export * from './queries/profile-entries'
 export * from './queries/embeddings'
+export * from './queries/access'
 
 // Types
 export type { Database, Json } from './types'

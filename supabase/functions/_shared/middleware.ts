@@ -142,13 +142,14 @@ export async function logRun(
 
 interface MiddlewareOptions {
   requireOpenAI?: boolean
+  requireAccess?: boolean
 }
 
 export function withMiddleware(
   handler: (req: Request, ctx: HandlerContext) => Promise<Response>,
   options: MiddlewareOptions = {}
 ): void {
-  const { requireOpenAI = true } = options
+  const { requireOpenAI = true, requireAccess = true } = options
 
   serve(async (req) => {
     if (req.method === 'OPTIONS') {
@@ -169,6 +170,30 @@ export function withMiddleware(
 
       if (authError || !user) {
         return errorResponse('Invalid token', 401)
+      }
+
+      // Beta access check — the real security boundary.
+      // Frontend AccessGuard is UX-only; this prevents actual resource consumption.
+      if (requireAccess) {
+        if (!user.email) {
+          return errorResponse('Access denied', 403)
+        }
+
+        try {
+          const { data: accessRow } = await supabase
+            .from('beta_allowlist')
+            .select('email')
+            .eq('email', user.email.toLowerCase())
+            .maybeSingle()
+
+          if (!accessRow) {
+            return errorResponse('Access denied', 403)
+          }
+        } catch {
+          // Fail closed — if the check errors, deny access.
+          // Generic message to avoid leaking table names or query structure.
+          return errorResponse('Access denied', 403)
+        }
       }
 
       const openaiKey = Deno.env.get('OPENAI_API_KEY') ?? ''

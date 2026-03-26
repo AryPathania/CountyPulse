@@ -399,6 +399,8 @@ export async function setupApiMocks(page: Page) {
     }
   })
 
+  // Beta access mock lives in auth.ts mockAuthState() — no need to duplicate here.
+
   // Mock RPC calls (unified match_items)
   await page.route('**/rest/v1/rpc/match_items*', async (route) => {
     await route.fulfill({

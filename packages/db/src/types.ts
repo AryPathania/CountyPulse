@@ -385,6 +385,10 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: undefined
       }
+      check_beta_access: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

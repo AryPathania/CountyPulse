@@ -66,6 +66,7 @@ See `docs/adr/006_security_model.md` for the full security model. Summary:
 - **XSS**: Not possible — React JSX escapes all dynamic content; no `dangerouslySetInnerHTML`
 - **LLM prompt injection**: Limited to single-user impact; system prompts reduce susceptibility
 - **Auth**: All tables have RLS; all edge functions require valid JWT
+- **Beta access gating**: Dual-layer enforcement — `AccessGuard` component (UX-only, redirects to `/no-access`) + `withMiddleware` backend check (real security boundary, fail-closed). Email-based `beta_allowlist` table. See ADR 009.
 
 ## Development Process (Steering)
 
@@ -97,6 +98,7 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - DnD drag types: Use `@dnd-kit` `data` prop with type discrimination, never string prefix parsing
 - Education title formatting: Always use `formatEducationTitle()` from `@odie/db` for consistent education titles from parsed data
 - Query key invalidation: Always import from canonical key factories (e.g., `bulletKeys.all`). Never hardcode query key strings in invalidation calls.
+- Access checks: Frontend guards (`AccessGuard`) are UX-only. Backend middleware (`withMiddleware`) is the real security boundary. Always fail closed on errors.
 
 ## Key Shared Components
 - `ProfileForm` (`packages/ui/src/components/ProfileForm.tsx`) — shared form for editing name, contact, links; used by CompleteProfile, ProfilePage, PersonalInfoPanel
@@ -108,6 +110,8 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - `SubSectionEditForm` (`packages/ui/src/components/resume/SubSectionEditForm.tsx`) — extracted reusable form for editing subsection fields (title, subtitle, meta, textItems); used by SortableSubSection and ProfileEntriesEditor
 - `formatEducationTitle` (`packages/db/src/queries/profile-entries.ts`) — formats education titles consistently from parsed degree/field/institution data; used by `buildEducationEntries` and resume upload
 - `ProfileEntriesEditor` (`packages/ui/src/components/ProfileEntriesEditor.tsx`) — Profile page component for managing profile_entries (education, certifications, awards, projects, volunteer)
+- `AccessGuard` (`packages/ui/src/components/auth/AccessGuard.tsx`) — UX-only access gate; wraps protected routes inside AuthGuard, redirects to `/no-access` if not on beta list
+- `useAccess` (`packages/ui/src/hooks/useAccess.ts`) — TanStack Query hook calling `checkBetaAccess()` RPC; 5-min staleTime, query key factory at `accessKeys.byUser(userId)`
 
 ## Routes
 - `/` — Home (JD paste + quick actions)
@@ -120,6 +124,7 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - `/telemetry` — Runs dashboard
 - `/profile` — Profile Info (ProfileForm + ProfileEntriesEditor for education, certifications, etc.)
 - `/settings` — Account settings (danger zone, sign out; accessed via Settings button in nav bar)
+- `/no-access` — No Access page (beta gate; auth-required, access-exempt)
 
 ## Edge Functions
 - `interview` — Conversational interview (context-aware: blank/resume/gaps; auto-start supported via `StartInterviewButton`)
@@ -131,6 +136,8 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - `refine-analysis` — Intelligence layer: reviews vector match results via o4-mini reasoning model, reclassifies covered/partial/gap, recommends additional bullets
 - `transcribe` — OpenAI Whisper STT for voice interview
 
+**Note:** All edge functions use `withMiddleware` which includes a `requireAccess` option (default `true`). After JWT auth, it checks the `beta_allowlist` table via service role. Functions can opt out with `requireAccess: false`.
+
 ## DB Tables (Odie)
 - `candidate_profiles` — Unified user profile: display_name, headline, summary, phone, location, links JSONB [{label, url}], profile_completed_at, profile_version, created_at. One row per user (merged from user_profiles in migration 028).
 - `positions` — Work experience entries
@@ -140,6 +147,7 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - `uploaded_resumes` — PDF uploads with cached parse results
 - `profile_entries` — Generic structured profile data (education, certification, award, project, volunteer). Category-based with sort_order. Mapped to `SubSectionData` via `toSubSectionData()`.
 - `runs` — LLM telemetry
+- `beta_allowlist` — Email allowlist for beta testers (email TEXT PK, created_at). RLS enabled, service-role only. Checked by `check_beta_access()` RPC and `withMiddleware`.
 
 ## Theme
 - Background: black

@@ -4,7 +4,7 @@ This file is the human-readable source of truth for table/column names, relation
 
 **Updated by:** DB Agent only
 **Updated when:** any migration changes schema
-**Last updated:** 2026-03-19 (migrations 022-030; profile_entries table added)
+**Last updated:** 2026-03-25 (migration 031; beta_allowlist table added)
 
 ---
 
@@ -310,6 +310,30 @@ This file is the human-readable source of truth for table/column names, relation
 
 ---
 
+### beta_allowlist
+
+**Purpose:** Email-based allowlist for beta testers. Controls access to the application before subscription billing is set up. Managed via Supabase dashboard (service role only).
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| email | text | no | - |
+| created_at | timestamptz | yes | now() |
+
+**Constraints:**
+- PK: `email`
+
+**Indexes:** None (PK sufficient)
+
+**RLS:**
+- Enabled, but no user-facing policies. Only accessible via service role or `SECURITY DEFINER` functions.
+
+**Notes:**
+- No `user_id` column — keyed on email for simplicity during beta phase.
+- Access checked via `check_beta_access()` RPC (frontend) or direct service-role query (backend middleware).
+- Will be superseded by `subscriptions` table when Stripe billing is added, but retained as a free-access override.
+
+---
+
 ## Functions
 
 ### match_bullets
@@ -337,6 +361,21 @@ match_bullets(
 - Uses cosine similarity (1 - cosine distance)
 - Returns bullets ordered by similarity (highest first)
 - Threshold default 0.5 filters low-quality matches
+
+### check_beta_access
+
+**Purpose:** Check if the current authenticated user's email is on the beta allowlist
+
+```sql
+check_beta_access() RETURNS boolean
+```
+
+**Security:** SECURITY DEFINER (bypasses RLS to read `beta_allowlist`)
+
+**Notes:**
+- Takes no parameters — reads email from `auth.jwt()` to prevent email enumeration
+- Returns `true` if email is in `beta_allowlist`, `false` otherwise
+- Called by `useAccess` hook on the frontend via Supabase RPC
 
 ### reset_account_data
 

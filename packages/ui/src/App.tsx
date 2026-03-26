@@ -4,6 +4,8 @@ import { queryClient } from './lib/queryClient'
 import { AuthProvider } from './components/auth/AuthProvider'
 import { LoginForm } from './components/auth/LoginForm'
 import { AuthGuard } from './components/auth/AuthGuard'
+import { AccessGuard } from './components/auth/AccessGuard'
+import { NoAccessPage } from './pages/NoAccessPage'
 import { CompleteProfile } from './pages/CompleteProfile'
 import { BulletsPage } from './pages/BulletsPage'
 import { InterviewPage } from './pages/InterviewPage'
@@ -21,80 +23,109 @@ function AuthenticatedApp() {
   return (
     <Router>
       <Routes>
-        {/* Profile completion - accessible to authenticated users */}
+        {/* Auth-required, access-exempt (must be outside AccessGuard to avoid redirect loop) */}
+        <Route path="/no-access" element={
+          <AuthGuard fallback={<LoginForm />}>
+            <NoAccessPage />
+          </AuthGuard>
+        } />
+
+        {/* Profile completion - accessible to authenticated beta users */}
         <Route path="/complete-profile" element={
           <AuthGuard fallback={<LoginForm />}>
-            <CompleteProfile />
+            <AccessGuard>
+              <CompleteProfile />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Bullets Library */}
         <Route path="/bullets" element={
           <AuthGuard fallback={<LoginForm />}>
-            <BulletsPage />
+            <AccessGuard>
+              <BulletsPage />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Interview Flow */}
         <Route path="/interview" element={
           <AuthGuard fallback={<LoginForm />}>
-            <InterviewPage />
+            <AccessGuard>
+              <InterviewPage />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Resumes List */}
         <Route path="/resumes" element={
           <AuthGuard fallback={<LoginForm />}>
-            <ResumesPage />
+            <AccessGuard>
+              <ResumesPage />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Resume Builder */}
         <Route path="/resumes/:id/edit" element={
           <AuthGuard fallback={<LoginForm />}>
-            <ResumeBuilderPage />
+            <AccessGuard>
+              <ResumeBuilderPage />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Draft Resume / Resume View */}
         <Route path="/resumes/:id" element={
           <AuthGuard fallback={<LoginForm />}>
-            <DraftResumePage />
+            <AccessGuard>
+              <DraftResumePage />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Telemetry Dashboard */}
         <Route path="/telemetry" element={
           <AuthGuard fallback={<LoginForm />}>
-            <TelemetryPage />
+            <AccessGuard>
+              <TelemetryPage />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Profile */}
         <Route path="/profile" element={
           <AuthGuard fallback={<LoginForm />}>
-            <ProfilePage />
+            <AccessGuard>
+              <ProfilePage />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Settings */}
         <Route path="/settings" element={
           <AuthGuard fallback={<LoginForm />}>
-            <SettingsPage />
+            <AccessGuard>
+              <SettingsPage />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Resume Upload */}
         <Route path="/upload-resume" element={
           <AuthGuard fallback={<LoginForm />}>
-            <ResumeUploadPage />
+            <AccessGuard>
+              <ResumeUploadPage />
+            </AccessGuard>
           </AuthGuard>
         } />
 
         {/* Home - JD paste interface */}
         <Route path="/" element={
           <AuthGuard fallback={<LoginForm />}>
-            <HomePage />
+            <AccessGuard>
+              <HomePage />
+            </AccessGuard>
           </AuthGuard>
         } />
       </Routes>

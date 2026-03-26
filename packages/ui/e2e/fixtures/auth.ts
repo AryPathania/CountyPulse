@@ -94,6 +94,15 @@ export async function mockAuthState(page: Page, user: MockUser = TEST_USER) {
     await route.continue()
   })
 
+  // Mock beta access check — every authenticated user needs this for AccessGuard
+  await page.route('**/rest/v1/rpc/check_beta_access*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(true),
+    })
+  })
+
   // The key fix: inject the session into localStorage BEFORE the app loads
   // Supabase checks localStorage first for existing session
   await page.addInitScript(

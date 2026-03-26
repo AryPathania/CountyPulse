@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "vitest run src/__tests__/access.test.ts",
     "test:integration": "dotenv -e ../../.env -- vitest run src/__tests__/"
   },
   "dependencies": {

@@ -1,0 +1,31 @@
+.no-access-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.no-access-page__content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.no-access-page__title {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.no-access-page__message {
+  color: var(--color-text-secondary, #aaa);
+  margin-bottom: 1rem;
+}
+
+.no-access-page__email {
+  color: var(--color-text-secondary, #aaa);
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.no-access-page__signout {
+  margin-top: 1rem;
+}
