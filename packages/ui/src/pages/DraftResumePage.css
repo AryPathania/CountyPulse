@@ -46,6 +46,7 @@
   min-height: 400px;
   gap: 1rem;
   text-align: center;
+  grid-column: 1 / -1;
 }
 
 .draft-page__error p {
@@ -76,8 +77,16 @@
 
 .draft-page__content {
   display: grid;
-  grid-template-columns: 1fr 350px;
+  grid-template-columns: 1fr 1fr;
   gap: 2rem;
+}
+
+.draft-page__bullets--full {
+  grid-column: 1 / -1;
+}
+
+.draft-page__analyzing {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 900px) {
@@ -159,9 +168,7 @@
 }
 
 .draft-page__jd {
-  position: sticky;
-  top: 80px;
-  align-self: start;
+  grid-column: 1 / -1;
 }
 
 .draft-page__jd-text {
@@ -172,7 +179,7 @@
   font-size: 0.875rem;
   line-height: 1.6;
   color: var(--color-text-muted, #888);
-  max-height: 400px;
+  max-height: 600px;
   overflow-y: auto;
   white-space: pre-wrap;
 }

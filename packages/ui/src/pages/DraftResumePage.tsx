@@ -277,7 +277,7 @@ export function DraftResumePage() {
             </div>
           ) : (
             <>
-              <section className="draft-page__bullets">
+              <section className={`draft-page__bullets${!gapData ? ' draft-page__bullets--full' : ''}`}>
                 <h2 className="draft-page__section-title">
                   Matched Bullets ({draft?.bullets.length ?? 0})
                 </h2>
@@ -339,24 +339,24 @@ export function DraftResumePage() {
                   refineFailed={gapData.refineFailed}
                 />
               )}
-            </>
-          )}
 
-          {gapAnalysis.isError && (
-            <div className="draft-page__error" data-testid="gap-error">
-              <p>Gap analysis failed: {gapAnalysis.error instanceof Error ? gapAnalysis.error.message : 'Unknown error'}</p>
-              <button
-                onClick={() => {
-                  if (draft?.jd_text && user?.id) {
-                    setAnalysisStage(null)
-                    gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id, skills: aggregatedSkills, onProgress: setAnalysisStage })
-                  }
-                }}
-                className="btn-secondary"
-              >
-                Retry Analysis
-              </button>
-            </div>
+              {gapAnalysis.isError && (
+                <div className="draft-page__error" data-testid="gap-error">
+                  <p>Gap analysis failed: {gapAnalysis.error instanceof Error ? gapAnalysis.error.message : 'Unknown error'}</p>
+                  <button
+                    onClick={() => {
+                      if (draft?.jd_text && user?.id) {
+                        setAnalysisStage(null)
+                        gapAnalysis.mutate({ userId: user.id, jdText: draft.jd_text, draftId: draft.id, skills: aggregatedSkills, onProgress: setAnalysisStage })
+                      }
+                    }}
+                    className="btn-secondary"
+                  >
+                    Retry Analysis
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           {draft?.jd_text && (
