@@ -60,6 +60,11 @@ Mission: block merges that increase complexity.
 - Confirm screenshots or traces are captured on failure
 - Coverage must include both individual component and full wiring (page load → interaction → DB save → UI update)
 
+8) E2E test execution
+- Run `pnpm test:e2e` after all other checks pass
+- All E2E tests must pass (0 failures)
+- If failures exist, report the failing specs and error summaries
+
 ## Output
 - a short report for the Orchestrator:
   - violations found
