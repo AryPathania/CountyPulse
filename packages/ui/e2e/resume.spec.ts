@@ -150,6 +150,14 @@ test.describe('Resume Builder Editor', () => {
       })
     })
 
+    await page.route('**/rest/v1/profile_entries*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+    })
+
     await page.route('**/rest/v1/runs*', async (route) => {
       await route.fulfill({
         status: 201,

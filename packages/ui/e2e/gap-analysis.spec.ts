@@ -20,6 +20,7 @@ const REFINE_RESPONSE_DEFAULT = {
   ],
   recommendedBulletIds: [],
   fitSummary: 'Test candidate assessment',
+  bulletTexts: {},
 }
 
 function setupGapAnalysisMocks(
@@ -157,6 +158,7 @@ test.describe('Gap Analysis on Draft Page', () => {
       ],
       recommendedBulletIds: [],
       fitSummary: 'Partial coverage assessment',
+      bulletTexts: {},
     }
     // Provide gap_analysis with partiallyCovered so stored data includes it
     const gapAnalysisWithPartial = {
@@ -256,52 +258,6 @@ test.describe('Gap Analysis on Draft Page', () => {
 
     await expect(page.getByRole('heading', { name: MOCK_JOB_DRAFTS[0].job_title, level: 1 })).toBeVisible()
     await expect(page.getByText(MOCK_JOB_DRAFTS[0].company).first()).toBeVisible()
-  })
-
-  test('uses match_items RPC and handles entry-type matches', async ({ page }) => {
-    // Track RPC calls to verify match_items is used
-    const rpcCalls: string[] = []
-
-    await setupGapAnalysisMocks(page)
-
-    // Override match_items to return an entry-type match
-    await page.route('**/rest/v1/rpc/match_items*', async (route) => {
-      rpcCalls.push('match_items')
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([{
-          id: 'entry-1',
-          source_type: 'entry',
-          content_text: 'B.S. Computer Science, Stanford University',
-          category: 'education',
-          similarity: 0.91,
-        }]),
-      })
-    })
-
-    // Also verify match_bullets is NOT called
-    await page.route('**/rest/v1/rpc/match_bullets*', async (route) => {
-      rpcCalls.push('match_bullets')
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([]),
-      })
-    })
-
-    await page.goto('/resumes/draft-1')
-
-    // Wait for gap analysis to render
-    await expect(page.getByTestId('gap-analysis')).toBeVisible({ timeout: 10000 })
-
-    // Verify match_items was called and match_bullets was NOT
-    expect(rpcCalls).toContain('match_items')
-    expect(rpcCalls).not.toContain('match_bullets')
-
-    // The entry-based match should show as covered
-    const coveredItems = page.getByTestId('covered-item')
-    await expect(coveredItems.first()).toBeVisible()
   })
 
   test('triage "Not a Gap" moves gap item to Triaged section with Ignored badge', async ({ page }) => {

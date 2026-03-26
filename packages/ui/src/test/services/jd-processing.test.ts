@@ -731,6 +731,58 @@ describe('jd-processing service', () => {
         expect(result.covered[0].matchedBullets).toContainEqual({ id: 'unknown-id', text: '', similarity: 0 })
       })
 
+      it('resolves evidence bullet text from bulletTexts when not in vector results', async () => {
+        setupAuthenticatedSession()
+        setupFunctionsInvoke({
+          refineAnalysis: {
+            data: {
+              refinedRequirements: [
+                { requirementIndex: 0, status: 'covered', reasoning: 'Has React', evidenceBulletIds: ['b1', 'cross-req-bullet'], evidenceEntryIds: [] },
+                { requirementIndex: 1, status: 'partially_covered', reasoning: 'Some leadership', evidenceBulletIds: ['llm-found-bullet'], evidenceEntryIds: [] },
+                { requirementIndex: 2, status: 'gap', reasoning: 'No AWS', evidenceBulletIds: [], evidenceEntryIds: [] },
+              ],
+              recommendedBulletIds: [],
+              fitSummary: 'Decent fit',
+              bulletTexts: {
+                'b1': 'React work',
+                'cross-req-bullet': 'Built microservices with Docker',
+                'llm-found-bullet': 'Mentored 3 junior engineers on team processes',
+              },
+            },
+            error: null,
+          },
+        })
+
+        mockMatchItemsPerRequirement.mockResolvedValue([
+          {
+            requirement: mockRequirements[0],
+            matches: [{ id: 'b1', content_text: 'React work', category: 'Frontend', similarity: 0.9 }],
+            isCovered: true,
+          },
+          {
+            requirement: mockRequirements[1],
+            matches: [],
+            isCovered: false,
+          },
+          {
+            requirement: mockRequirements[2],
+            matches: [],
+            isCovered: false,
+          },
+        ])
+        mockUpdateJobDraftRequirements.mockResolvedValue({})
+        mockUpdateJobDraftBullets.mockResolvedValue({})
+
+        const result = await analyzeJobDescriptionGaps('user-1', 'JD text', 'draft-1')
+
+        // Covered: b1 from vector results, cross-req-bullet from bulletTexts
+        expect(result.covered[0].matchedBullets).toContainEqual({ id: 'b1', text: 'React work', similarity: 0.9 })
+        expect(result.covered[0].matchedBullets).toContainEqual({ id: 'cross-req-bullet', text: 'Built microservices with Docker', similarity: 0 })
+
+        // Partial: llm-found-bullet not in any vector results, resolved from bulletTexts
+        expect(result.partiallyCovered[0].evidenceBullets).toContainEqual({ id: 'llm-found-bullet', text: 'Mentored 3 junior engineers on team processes', similarity: 0 })
+      })
+
       it('includes reasoning and evidence in partiallyCovered items', async () => {
         setupAuthenticatedSession()
         setupFunctionsInvoke({

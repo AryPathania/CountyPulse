@@ -196,5 +196,8 @@ withMiddleware(async (req: Request, ctx: HandlerContext) => {
 
   console.log('[refine-analysis] Success | latency:', latencyMs, 'ms | hallucinated IDs removed:', hallucinatedCount)
 
-  return jsonResponse(parsed)
+  return jsonResponse({
+    ...parsed,
+    bulletTexts: Object.fromEntries(bulletData.map(b => [b.id, b.text])),
+  })
 })

@@ -408,6 +408,7 @@ export async function analyzeJobDescriptionGaps(
         return { ...g, ...(skillMatch ? { skillMatch } : {}) }
       })
     } else {
+      const bulletTexts: Record<string, string> = refineData.bulletTexts ?? {}
       refined = refineData as RefineAnalysisOutput
       fitSummary = refined.fitSummary
 
@@ -433,14 +434,14 @@ export async function analyzeJobDescriptionGaps(
           // Add evidence bullets not in mechanical matches
           for (const bid of rr.evidenceBulletIds ?? []) {
             if (!matchedBullets.some(b => b.id === bid)) {
-              matchedBullets.push({ id: bid, text: '', similarity: 0 })
+              matchedBullets.push({ id: bid, text: bulletTexts[bid] ?? '', similarity: 0 })
             }
           }
           newCovered.push({ requirement: req, matchedBullets })
         } else if (rr.status === 'partially_covered') {
           const evidenceBullets = (rr.evidenceBulletIds ?? []).map(bid => {
             const match = matchResults[rr.requirementIndex]?.matches.find(m => m.id === bid)
-            return { id: bid, text: match?.content_text ?? '', similarity: match?.similarity ?? 0 }
+            return { id: bid, text: match?.content_text ?? bulletTexts[bid] ?? '', similarity: match?.similarity ?? 0 }
           })
           newPartial.push({ requirement: req, reasoning: rr.reasoning, evidenceBullets })
         } else {

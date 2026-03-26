@@ -13,7 +13,7 @@ test.describe('Bullets Library', () => {
 
     // Should see bullets page
     await expect(page.getByTestId('bullets-page')).toBeVisible()
-    await expect(page.getByText('Bullets Library')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Experience Bullets' })).toBeVisible()
 
     // Should see bullets list
     await expect(page.getByTestId('bullets-list')).toBeVisible()
