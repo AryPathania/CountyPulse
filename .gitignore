@@ -9,6 +9,8 @@ playwright-report/
 test-results/
 packages/ui/playwright-report/
 packages/ui/test-results/
+packages/ui/e2e-screenshots/
+e2e-screenshots/
 screenshots/
 
 # Test coverage

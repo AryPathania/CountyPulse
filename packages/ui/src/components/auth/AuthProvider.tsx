@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, type User } from '@odie/db'
+import { queryClient } from '../../lib/queryClient'
+import { accessKeys } from '../../hooks/useAccess'
 
 interface AuthContextType {
   user: User | null
@@ -31,9 +33,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     })
 
     // Listen for auth changes - trust Supabase to handle everything
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)
+      // Invalidate cached access check only when the token actually changed.
+      // TOKEN_REFRESHED: new JWT obtained after expiry — re-check with fresh token.
+      // SIGNED_IN: magic link login — re-check in case it's a different email.
+      // INITIAL_SESSION: skip — useAccess fires its own query on mount.
+      // SIGNED_OUT: skip — enabled:!!user prevents refetch when user is null.
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+        void queryClient.invalidateQueries({ queryKey: accessKeys.all })
+      }
     })
 
     return () => subscription.unsubscribe()

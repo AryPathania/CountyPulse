@@ -4,10 +4,21 @@ import { MemoryRouter } from 'react-router-dom'
 import { NoAccessPage } from '../../pages/NoAccessPage'
 
 const mockUseAuth = vi.fn()
+const mockUseAccess = vi.fn()
+const mockNavigate = vi.fn()
 
 vi.mock('../../components/auth/AuthProvider', () => ({
   useAuth: () => mockUseAuth(),
 }))
+
+vi.mock('../../hooks/useAccess', () => ({
+  useAccess: () => mockUseAccess(),
+}))
+
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>()
+  return { ...actual, useNavigate: () => mockNavigate }
+})
 
 vi.mock('../../components/auth/SignOutButton', () => ({
   SignOutButton: ({ className }: { className?: string }) => (
@@ -26,6 +37,7 @@ function renderNoAccessPage() {
 describe('NoAccessPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseAccess.mockReturnValue({ hasAccess: false, isFetching: false })
   })
 
   it('renders the page with correct testid', () => {
@@ -97,5 +109,24 @@ describe('NoAccessPage', () => {
     renderNoAccessPage()
 
     expect(screen.getByTestId('signout-button')).toHaveClass('no-access-page__signout')
+  })
+
+  it('shows checking state while access is being fetched', () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'user-1', email: 'alice@example.com' } })
+    mockUseAccess.mockReturnValue({ hasAccess: false, isFetching: true })
+
+    renderNoAccessPage()
+
+    expect(screen.getByText('Checking access...')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Access Limited' })).not.toBeInTheDocument()
+  })
+
+  it('navigates to home when access becomes granted', () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'user-1', email: 'alice@example.com' } })
+    mockUseAccess.mockReturnValue({ hasAccess: true, isFetching: false })
+
+    renderNoAccessPage()
+
+    expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true })
   })
 })

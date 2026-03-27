@@ -1,9 +1,30 @@
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../components/auth/AuthProvider'
+import { useAccess } from '../hooks/useAccess'
 import { SignOutButton } from '../components/auth/SignOutButton'
 import './NoAccessPage.css'
 
 export function NoAccessPage() {
   const { user } = useAuth()
+  const { hasAccess, isFetching } = useAccess()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (hasAccess) {
+      void navigate('/', { replace: true })
+    }
+  }, [hasAccess, navigate])
+
+  if (isFetching) {
+    return (
+      <div className="no-access-page" data-testid="no-access-page">
+        <div className="no-access-page__content">
+          <p className="no-access-page__message">Checking access...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="no-access-page" data-testid="no-access-page">

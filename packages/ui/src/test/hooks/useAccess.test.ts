@@ -95,4 +95,20 @@ describe('useAccess', () => {
     // data is undefined on error, so hasAccess = (undefined === true) = false
     expect(result.current.hasAccess).toBe(false)
   })
+
+  it('exposes isFetching from the query', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'user-5' } })
+    mockCheckBetaAccess.mockResolvedValue(true)
+
+    const { result } = renderHook(() => useAccess(), { wrapper: createWrapper() })
+
+    // isFetching is true initially while the query runs
+    expect(result.current.isFetching).toBe(true)
+
+    await waitFor(() => {
+      expect(result.current.isFetching).toBe(false)
+    })
+
+    expect(result.current.hasAccess).toBe(true)
+  })
 })
