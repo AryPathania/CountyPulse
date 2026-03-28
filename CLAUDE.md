@@ -80,7 +80,13 @@ Every feature or bug fix follows this workflow:
 6. **Validate** — validation-agent checks duplication (must be 0%), naming, patch-on-patch, linting
 7. **Document** — docs-agent updates db_schema.md, CLAUDE.md, and records design decisions
 8. **E2E** — Write Playwright E2E tests for all verifiable behavior (using `playwright-e2e` skill)
-9. **CI** — `pnpm typecheck` + `pnpm test` + `pnpm lint` + `pnpm dup:check` must all pass (0% duplication threshold)
+9. **CI** — All of the following must pass before a feature is complete (owned by validation-agent):
+   - `pnpm typecheck` — zero type errors
+   - `pnpm test` — all unit/integration tests pass with >95% coverage
+   - `pnpm test:e2e` — all Playwright E2E tests pass
+   - `pnpm lint` — zero lint errors
+   - `pnpm dup:check` — 0% duplication, including test files
+   Never mark a feature complete without all five passing.
 
 ### Design Decisions
 Significant architectural decisions are recorded in `docs/adr/` as Architecture Decision Records. Each ADR includes: context, decision, tradeoffs, and justification. The docs-agent is responsible for creating ADRs when design decisions are made during planning.
@@ -112,6 +118,7 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - `ProfileEntriesEditor` (`packages/ui/src/components/ProfileEntriesEditor.tsx`) — Profile page component for managing profile_entries (education, certifications, awards, projects, volunteer)
 - `AccessGuard` (`packages/ui/src/components/auth/AccessGuard.tsx`) — UX-only access gate; wraps protected routes inside AuthGuard, redirects to `/no-access` if not on beta list
 - `useAccess` (`packages/ui/src/hooks/useAccess.ts`) — TanStack Query hook calling `checkBetaAccess()` RPC; 5-min staleTime, query key factory at `accessKeys.byUser(userId)`
+- `streamFunctionCall` (`packages/ui/src/services/supabase-stream.ts`) — Low-level SSE utility for calling streaming Supabase edge functions. Handles Content-Type detection (pre-stream JSON errors route to `onError`), Safari < 16.4 `response.body` guard, and clean stream-close-before-done treated as error. Used by `streamInterviewMessage` in `interview.ts`. Auth pattern: raw `fetch()` with `Authorization: Bearer <token>`, same as voice hooks.
 
 ## Routes
 - `/` — Home (JD paste + quick actions)
@@ -127,16 +134,16 @@ Significant architectural decisions are recorded in `docs/adr/` as Architecture 
 - `/no-access` — No Access page (beta gate; auth-required, access-exempt)
 
 ## Edge Functions
-- `interview` — Conversational interview (context-aware: blank/resume/gaps; auto-start supported via `StartInterviewButton`)
+- `interview` — Conversational interview (context-aware: blank/resume/gaps; auto-start supported via `StartInterviewButton`). Supports conditional SSE streaming: when `stream: true` is present in the request body, returns `text/event-stream` with `text_delta`, `sentence`, `done`, and `error` events. When `stream` is absent or `false`, returns JSON as before (backward compatible). Uses OpenAI Structured Outputs (not JSON mode) with `response` field first in schema to guarantee field emission order during streaming.
 - `embed` — Batch text embeddings (`texts: string[]` → `embeddings: number[][]`)
 - `parse-resume` — LLM resume parsing (positions, bullets with quality classification)
 - `parse-jd` — JD requirement extraction (structured requirements with importance)
 - `extract-pdf` — Server-side PDF text extraction (fallback)
-- `speak` — OpenAI TTS for voice interview
+- `speak` — OpenAI TTS for voice interview. Accepts individual text strings (used for sentence-level TTS in voice mode). Returns `audio/mpeg`. One API call per invocation; sentence-level callers make N calls for N sentences (see ADR 011).
 - `refine-analysis` — Intelligence layer: reviews vector match results via o4-mini reasoning model, reclassifies covered/partial/gap, recommends additional bullets
 - `transcribe` — OpenAI Whisper STT for voice interview
 
-**Note:** All edge functions use `withMiddleware` which includes a `requireAccess` option (default `true`). After JWT auth, it checks the `beta_allowlist` table via service role. Functions can opt out with `requireAccess: false`.
+**Note:** All edge functions use `withMiddleware` which includes a `requireAccess` option (default `true`). After JWT auth, it checks the `beta_allowlist` table via service role. Functions can opt out with `requireAccess: false`. `withMiddleware` also attaches `ctx.waitUntil` from the Deno EdgeRuntime (if available) for post-stream async work such as telemetry logging. Falls back to fire-and-forget in local dev.
 
 ## DB Tables (Odie)
 - `candidate_profiles` — Unified user profile: display_name, headline, summary, phone, location, links JSONB [{label, url}], profile_completed_at, profile_version, created_at. One row per user (merged from user_profiles in migration 028).

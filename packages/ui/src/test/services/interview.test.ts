@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Mock @odie/db
 const mockGetSession = vi.fn()
@@ -11,8 +11,11 @@ vi.mock('@odie/db', () => ({
   },
 }))
 
+vi.stubEnv('VITE_SUPABASE_URL', 'http://localhost:54321')
+
 import {
   sendInterviewMessage,
+  streamInterviewMessage,
   getInitialMessage,
   resetMockState,
 } from '../../services/interview'
@@ -216,6 +219,160 @@ describe('interview service', () => {
       const messages = [makeMessage('user', 'test')]
 
       await expect(sendInterviewMessage(messages)).rejects.toThrow('Interview request failed')
+    })
+  })
+
+  describe('streamInterviewMessage', () => {
+    let originalFetch: typeof fetch
+
+    beforeEach(() => {
+      originalFetch = global.fetch
+    })
+
+    afterEach(() => {
+      global.fetch = originalFetch
+    })
+
+    function makeSseStream(events: object[]): ReadableStream<Uint8Array> {
+      const encoder = new TextEncoder()
+      return new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (const event of events) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+          }
+          controller.close()
+        },
+      })
+    }
+
+    it('calls onDone with parsed result on successful stream', async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+      })
+
+      const doneData = {
+        response: 'Great answer!',
+        extractedPosition: null,
+        extractedBullets: null,
+        shouldContinue: true,
+        extractedEntries: null,
+      }
+      global.fetch = vi.fn().mockResolvedValue(
+        new Response(
+          makeSseStream([
+            { type: 'text_delta', text: 'Great ' },
+            { type: 'text_delta', text: 'answer!' },
+            { type: 'sentence', text: 'Great answer!' },
+            { type: 'done', data: doneData },
+          ]),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+        )
+      )
+
+      const onTextDelta = vi.fn()
+      const onSentence = vi.fn()
+      const onDone = vi.fn()
+      const onError = vi.fn()
+
+      const messages: ChatMessage[] = [{ id: 'm1', role: 'user', content: 'Hi', timestamp: '2024-01-01T00:00:00Z' }]
+      await streamInterviewMessage(messages, {}, { onTextDelta, onSentence, onDone, onError })
+
+      expect(onTextDelta).toHaveBeenCalledWith('Great ')
+      expect(onTextDelta).toHaveBeenCalledWith('answer!')
+      expect(onSentence).toHaveBeenCalledWith('Great answer!')
+      expect(onDone).toHaveBeenCalledOnce()
+      expect(onDone.mock.calls[0][0].response).toBe('Great answer!')
+      expect(onDone.mock.calls[0][0].shouldContinue).toBe(true)
+      expect(onError).not.toHaveBeenCalled()
+    })
+
+    it('passes stream: true and context in request body', async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+      })
+
+      const doneData = {
+        response: 'ok',
+        extractedPosition: null,
+        extractedBullets: null,
+        shouldContinue: true,
+        extractedEntries: null,
+      }
+      global.fetch = vi.fn().mockResolvedValue(
+        new Response(
+          makeSseStream([{ type: 'done', data: doneData }]),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+        )
+      )
+
+      const context = { mode: 'resume' as const }
+      const messages: ChatMessage[] = []
+      await streamInterviewMessage(messages, { context }, {
+        onTextDelta: vi.fn(), onSentence: vi.fn(), onDone: vi.fn(), onError: vi.fn(),
+      })
+
+      const [, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+      const body = JSON.parse(init.body)
+      expect(body.stream).toBe(true)
+      expect(body.context).toEqual(context)
+    })
+
+    it('calls onError when not authenticated', async () => {
+      mockGetSession.mockResolvedValue({ data: { session: null } })
+
+      const onError = vi.fn()
+      const messages: ChatMessage[] = []
+      await streamInterviewMessage(messages, {}, {
+        onTextDelta: vi.fn(), onSentence: vi.fn(), onDone: vi.fn(), onError,
+      })
+
+      expect(onError).toHaveBeenCalledOnce()
+      expect(onError.mock.calls[0][0].message).toBe('Not authenticated')
+    })
+
+    it('calls onError on invalid done data schema', async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+      })
+
+      global.fetch = vi.fn().mockResolvedValue(
+        new Response(
+          makeSseStream([{ type: 'done', data: { invalid: true } }]),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+        )
+      )
+
+      const onError = vi.fn()
+      await streamInterviewMessage([], {}, {
+        onTextDelta: vi.fn(), onSentence: vi.fn(), onDone: vi.fn(), onError,
+      })
+
+      expect(onError).toHaveBeenCalledOnce()
+      expect(onError.mock.calls[0][0].message).toContain('Invalid response format')
+    })
+
+    it('calls onError when stream emits error event followed by unexpected close', async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { access_token: 'token' } },
+      })
+
+      global.fetch = vi.fn().mockResolvedValue(
+        new Response(
+          makeSseStream([{ type: 'error', message: 'LLM failed' }]),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+        )
+      )
+
+      const onError = vi.fn()
+      await streamInterviewMessage([], {}, {
+        onTextDelta: vi.fn(), onSentence: vi.fn(), onDone: vi.fn(), onError,
+      })
+
+      // onError fires twice: once from the error event handler, once from unexpected close
+      // (the error event handler calls onError via the event routing,
+      //  then streamFunctionCall also fires onError for the missing done event)
+      // We just verify it was called at least once with a meaningful message
+      expect(onError).toHaveBeenCalled()
     })
   })
 

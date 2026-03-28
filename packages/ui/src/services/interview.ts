@@ -7,6 +7,7 @@ import type {
   ExtractedEntry,
 } from '@odie/shared'
 import { InterviewStepResponseSchema } from '@odie/shared'
+import { streamFunctionCall } from './supabase-stream'
 
 export type { ExtractedEntry }
 
@@ -153,6 +154,63 @@ function getMockResponse(): InterviewResult {
     extractedBullets: response.extractedBullets,
     shouldContinue: response.shouldContinue,
   }
+}
+
+/**
+ * Stream a message in the interview and receive incremental AI response events.
+ *
+ * Uses SSE via the interview edge function (stream: true). Keeps
+ * sendInterviewMessage() unchanged for tests/mocks.
+ */
+export async function streamInterviewMessage(
+  messages: ChatMessage[],
+  config: InterviewServiceConfig,
+  callbacks: {
+    onTextDelta: (text: string) => void
+    onSentence: (sentence: string) => void
+    onDone: (data: InterviewResult) => void
+    onError: (error: Error) => void
+  }
+): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    callbacks.onError(new Error('Not authenticated'))
+    return
+  }
+
+  // Format messages the same way sendInterviewMessage does (raw array)
+  const formattedMessages = messages
+
+  await streamFunctionCall(
+    'interview',
+    { messages: formattedMessages, context: config.context, stream: true },
+    session,
+    {
+      onEvent: (event) => {
+        if (event.type === 'text_delta') {
+          callbacks.onTextDelta(event.text as string)
+        } else if (event.type === 'sentence') {
+          callbacks.onSentence(event.text as string)
+        } else if (event.type === 'done') {
+          const parsed = InterviewStepResponseSchema.safeParse(event.data)
+          if (!parsed.success) {
+            callbacks.onError(new Error('Invalid response format from interview service'))
+            return
+          }
+          callbacks.onDone({
+            response: parsed.data.response,
+            extractedPosition: parsed.data.extractedPosition ?? undefined,
+            extractedBullets: parsed.data.extractedBullets ?? undefined,
+            shouldContinue: parsed.data.shouldContinue,
+            extractedEntries: parsed.data.extractedEntries,
+          })
+        } else if (event.type === 'error') {
+          callbacks.onError(new Error((event.message as string) ?? 'Stream error'))
+        }
+      },
+      onError: callbacks.onError,
+    }
+  )
 }
 
 /**

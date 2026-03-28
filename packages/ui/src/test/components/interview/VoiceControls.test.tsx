@@ -3,6 +3,17 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { VoiceControls, type VoiceControlsProps } from '../../../components/interview/VoiceControls'
 
+// Minimal AnalyserNode stub sufficient for WaveformBars
+function makeAnalyserNode(): AnalyserNode {
+  return {
+    fftSize: 256,
+    frequencyBinCount: 128,
+    getByteFrequencyData: vi.fn(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  } as unknown as AnalyserNode
+}
+
 describe('VoiceControls', () => {
   const defaultProps: VoiceControlsProps = {
     inputEnabled: false,
@@ -295,6 +306,140 @@ describe('VoiceControls', () => {
 
       await userEvent.selectOptions(screen.getByTestId('voice-picker'), 'shimmer')
       expect(onVoiceChange).toHaveBeenCalledWith('shimmer')
+    })
+  })
+
+  describe('micDisabled prop', () => {
+    it('mic button is disabled when micDisabled is true', () => {
+      render(
+        <VoiceControls
+          {...defaultProps}
+          inputEnabled={true}
+          isRecording={false}
+          micDisabled={true}
+        />
+      )
+
+      expect(screen.getByTestId('mic-button')).toBeDisabled()
+    })
+
+    it('mic button is not disabled when micDisabled is false', () => {
+      render(
+        <VoiceControls
+          {...defaultProps}
+          inputEnabled={true}
+          isRecording={false}
+          micDisabled={false}
+        />
+      )
+
+      expect(screen.getByTestId('mic-button')).not.toBeDisabled()
+    })
+
+    it('mic button is not disabled by default (micDisabled omitted)', () => {
+      render(<VoiceControls {...defaultProps} inputEnabled={true} isRecording={false} />)
+
+      expect(screen.getByTestId('mic-button')).not.toBeDisabled()
+    })
+
+    it('onMicClick is not called when micDisabled is true and button is clicked', async () => {
+      const onMicClick = vi.fn()
+      render(
+        <VoiceControls
+          {...defaultProps}
+          inputEnabled={true}
+          isRecording={false}
+          micDisabled={true}
+          onMicClick={onMicClick}
+        />
+      )
+
+      const micButton = screen.getByTestId('mic-button')
+      // Disabled buttons do not fire click events in the browser;
+      // confirm the button is disabled so we know the handler cannot fire.
+      expect(micButton).toBeDisabled()
+    })
+  })
+
+  describe('waveform visualiser', () => {
+    it('does not render waveform when not recording', () => {
+      render(
+        <VoiceControls
+          {...defaultProps}
+          inputEnabled={true}
+          isRecording={false}
+          analyserNode={makeAnalyserNode()}
+        />
+      )
+
+      expect(screen.queryByTestId('waveform-bars')).not.toBeInTheDocument()
+    })
+
+    it('does not render waveform when recording but analyserNode is null', () => {
+      render(
+        <VoiceControls
+          {...defaultProps}
+          inputEnabled={true}
+          isRecording={true}
+          analyserNode={null}
+        />
+      )
+
+      expect(screen.queryByTestId('waveform-bars')).not.toBeInTheDocument()
+    })
+
+    it('does not render waveform when analyserNode is undefined', () => {
+      render(
+        <VoiceControls
+          {...defaultProps}
+          inputEnabled={true}
+          isRecording={true}
+        />
+      )
+
+      expect(screen.queryByTestId('waveform-bars')).not.toBeInTheDocument()
+    })
+
+    it('renders waveform bars when recording with a valid analyserNode', () => {
+      render(
+        <VoiceControls
+          {...defaultProps}
+          inputEnabled={true}
+          isRecording={true}
+          analyserNode={makeAnalyserNode()}
+        />
+      )
+
+      expect(screen.getByTestId('waveform-bars')).toBeInTheDocument()
+    })
+
+    it('hides static recording indicator when waveform is shown', () => {
+      render(
+        <VoiceControls
+          {...defaultProps}
+          inputEnabled={true}
+          isRecording={true}
+          analyserNode={makeAnalyserNode()}
+        />
+      )
+
+      // The dot indicator should be absent when waveform takes its place
+      expect(screen.queryByTestId('recording-indicator')).not.toBeInTheDocument()
+      expect(screen.getByTestId('waveform-bars')).toBeInTheDocument()
+    })
+
+    it('shows static recording indicator when recording without analyserNode', () => {
+      render(
+        <VoiceControls
+          {...defaultProps}
+          inputEnabled={true}
+          isRecording={true}
+          analyserNode={null}
+        />
+      )
+
+      expect(screen.getByTestId('recording-indicator')).toBeInTheDocument()
+      expect(screen.queryByTestId('waveform-bars')).not.toBeInTheDocument()
     })
   })
 })

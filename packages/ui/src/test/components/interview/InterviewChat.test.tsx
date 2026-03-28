@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { InterviewChat } from '../../../components/interview/InterviewChat'
 import { resetMockState } from '../../../services/interview'
+
+vi.stubEnv('VITE_SUPABASE_URL', 'http://localhost:54321')
 
 // Mock @odie/db so the live path can be tested for error states
 const mockGetSession = vi.fn()
@@ -13,6 +15,21 @@ vi.mock('@odie/db', () => ({
     functions: { invoke: (...args: unknown[]) => mockFunctionsInvoke(...args) },
   },
 }))
+
+/**
+ * Build a fake SSE ReadableStream for tests that exercise the live streaming path.
+ */
+function makeSseStream(events: object[]): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder()
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const event of events) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+      }
+      controller.close()
+    },
+  })
+}
 
 // Controllable mock for useVoiceInput so tests can set isTranscribing
 const mockStartRecording = vi.fn()
@@ -32,10 +49,16 @@ vi.mock('../../../hooks/useVoiceInput', () => ({
 describe('InterviewChat', () => {
   const mockOnComplete = vi.fn()
   const mockOnCancel = vi.fn()
+  let originalFetch: typeof fetch
 
   beforeEach(() => {
     vi.clearAllMocks()
     resetMockState()
+    originalFetch = global.fetch
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
   })
 
   it('should render with initial greeting message', () => {
@@ -596,7 +619,7 @@ describe('InterviewChat', () => {
       )
     })
 
-    it('deduplicates extractedEntries returned by sendInterviewMessage', async () => {
+    it('deduplicates extractedEntries returned by streamInterviewMessage', async () => {
       const educationEntry = {
         category: 'education' as const,
         title: 'B.S. CS',
@@ -606,38 +629,46 @@ describe('InterviewChat', () => {
         location: null,
       }
 
-      // First response returns an education entry
+      // First response returns an education entry; second returns the same entry (should dedup)
       mockGetSession.mockResolvedValue({
         data: { session: { access_token: 'test-token' } },
       })
-      mockFunctionsInvoke
-        .mockResolvedValueOnce({
-          data: {
-            response: 'Tell me more about your education.',
-            extractedPosition: null,
-            extractedBullets: null,
-            shouldContinue: true,
-            extractedEntries: [educationEntry],
-          },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: {
-            response: 'Great, anything else?',
-            extractedPosition: null,
-            extractedBullets: null,
-            shouldContinue: true,
-            // Same entry returned again - should be deduped
-            extractedEntries: [educationEntry],
-          },
-          error: null,
-        })
+
+      global.fetch = vi.fn()
+        .mockResolvedValueOnce(
+          new Response(
+            makeSseStream([
+              { type: 'done', data: {
+                response: 'Tell me more about your education.',
+                extractedPosition: null,
+                extractedBullets: null,
+                shouldContinue: true,
+                extractedEntries: [educationEntry],
+              }},
+            ]),
+            { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+          )
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            makeSseStream([
+              { type: 'done', data: {
+                response: 'Great, anything else?',
+                extractedPosition: null,
+                extractedBullets: null,
+                shouldContinue: true,
+                extractedEntries: [educationEntry],
+              }},
+            ]),
+            { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+          )
+        )
 
       render(
         <InterviewChat
           onComplete={mockOnComplete}
           onCancel={mockOnCancel}
-          // No useMock - uses live mode with mocked supabase
+          // No useMock - uses live streaming path
         />
       )
 

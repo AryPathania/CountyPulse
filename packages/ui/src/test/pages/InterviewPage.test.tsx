@@ -206,6 +206,8 @@ describe('InterviewPage', () => {
     mockLocalStorage.getItem.mockReturnValue(null)
     mockFinalizeDraftBullets.mockResolvedValue(undefined)
     mockEmbedBullets.mockResolvedValue(undefined)
+    mockCreatePosition.mockResolvedValue({ id: 'pos-created' })
+    mockCreateDraftBullet.mockResolvedValue({ id: 'draft-created' })
   })
 
   it('should render interview page', async () => {
@@ -911,6 +913,177 @@ describe('InterviewPage', () => {
         // Still only called once - dedup prevented the second call
         expect(mockCreateProfileEntry).toHaveBeenCalledTimes(1)
       })
+    })
+  })
+
+
+  describe('position and bullet persistence via handleStateChange', () => {
+    it('creates a new position and draft bullet when new data arrives', async () => {
+      renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnStateChange).not.toBeNull()
+      })
+
+      const messages: ChatMessage[] = [
+        { id: 'msg-1', role: 'assistant', content: 'Hello', timestamp: new Date().toISOString() },
+      ]
+      const extractedData: ExtractedInterviewData = {
+        positions: [
+          {
+            position: { company: 'Acme', title: 'Engineer', location: 'NYC', startDate: '2020-01', endDate: '2023-06' },
+            bullets: [
+              { text: 'Built pipelines', category: 'Backend', hardSkills: ['Python'], softSkills: [] },
+            ],
+          },
+        ],
+      }
+
+      await act(async () => {
+        capturedOnStateChange!(messages, extractedData)
+      })
+
+      await waitFor(() => {
+        expect(mockCreatePosition).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user_id: 'test-user-id',
+            company: 'Acme',
+            title: 'Engineer',
+            location: 'NYC',
+            start_date: '2020-01-01',
+            end_date: '2023-06-01',
+          })
+        )
+      })
+
+      await waitFor(() => {
+        expect(mockCreateDraftBullet).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user_id: 'test-user-id',
+            position_id: 'pos-created',
+            original_text: 'Built pipelines',
+            current_text: 'Built pipelines',
+            category: 'Backend',
+          })
+        )
+      })
+    })
+
+    it('reuses an existing position ID and skips duplicate bullets', async () => {
+      renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnStateChange).not.toBeNull()
+      })
+
+      const messages: ChatMessage[] = [
+        { id: 'msg-1', role: 'assistant', content: 'Hello', timestamp: new Date().toISOString() },
+      ]
+      const extractedData: ExtractedInterviewData = {
+        positions: [
+          {
+            position: { company: 'Corp', title: 'Dev' },
+            bullets: [{ text: 'Shipped code', category: 'Backend' }],
+          },
+        ],
+      }
+
+      // First call creates position and bullet
+      await act(async () => {
+        capturedOnStateChange!(messages, extractedData)
+      })
+
+      await waitFor(() => {
+        expect(mockCreatePosition).toHaveBeenCalledTimes(1)
+        expect(mockCreateDraftBullet).toHaveBeenCalledTimes(1)
+      })
+
+      // Second call with same data - position already in map, bullet already keyed
+      await act(async () => {
+        capturedOnStateChange!(messages, extractedData)
+      })
+
+      // Still only once each (deduplication)
+      await waitFor(() => {
+        expect(mockCreatePosition).toHaveBeenCalledTimes(1)
+        expect(mockCreateDraftBullet).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    it('handles createPosition error gracefully and skips bullet creation', async () => {
+      mockCreatePosition.mockRejectedValue(new Error('DB error creating position'))
+
+      renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnStateChange).not.toBeNull()
+      })
+
+      const messages: ChatMessage[] = [
+        { id: 'msg-1', role: 'assistant', content: 'Hello', timestamp: new Date().toISOString() },
+      ]
+
+      await act(async () => {
+        capturedOnStateChange!(messages, {
+          positions: [
+            {
+              position: { company: 'BadCorp', title: 'Dev' },
+              bullets: [{ text: 'Some work', category: 'Backend' }],
+            },
+          ],
+        })
+      })
+
+      await waitFor(() => {
+        expect(mockCreatePosition).toHaveBeenCalledTimes(1)
+      })
+      // bullet creation skipped because position failed
+      expect(mockCreateDraftBullet).not.toHaveBeenCalled()
+    })
+
+    it('handles createProfileEntry error gracefully and continues without crashing', async () => {
+      mockCreateProfileEntry.mockRejectedValue(new Error('DB error creating entry'))
+
+      renderInterviewPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
+      })
+
+      await waitFor(() => {
+        expect(capturedOnStateChange).not.toBeNull()
+      })
+
+      const messages: ChatMessage[] = [
+        { id: 'msg-1', role: 'assistant', content: 'Hello', timestamp: new Date().toISOString() },
+      ]
+
+      await act(async () => {
+        capturedOnStateChange!(messages, {
+          positions: [],
+          entries: [
+            { category: 'education', title: 'B.S.', subtitle: null, startDate: null, endDate: null, location: null },
+          ],
+        })
+      })
+
+      await waitFor(() => {
+        expect(mockCreateProfileEntry).toHaveBeenCalledTimes(1)
+      })
+      // Page should still be rendered (no crash)
+      expect(screen.getByTestId('mock-interview-chat')).toBeInTheDocument()
     })
   })
 })

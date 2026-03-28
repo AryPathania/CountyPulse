@@ -183,3 +183,21 @@
 }
 
 /* .sr-only is defined in styles/theme.css */
+
+/* Waveform visualiser */
+.waveform-bars {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 32px;
+  padding: 0 var(--space-sm, 0.5rem);
+}
+
+.waveform-bar {
+  display: inline-block;
+  width: 3px;
+  height: 4px;
+  background: var(--color-accent, #4169e1);
+  border-radius: 2px;
+  transition: height 60ms ease;
+}

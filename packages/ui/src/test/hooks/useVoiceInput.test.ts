@@ -61,12 +61,41 @@ class MockMediaStream {
   }
 }
 
+// Mock AnalyserNode
+class MockAnalyserNode {
+  fftSize = 256
+  frequencyBinCount = 128
+
+  getByteFrequencyData(_array: Uint8Array) {
+    // no-op in tests
+  }
+
+  connect(_dest: unknown) {
+    return this
+  }
+}
+
+// Mock AudioContext
+class MockAudioContext {
+  close = vi.fn().mockResolvedValue(undefined)
+
+  createMediaStreamSource(_stream: MediaStream) {
+    return { connect: vi.fn() }
+  }
+
+  createAnalyser() {
+    return new MockAnalyserNode()
+  }
+}
+
 describe('useVoiceInput', () => {
   const mockOnTranscript = vi.fn()
   const mockOnError = vi.fn()
   let mockGetUserMedia: ReturnType<typeof vi.fn>
   let originalMediaRecorder: typeof MediaRecorder
   let originalFetch: typeof fetch
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let originalAudioContext: any
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -74,6 +103,8 @@ describe('useVoiceInput', () => {
     // Save originals
     originalMediaRecorder = window.MediaRecorder
     originalFetch = global.fetch
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    originalAudioContext = (window as any).AudioContext
 
     // Mock authenticated session
     mockGetSession.mockResolvedValue({
@@ -83,6 +114,10 @@ describe('useVoiceInput', () => {
     // Mock MediaRecorder
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).MediaRecorder = MockMediaRecorder
+
+    // Mock AudioContext
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).AudioContext = MockAudioContext
 
     // Mock navigator.mediaDevices.getUserMedia
     mockGetUserMedia = vi.fn()
@@ -102,6 +137,8 @@ describe('useVoiceInput', () => {
     // Restore originals
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any).MediaRecorder = originalMediaRecorder
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).AudioContext = originalAudioContext
     global.fetch = originalFetch
   })
 
@@ -116,6 +153,48 @@ describe('useVoiceInput', () => {
     expect(result.current.isRecording).toBe(false)
     expect(result.current.isTranscribing).toBe(false)
     expect(result.current.error).toBeNull()
+    expect(result.current.analyserNode).toBeNull()
+  })
+
+  it('exposes a non-null analyserNode while recording', async () => {
+    mockGetUserMedia.mockResolvedValue(new MockMediaStream())
+
+    const { result } = renderHook(() =>
+      useVoiceInput({
+        onTranscript: mockOnTranscript,
+        onError: mockOnError,
+      })
+    )
+
+    await act(async () => {
+      await result.current.startRecording()
+    })
+
+    expect(result.current.isRecording).toBe(true)
+    expect(result.current.analyserNode).not.toBeNull()
+  })
+
+  it('sets analyserNode to null after stopping recording', async () => {
+    mockGetUserMedia.mockResolvedValue(new MockMediaStream())
+
+    const { result } = renderHook(() =>
+      useVoiceInput({
+        onTranscript: mockOnTranscript,
+        onError: mockOnError,
+      })
+    )
+
+    await act(async () => {
+      await result.current.startRecording()
+    })
+
+    expect(result.current.analyserNode).not.toBeNull()
+
+    await act(async () => {
+      result.current.stopRecording()
+    })
+
+    expect(result.current.analyserNode).toBeNull()
   })
 
   it('starts recording when permission is granted', async () => {
@@ -407,5 +486,89 @@ describe('useVoiceInput', () => {
     })
 
     expect(result.current.error?.message).toBe('Failed to start recording')
+  })
+
+  it('handles no session (unauthenticated) by setting error after stop', async () => {
+    mockGetSession.mockResolvedValue({ data: { session: null } })
+    mockGetUserMedia.mockResolvedValue(new MockMediaStream())
+
+    const { result } = renderHook(() =>
+      useVoiceInput({
+        onTranscript: mockOnTranscript,
+        onError: mockOnError,
+      })
+    )
+
+    await act(async () => {
+      await result.current.startRecording()
+    })
+
+    await act(async () => {
+      result.current.stopRecording()
+    })
+
+    await waitFor(() => {
+      expect(result.current.error).not.toBeNull()
+    })
+
+    expect(result.current.error?.message).toBe('Not authenticated')
+    expect(mockOnTranscript).not.toHaveBeenCalled()
+  })
+
+  it('fires error handler when MediaRecorder emits onerror', async () => {
+    mockGetUserMedia.mockResolvedValue(new MockMediaStream())
+
+    const { result } = renderHook(() =>
+      useVoiceInput({
+        onTranscript: mockOnTranscript,
+        onError: mockOnError,
+      })
+    )
+
+    await act(async () => {
+      await result.current.startRecording()
+    })
+
+    expect(result.current.isRecording).toBe(true)
+
+    // Trigger the onerror callback on the MediaRecorder instance
+    const recorder = (window as unknown as { MediaRecorder: typeof MockMediaRecorder }).MediaRecorder
+    // The mock class stores the current instance implicitly; we simulate an error by calling onerror
+    // Access via the ref indirectly: fire onerror by calling stopRecording first to get a handle
+    // Simpler: store a reference via a mock class override
+    // Instead, let's test the effect: onerror -> handleError -> stopRecording -> isRecording false
+    // We verify by triggering via the current MediaRecorder reference.
+    // The MockMediaRecorder.onerror property is set in startRecording.
+    // We need to call it — use a patched version.
+    void recorder // silence lint
+
+    // Re-render with a MediaRecorder class that immediately fires onerror
+    class ErrorMediaRecorder extends MockMediaRecorder {
+      start() {
+        super.start()
+        setTimeout(() => {
+          if (this.onerror) this.onerror()
+        }, 0)
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).MediaRecorder = ErrorMediaRecorder
+
+    const { result: result2 } = renderHook(() =>
+      useVoiceInput({
+        onTranscript: mockOnTranscript,
+        onError: mockOnError,
+      })
+    )
+
+    await act(async () => {
+      await result2.current.startRecording()
+    })
+
+    await waitFor(() => {
+      expect(mockOnError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Recording error occurred' })
+      )
+    })
   })
 })

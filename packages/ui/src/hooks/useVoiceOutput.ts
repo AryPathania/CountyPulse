@@ -11,11 +11,49 @@ export interface UseVoiceOutputOptions {
 export interface UseVoiceOutputReturn {
   isSpeaking: boolean
   speak: (text: string) => Promise<void>
+  speakSentence: (text: string) => void
   stop: () => void
   error: Error | null
 }
 
+interface SentenceQueueItem {
+  text: string
+  controller: AbortController
+}
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+
+/**
+ * Fetch a TTS audio blob from the speak edge function.
+ * Shared by both `speak()` and `drainQueue()` to avoid duplication.
+ */
+async function fetchSpeechAudio(
+  text: string,
+  voice: string,
+  signal: AbortSignal
+): Promise<Blob> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    throw new Error('Not authenticated')
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/speak`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ text, voice }),
+    signal,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Speech synthesis failed: ${errorText}`)
+  }
+
+  return response.blob()
+}
 
 /**
  * Hook for voice output using the speak API.
@@ -33,6 +71,10 @@ export function useVoiceOutput({
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
+  // Sentence queue state (refs to avoid stale closures in callbacks)
+  const sentenceQueueRef = useRef<SentenceQueueItem[]>([])
+  const isPlayingRef = useRef(false)
+
   const handleError = useCallback(
     (err: Error) => {
       setError(err)
@@ -42,6 +84,13 @@ export function useVoiceOutput({
   )
 
   const stop = useCallback(() => {
+    // Abort all queued sentence controllers (including items not yet fetching)
+    for (const item of sentenceQueueRef.current) {
+      item.controller.abort()
+    }
+    sentenceQueueRef.current = []
+    isPlayingRef.current = false
+
     // Abort any pending fetch
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -79,29 +128,7 @@ export function useVoiceOutput({
         setIsSpeaking(true)
         onStart?.()
 
-        // Get auth token
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) {
-          throw new Error('Not authenticated')
-        }
-
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/speak`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ text, voice }),
-          signal: abortControllerRef.current.signal,
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          throw new Error(`Speech synthesis failed: ${errorText}`)
-        }
-
-        // Get audio data as blob
-        const audioBlob = await response.blob()
+        const audioBlob = await fetchSpeechAudio(text, voice, abortControllerRef.current.signal)
         const audioUrl = URL.createObjectURL(audioBlob)
 
         // Create and play audio
@@ -135,9 +162,64 @@ export function useVoiceOutput({
     [voice, onStart, onEnd, handleError, stop]
   )
 
+  const drainQueue = useCallback(async () => {
+    const item = sentenceQueueRef.current.shift()
+    if (!item) {
+      isPlayingRef.current = false
+      setIsSpeaking(false)
+      return
+    }
+
+    isPlayingRef.current = true
+    setIsSpeaking(true)
+
+    try {
+      const audioBlob = await fetchSpeechAudio(item.text, voice, item.controller.signal)
+      const audioUrl = URL.createObjectURL(audioBlob)
+      const audio = new Audio(audioUrl)
+      audioRef.current = audio
+
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl)
+        audioRef.current = null
+        drainQueue()
+      }
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl)
+        audioRef.current = null
+        handleError(new Error('Audio playback failed'))
+        drainQueue()
+      }
+
+      await audio.play()
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // Sentence was aborted (stop() called); continue draining remaining queue
+        drainQueue()
+        return
+      }
+      handleError(err instanceof Error ? err : new Error('Speech synthesis failed'))
+      // Don't block the queue on a single failure
+      drainQueue()
+    }
+  }, [voice, handleError])
+
+  const speakSentence = useCallback((text: string) => {
+    if (!text.trim()) {
+      return
+    }
+    const controller = new AbortController()
+    sentenceQueueRef.current.push({ text, controller })
+    if (!isPlayingRef.current) {
+      drainQueue()
+    }
+  }, [drainQueue])
+
   return {
     isSpeaking,
     speak,
+    speakSentence,
     stop,
     error,
   }

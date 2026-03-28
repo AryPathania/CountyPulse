@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import './VoiceControls.css'
 
 export interface VoiceControlsProps {
@@ -5,6 +6,8 @@ export interface VoiceControlsProps {
   outputEnabled: boolean
   voice: string
   isRecording: boolean
+  micDisabled?: boolean
+  analyserNode?: AnalyserNode | null
   onInputToggle: () => void
   onOutputToggle: () => void
   onVoiceChange: (voice: string) => void
@@ -20,20 +23,87 @@ const AVAILABLE_VOICES = [
   { id: 'shimmer', label: 'Shimmer' },
 ]
 
+/** Number of bars in the waveform display. */
+const WAVEFORM_BAR_COUNT = 6
+
+/**
+ * Picks `count` evenly-spaced indices from a frequency data array
+ * and returns a normalized 0–1 amplitude value for each bar.
+ */
+function sampleFrequencyBins(data: Uint8Array, count: number): number[] {
+  const bins: number[] = []
+  for (let i = 0; i < count; i++) {
+    const index = Math.floor((i / count) * data.length)
+    bins.push(data[index] / 255)
+  }
+  return bins
+}
+
+function WaveformBars({ analyserNode }: { analyserNode: AnalyserNode }) {
+  const barsRef = useRef<(HTMLSpanElement | null)[]>([])
+  const rafRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const dataArray = new Uint8Array(analyserNode.frequencyBinCount)
+
+    const animate = () => {
+      analyserNode.getByteFrequencyData(dataArray)
+      const samples = sampleFrequencyBins(dataArray, WAVEFORM_BAR_COUNT)
+      samples.forEach((value, idx) => {
+        const el = barsRef.current[idx]
+        if (el) {
+          // Map 0–1 to 4px–28px height
+          el.style.height = `${4 + value * 24}px`
+        }
+      })
+      rafRef.current = requestAnimationFrame(animate)
+    }
+
+    rafRef.current = requestAnimationFrame(animate)
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+  }, [analyserNode])
+
+  return (
+    <span className="waveform-bars" data-testid="waveform-bars" aria-hidden="true">
+      {Array.from({ length: WAVEFORM_BAR_COUNT }, (_, i) => (
+        <span
+          key={i}
+          className="waveform-bar"
+          ref={(el) => {
+            barsRef.current[i] = el
+          }}
+        />
+      ))}
+    </span>
+  )
+}
+
 /**
  * UI component for voice controls in the interview chat.
  * Provides toggles for voice input/output, voice selection, and microphone button.
+ * When `analyserNode` is supplied and `isRecording` is true, renders an animated
+ * waveform visualiser in place of the static recording indicator text.
  */
 export function VoiceControls({
   inputEnabled,
   outputEnabled,
   voice,
   isRecording,
+  micDisabled = false,
+  analyserNode,
   onInputToggle,
   onOutputToggle,
   onVoiceChange,
   onMicClick,
 }: VoiceControlsProps) {
+  const showWaveform = isRecording && analyserNode != null
+
   return (
     <div className="voice-controls" data-testid="voice-controls">
       <div className="voice-toggles">
@@ -92,6 +162,7 @@ export function VoiceControls({
           type="button"
           className={`mic-button ${isRecording ? 'recording' : ''}`}
           onClick={onMicClick}
+          disabled={micDisabled}
           data-testid="mic-button"
           aria-label={isRecording ? 'Stop recording' : 'Start recording'}
         >
@@ -99,11 +170,13 @@ export function VoiceControls({
             <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
           </svg>
-          {isRecording && (
+          {isRecording && !showWaveform && (
             <span className="recording-indicator" data-testid="recording-indicator" />
           )}
         </button>
       )}
+
+      {showWaveform && <WaveformBars analyserNode={analyserNode} />}
     </div>
   )
 }

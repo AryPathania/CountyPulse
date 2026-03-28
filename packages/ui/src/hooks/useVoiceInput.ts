@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { supabase } from '@odie/db'
 
 export interface UseVoiceInputOptions {
@@ -12,6 +12,7 @@ export interface UseVoiceInputReturn {
   startRecording: () => Promise<void>
   stopRecording: () => void
   error: Error | null
+  analyserNode: AnalyserNode | null
 }
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
@@ -27,10 +28,12 @@ export function useVoiceInput({
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [error, setError] = useState<Error | null>(null)
+  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
 
   const handleError = useCallback(
     (err: Error) => {
@@ -40,6 +43,14 @@ export function useVoiceInput({
     [onError]
   )
 
+  const tearDownAudioContext = useCallback(() => {
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => undefined)
+      audioContextRef.current = null
+    }
+    setAnalyserNode(null)
+  }, [])
+
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
@@ -48,8 +59,16 @@ export function useVoiceInput({
       streamRef.current.getTracks().forEach((track) => track.stop())
       streamRef.current = null
     }
+    tearDownAudioContext()
     setIsRecording(false)
-  }, [])
+  }, [tearDownAudioContext])
+
+  // Clean up AudioContext on unmount to avoid leaks
+  useEffect(() => {
+    return () => {
+      tearDownAudioContext()
+    }
+  }, [tearDownAudioContext])
 
   const startRecording = useCallback(async () => {
     setError(null)
@@ -59,6 +78,19 @@ export function useVoiceInput({
       // Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
+
+      // Set up AudioContext and AnalyserNode for waveform visualisation
+      try {
+        const audioContext = new AudioContext()
+        audioContextRef.current = audioContext
+        const source = audioContext.createMediaStreamSource(stream)
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 256
+        source.connect(analyser)
+        setAnalyserNode(analyser)
+      } catch {
+        // Non-critical: waveform will be absent but recording still works
+      }
 
       // Create MediaRecorder with webm format (widely supported)
       const mimeType = MediaRecorder.isTypeSupported('audio/webm')
@@ -155,5 +187,6 @@ export function useVoiceInput({
     startRecording,
     stopRecording,
     error,
+    analyserNode,
   }
 }

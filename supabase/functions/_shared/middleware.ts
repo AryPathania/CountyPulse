@@ -11,6 +11,7 @@ export interface HandlerContext {
   user: { id: string; [key: string]: unknown }
   supabase: ReturnType<typeof createClient>
   openaiKey: string
+  waitUntil?: (p: Promise<unknown>) => void
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {
@@ -81,6 +82,88 @@ export async function callChatCompletion(options: ChatCompletionOptions): Promis
   }
 
   return { parsed, usage: data.usage ?? null, latencyMs }
+}
+
+export interface StreamChatCompletionOptions {
+  openaiKey: string
+  messages: Array<{ role: string; content: string }>
+  responseFormat: { type: 'json_schema'; json_schema: { strict: boolean; schema: Record<string, unknown> } }
+  temperature?: number
+  maxTokens?: number
+}
+
+/**
+ * Calls OpenAI chat completions with stream: true and the given structured output
+ * response format. Returns a ReadableStream<string> that yields raw delta text
+ * strings (choices[0].delta.content) as they arrive from the OpenAI SSE stream.
+ */
+export async function streamChatCompletion(options: StreamChatCompletionOptions): Promise<ReadableStream<string>> {
+  const { openaiKey, messages, responseFormat, temperature = 0.3, maxTokens = 4000 } = options
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+      stream: true,
+      response_format: responseFormat,
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`OpenAI API error: ${response.status} ${errorText}`)
+  }
+
+  if (!response.body) {
+    throw new Error('OpenAI response has no body')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+
+  return new ReadableStream<string>({
+    async pull(controller) {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          controller.close()
+          return
+        }
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data: ')) continue
+          const payload = trimmed.slice(6)
+          if (payload === '[DONE]') {
+            controller.close()
+            return
+          }
+          try {
+            const parsed = JSON.parse(payload)
+            const delta = parsed.choices?.[0]?.delta?.content ?? ''
+            if (delta) {
+              controller.enqueue(delta)
+            }
+          } catch {
+            // Ignore malformed SSE lines
+          }
+        }
+      }
+    },
+    cancel() {
+      reader.cancel()
+    },
+  })
 }
 
 export interface ReasoningModelOptions {
@@ -201,10 +284,19 @@ export function withMiddleware(
         return errorResponse('OpenAI API key not configured', 500)
       }
 
+      // Attach waitUntil if the Deno EdgeRuntime exposes it on the request.
+      // Falls back to undefined in local dev where it may not be available.
+      // deno-lint-ignore no-explicit-any
+      const waitUntil = typeof (req as any).waitUntil === 'function'
+        // deno-lint-ignore no-explicit-any
+        ? (req as any).waitUntil.bind(req)
+        : undefined
+
       const ctx: HandlerContext = {
         user: user as HandlerContext['user'],
         supabase,
         openaiKey,
+        waitUntil,
       }
 
       return await handler(req, ctx)

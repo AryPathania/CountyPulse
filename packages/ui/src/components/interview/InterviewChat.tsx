@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import type { ChatMessage, ExtractedInterviewData } from '@odie/shared'
 import {
   sendInterviewMessage,
+  streamInterviewMessage,
   getInitialMessage,
   resetMockState,
   type InterviewServiceConfig,
+  type InterviewResult,
 } from '../../services/interview'
 import { useVoiceInput } from '../../hooks/useVoiceInput'
 import { useVoiceOutput } from '../../hooks/useVoiceOutput'
@@ -53,6 +56,7 @@ export function InterviewChat({
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages ?? [])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isComplete, setIsComplete] = useState(false)
   const [extractedData, setExtractedData] = useState<ExtractedInterviewData>(
@@ -62,30 +66,61 @@ export function InterviewChat({
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Mirrors `messages` state so submitMessage always reads the latest snapshot
+  // without needing `messages` as a useCallback dependency.
+  const messagesRef = useRef<ChatMessage[]>(initialMessages ?? [])
+  // Stores a transcript that arrived while TTS was playing; submitted when TTS ends.
+  const pendingTranscriptRef = useRef<string | null>(null)
+  // Stable ref to submitMessage so TTS onEnd callback can invoke it without stale closure.
+  const submitMessageRef = useRef<((text: string) => Promise<void>) | null>(null)
 
   // Voice settings and hooks
   const { settings: voiceSettings, setInputEnabled, setOutputEnabled, setVoice } = useVoiceSettings()
 
-  const handleTranscript = useCallback((text: string) => {
-    setInput((prev) => (prev ? `${prev} ${text}` : text))
-    inputRef.current?.focus({ preventScroll: true })
+  const handleTtsEnd = useCallback(() => {
+    const pending = pendingTranscriptRef.current
+    if (pending !== null) {
+      pendingTranscriptRef.current = null
+      submitMessageRef.current?.(pending)
+    }
   }, [])
 
-  const { isRecording, isTranscribing, startRecording, stopRecording } = useVoiceInput({
+  const { isSpeaking, speak, speakSentence, stop: stopSpeaking } = useVoiceOutput({
+    voice: voiceSettings.voice,
+    onEnd: handleTtsEnd,
+  })
+
+  const handleTranscript = useCallback(
+    (text: string) => {
+      if (voiceSettings.inputEnabled) {
+        // Auto-submit voice transcript. Defer if TTS is currently playing to prevent echo loop.
+        if (isSpeaking) {
+          pendingTranscriptRef.current = text
+        } else {
+          submitMessageRef.current?.(text)
+        }
+      } else {
+        // Text-mode fallback: populate input field
+        setInput((prev) => (prev ? `${prev} ${text}` : text))
+        inputRef.current?.focus({ preventScroll: true })
+      }
+    },
+    [voiceSettings.inputEnabled, isSpeaking]
+  )
+
+  const { isRecording, isTranscribing, startRecording, stopRecording, analyserNode } = useVoiceInput({
     onTranscript: handleTranscript,
   })
 
-  const { isSpeaking, speak, stop: stopSpeaking } = useVoiceOutput({
-    voice: voiceSettings.voice,
-  })
-
   const handleMicClick = useCallback(() => {
+    // Never start recording while TTS is playing — prevents echo loop
+    if (isSpeaking) return
     if (isRecording) {
       stopRecording()
     } else {
       startRecording()
     }
-  }, [isRecording, startRecording, stopRecording])
+  }, [isSpeaking, isRecording, startRecording, stopRecording])
 
   const handleSpeak = useCallback((text: string) => {
     if (isSpeaking) {
@@ -104,6 +139,162 @@ export function InterviewChat({
     }
     setMessages((prev) => [...prev, msg])
   }, [])
+
+  // Echo loop prevention: stop active recording when TTS starts playing.
+  // This prevents TTS audio from being captured by the mic and re-submitted.
+  useEffect(() => {
+    if (isSpeaking && isRecording) {
+      stopRecording()
+    }
+  }, [isSpeaking, isRecording, stopRecording])
+
+  // Keep messagesRef in sync so submitMessage always reads the current snapshot.
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  /**
+   * Apply extracted data from an interview result into component state.
+   * Pure state-update logic extracted so both the streaming and mock paths share it.
+   */
+  const applyExtractedData = useCallback((result: Pick<InterviewResult, 'extractedPosition' | 'extractedBullets' | 'extractedEntries'>) => {
+    if (result.extractedPosition) {
+      setExtractedData((prev) => {
+        const existingIndex = prev.positions.findIndex(
+          (p) =>
+            p.position.company === result.extractedPosition?.company &&
+            p.position.title === result.extractedPosition?.title
+        )
+        if (existingIndex >= 0) {
+          const updated = [...prev.positions]
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            position: { ...updated[existingIndex].position, ...result.extractedPosition },
+          }
+          return { ...prev, positions: updated }
+        }
+        return {
+          ...prev,
+          positions: [
+            ...prev.positions,
+            { position: result.extractedPosition!, bullets: [] },
+          ],
+        }
+      })
+    }
+
+    if (result.extractedBullets && result.extractedBullets.length > 0) {
+      setExtractedData((prev) => {
+        if (prev.positions.length === 0) return prev
+        const updated = [...prev.positions]
+        const lastIndex = updated.length - 1
+        const existingTexts = new Set(updated[lastIndex].bullets.map((b) => b.text))
+        const newBullets = result.extractedBullets!.filter((b) => !existingTexts.has(b.text))
+        if (newBullets.length === 0) return prev
+        updated[lastIndex] = {
+          ...updated[lastIndex],
+          bullets: [...updated[lastIndex].bullets, ...newBullets],
+        }
+        return { ...prev, positions: updated }
+      })
+    }
+
+    if (result.extractedEntries && result.extractedEntries.length > 0) {
+      setExtractedData((prev) => mergeExtractedEntries(prev, result.extractedEntries!))
+    }
+  }, [])
+
+  /**
+   * Core send logic. Used by both the form submit path (typed text) and the
+   * voice auto-submit path (transcript text). Reads current messages from
+   * messagesRef to avoid stale closure issues.
+   *
+   * Uses streamInterviewMessage for the live path (progressive text in bubble +
+   * sentence-level TTS). Falls back to sendInterviewMessage in mock mode so
+   * all existing tests continue to pass unchanged.
+   */
+  const submitMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isLoading) return
+
+      const userMessage: ChatMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: text.trim(),
+        timestamp: new Date().toISOString(),
+      }
+
+      const updatedMessages = [...messagesRef.current, userMessage]
+      setMessages(updatedMessages)
+      setIsLoading(true)
+      setStreamingText('')
+      setError(null)
+
+      // Mock path: use synchronous sendInterviewMessage so tests are unaffected
+      if (config?.useMock) {
+        let responseTextForTts: string | null = null
+        try {
+          const result = await sendInterviewMessage(updatedMessages, config)
+          appendAssistantMessage(result.response)
+          responseTextForTts = result.response
+          applyExtractedData(result)
+          if (!result.shouldContinue) {
+            setIsComplete(true)
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to send message')
+        } finally {
+          setIsLoading(false)
+          if (voiceSettings.outputEnabled && responseTextForTts !== null) {
+            speak(responseTextForTts)
+          }
+        }
+        return
+      }
+
+      // Live streaming path
+      await streamInterviewMessage(updatedMessages, config ?? {}, {
+        onTextDelta: (delta) => {
+          setStreamingText((prev) => prev + delta)
+        },
+        onSentence: (sentence) => {
+          if (voiceSettings.outputEnabled) {
+            speakSentence?.(sentence)
+          }
+        },
+        onDone: (result) => {
+          const assistantMessage: ChatMessage = {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: result.response,
+            timestamp: new Date().toISOString(),
+          }
+          // Atomic transition: commit permanent message and clear streaming text
+          // in one synchronous render so no frame shows both bubbles at once.
+          flushSync(() => {
+            setMessages((prev) => [...prev, assistantMessage])
+            setStreamingText('')
+          })
+          applyExtractedData(result)
+          setIsLoading(false)
+          if (!result.shouldContinue) {
+            setIsComplete(true)
+          }
+        },
+        onError: (err) => {
+          setIsLoading(false)
+          setStreamingText('')
+          setError(err.message)
+        },
+      })
+    },
+    [isLoading, config, appendAssistantMessage, applyExtractedData, voiceSettings.outputEnabled, speak, speakSentence]
+  )
+
+  // Keep submitMessageRef current so TTS onEnd can invoke it without a stale closure.
+  useEffect(() => {
+    submitMessageRef.current = submitMessage
+  }, [submitMessage])
 
   // Initialize chat with greeting (only if no initial messages provided)
   useEffect(() => {
@@ -179,13 +370,13 @@ export function InterviewChat({
     }
   }, [messages, extractedData, onStateChange])
 
-  // Scroll to bottom when messages change (within container only, not page)
+  // Scroll to bottom when messages or streaming text change (within container only, not page)
   useEffect(() => {
     const container = messagesContainerRef.current
     if (container) {
       container.scrollTop = container.scrollHeight
     }
-  }, [messages])
+  }, [messages, streamingText])
 
   // Focus input when not loading
   useEffect(() => {
@@ -196,91 +387,10 @@ export function InterviewChat({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isLoading) return
-
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date().toISOString(),
-    }
-
-    const updatedMessages = [...messages, userMessage]
-    setMessages(updatedMessages)
+    if (!input.trim() || isLoading || isTranscribing) return
+    const text = input.trim()
     setInput('')
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const result = await sendInterviewMessage(updatedMessages, config)
-
-      appendAssistantMessage(result.response)
-
-      // Auto-play AI response if voice output is enabled
-      if (voiceSettings.outputEnabled) {
-        speak(result.response)
-      }
-
-      // Handle extracted data
-      if (result.extractedPosition) {
-        setExtractedData((prev) => {
-          const existingIndex = prev.positions.findIndex(
-            (p) =>
-              p.position.company === result.extractedPosition?.company &&
-              p.position.title === result.extractedPosition?.title
-          )
-
-          if (existingIndex >= 0) {
-            // Update existing position
-            const updated = [...prev.positions]
-            updated[existingIndex] = {
-              ...updated[existingIndex],
-              position: { ...updated[existingIndex].position, ...result.extractedPosition },
-            }
-            return { ...prev, positions: updated }
-          } else {
-            // Add new position
-            return {
-              ...prev,
-              positions: [
-                ...prev.positions,
-                { position: result.extractedPosition!, bullets: [] },
-              ],
-            }
-          }
-        })
-      }
-
-      if (result.extractedBullets && result.extractedBullets.length > 0) {
-        setExtractedData((prev) => {
-          if (prev.positions.length === 0) return prev
-          const updated = [...prev.positions]
-          const lastIndex = updated.length - 1
-          // Deduplicate: only add bullets whose text doesn't already exist
-          const existingTexts = new Set(updated[lastIndex].bullets.map((b) => b.text))
-          const newBullets = result.extractedBullets!.filter((b) => !existingTexts.has(b.text))
-          if (newBullets.length === 0) return prev
-          updated[lastIndex] = {
-            ...updated[lastIndex],
-            bullets: [...updated[lastIndex].bullets, ...newBullets],
-          }
-          return { ...prev, positions: updated }
-        })
-      }
-
-      // Handle extracted entries (education, certifications, etc.)
-      if (result.extractedEntries && result.extractedEntries.length > 0) {
-        setExtractedData((prev) => mergeExtractedEntries(prev, result.extractedEntries!))
-      }
-
-      if (!result.shouldContinue) {
-        setIsComplete(true)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message')
-    } finally {
-      setIsLoading(false)
-    }
+    await submitMessage(text)
   }
 
   const handleEndInterview = () => {
@@ -327,6 +437,8 @@ export function InterviewChat({
         outputEnabled={voiceSettings.outputEnabled}
         voice={voiceSettings.voice}
         isRecording={isRecording}
+        micDisabled={isSpeaking}
+        analyserNode={analyserNode}
         onInputToggle={() => setInputEnabled(!voiceSettings.inputEnabled)}
         onOutputToggle={() => setOutputEnabled(!voiceSettings.outputEnabled)}
         onVoiceChange={setVoice}
@@ -368,7 +480,16 @@ export function InterviewChat({
             </div>
           </div>
         ))}
-        {isLoading && (
+        {streamingText.length > 0 && (
+          <div className="message message-assistant" data-testid="message-streaming">
+            <div className="message-avatar">🤖</div>
+            <div className="message-content">
+              {streamingText}
+              <span className="streaming-cursor" aria-hidden="true" />
+            </div>
+          </div>
+        )}
+        {isLoading && streamingText.length === 0 && (
           <div className="message message-assistant" data-testid="message-loading">
             <div className="message-avatar">🤖</div>
             <div className="message-content typing-indicator">

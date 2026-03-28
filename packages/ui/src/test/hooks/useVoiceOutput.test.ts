@@ -488,4 +488,273 @@ describe('useVoiceOutput', () => {
       })
     )
   })
+
+  describe('speakSentence / sentence queue', () => {
+    it('exposes speakSentence on the return value', () => {
+      const { result } = renderHook(() => useVoiceOutput())
+      expect(typeof result.current.speakSentence).toBe('function')
+    })
+
+    it('does not call fetch for empty or whitespace-only text', async () => {
+      const { result } = renderHook(() => useVoiceOutput())
+
+      act(() => {
+        result.current.speakSentence('')
+        result.current.speakSentence('   ')
+      })
+
+      // allow microtasks to settle
+      await act(async () => {})
+
+      expect(global.fetch).not.toHaveBeenCalled()
+      expect(result.current.isSpeaking).toBe(false)
+    })
+
+    it('fetches and plays the first sentence immediately', async () => {
+      const audioBlob = new Blob(['mock audio'], { type: 'audio/mpeg' })
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        blob: async () => audioBlob,
+      } as Response)
+
+      const { result } = renderHook(() =>
+        useVoiceOutput({ onStart: mockOnStart, onEnd: mockOnEnd, onError: mockOnError })
+      )
+
+      act(() => {
+        result.current.speakSentence('First sentence.')
+      })
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledTimes(1)
+      })
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${SUPABASE_URL}/functions/v1/speak`,
+        expect.objectContaining({
+          body: JSON.stringify({ text: 'First sentence.', voice: 'nova' }),
+        })
+      )
+      expect(mockAudioInstance.play).toHaveBeenCalled()
+      expect(result.current.isSpeaking).toBe(true)
+    })
+
+    it('plays sentences sequentially: second sentence starts after first ends', async () => {
+      const audioBlob = new Blob(['mock audio'], { type: 'audio/mpeg' })
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        blob: async () => audioBlob,
+      } as Response)
+
+      // Track a second mock audio instance for the second sentence
+      let secondAudioInstance: typeof mockAudioInstance
+      let callCount = 0
+      global.Audio = vi.fn(() => {
+        callCount++
+        if (callCount === 1) return mockAudioInstance
+        secondAudioInstance = {
+          play: vi.fn().mockResolvedValue(undefined),
+          pause: vi.fn(),
+          src: '',
+          currentTime: 0,
+          onended: null,
+          onerror: null,
+        }
+        return secondAudioInstance
+      }) as unknown as typeof Audio
+
+      const { result } = renderHook(() => useVoiceOutput())
+
+      act(() => {
+        result.current.speakSentence('First sentence.')
+        result.current.speakSentence('Second sentence.')
+      })
+
+      // Wait for the first fetch and play
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+      expect(mockAudioInstance.play).toHaveBeenCalledTimes(1)
+
+      // Second sentence should not have been fetched yet
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+
+      // Simulate first audio ending — should drain queue and fetch second sentence
+      await act(async () => {
+        mockAudioInstance.onended?.()
+      })
+
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2))
+      expect(secondAudioInstance!.play).toHaveBeenCalledTimes(1)
+      expect(result.current.isSpeaking).toBe(true)
+    })
+
+    it('sets isSpeaking to false when queue is exhausted', async () => {
+      const audioBlob = new Blob(['mock audio'], { type: 'audio/mpeg' })
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        blob: async () => audioBlob,
+      } as Response)
+
+      const { result } = renderHook(() => useVoiceOutput())
+
+      act(() => {
+        result.current.speakSentence('Only sentence.')
+      })
+
+      await waitFor(() => expect(mockAudioInstance.play).toHaveBeenCalled())
+      expect(result.current.isSpeaking).toBe(true)
+
+      // Simulate audio ending with empty queue
+      await act(async () => {
+        mockAudioInstance.onended?.()
+      })
+
+      await waitFor(() => expect(result.current.isSpeaking).toBe(false))
+    })
+
+    it('stop() aborts all queued sentences and clears isSpeaking', async () => {
+      // Make fetch hang so we can test stop() during a pending fetch
+      let rejectFetch: (reason: unknown) => void
+      vi.mocked(global.fetch).mockImplementation(
+        () =>
+          new Promise((_, reject) => {
+            rejectFetch = reject
+          })
+      )
+
+      const { result } = renderHook(() => useVoiceOutput())
+
+      act(() => {
+        result.current.speakSentence('Sentence one.')
+        result.current.speakSentence('Sentence two.')
+        result.current.speakSentence('Sentence three.')
+      })
+
+      // Wait for fetch to be called for the first sentence
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+
+      // stop() should abort all controllers and clear the queue
+      act(() => {
+        result.current.stop()
+      })
+
+      // Simulate the abort error from fetch
+      await act(async () => {
+        rejectFetch(new DOMException('Aborted', 'AbortError'))
+      })
+
+      expect(result.current.isSpeaking).toBe(false)
+      // Only one fetch should have been made (the queued ones were cancelled before fetching)
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('continues queue after a single sentence fetch error', async () => {
+      const audioBlob = new Blob(['mock audio'], { type: 'audio/mpeg' })
+      vi.mocked(global.fetch)
+        .mockResolvedValueOnce({
+          ok: false,
+          text: async () => 'TTS error',
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          blob: async () => audioBlob,
+        } as Response)
+
+      const { result } = renderHook(() =>
+        useVoiceOutput({ onError: mockOnError })
+      )
+
+      act(() => {
+        result.current.speakSentence('Failing sentence.')
+        result.current.speakSentence('Succeeding sentence.')
+      })
+
+      // First fetch fails, second should succeed
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2))
+      await waitFor(() => expect(mockAudioInstance.play).toHaveBeenCalledTimes(1))
+
+      // Error callback was fired for the failed sentence
+      expect(mockOnError).toHaveBeenCalledTimes(1)
+      expect(mockOnError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining('Speech synthesis failed') })
+      )
+    })
+
+    it('continues queue after audio playback error', async () => {
+      const audioBlob = new Blob(['mock audio'], { type: 'audio/mpeg' })
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        blob: async () => audioBlob,
+      } as Response)
+
+      let secondAudioInstance: typeof mockAudioInstance
+      let callCount = 0
+      global.Audio = vi.fn(() => {
+        callCount++
+        if (callCount === 1) return mockAudioInstance
+        secondAudioInstance = {
+          play: vi.fn().mockResolvedValue(undefined),
+          pause: vi.fn(),
+          src: '',
+          currentTime: 0,
+          onended: null,
+          onerror: null,
+        }
+        return secondAudioInstance
+      }) as unknown as typeof Audio
+
+      const { result } = renderHook(() =>
+        useVoiceOutput({ onError: mockOnError })
+      )
+
+      act(() => {
+        result.current.speakSentence('First sentence.')
+        result.current.speakSentence('Second sentence.')
+      })
+
+      await waitFor(() => expect(mockAudioInstance.play).toHaveBeenCalled())
+
+      // Simulate audio error on first sentence
+      await act(async () => {
+        mockAudioInstance.onerror?.()
+      })
+
+      // Second sentence should still play
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2))
+      expect(secondAudioInstance!.play).toHaveBeenCalled()
+      expect(mockOnError).toHaveBeenCalledTimes(1)
+    })
+
+    it('enqueues while playing: second call does not start a second drain', async () => {
+      const audioBlob = new Blob(['mock audio'], { type: 'audio/mpeg' })
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        blob: async () => audioBlob,
+      } as Response)
+
+      const { result } = renderHook(() => useVoiceOutput())
+
+      act(() => {
+        result.current.speakSentence('First.')
+      })
+
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+
+      // First sentence is now "playing" (isPlayingRef = true)
+      // Enqueue a second sentence while playing — should NOT trigger another drainQueue
+      act(() => {
+        result.current.speakSentence('Second.')
+      })
+
+      // Still only one fetch (second not started yet)
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+
+      // Now finish first sentence
+      await act(async () => {
+        mockAudioInstance.onended?.()
+      })
+
+      // Second sentence now fetched
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2))
+    })
+  })
 })
